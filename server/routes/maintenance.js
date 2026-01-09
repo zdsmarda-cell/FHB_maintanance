@@ -7,9 +7,13 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM maintenances');
+        // Updated query to include count of generated requests
+        const [rows] = await pool.query(`
+            SELECT m.*, (SELECT COUNT(*) FROM requests r WHERE r.maintenance_id = m.id) as request_count 
+            FROM maintenances m
+        `);
+        
         // Parse JSON fields and map DB columns (snake_case) to Frontend Model (camelCase)
-        // This fixes the "Unknown" tech issue and empty edit forms
         const parsed = rows.map(r => ({
             id: r.id,
             techId: r.tech_id,
@@ -21,7 +25,9 @@ router.get('/', async (req, res) => {
             isActive: !!r.is_active,
             supplierId: r.supplier_id,
             lastGeneratedDate: r.last_generated_at,
-            type: r.type
+            createdAt: r.created_at,
+            type: r.type,
+            generatedRequestCount: r.request_count || 0
         }));
         res.json(parsed);
     } catch (err) {

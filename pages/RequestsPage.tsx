@@ -10,7 +10,7 @@ import { Modal, Pagination, ConfirmModal, AlertModal } from '../components/Share
 import { ApprovalModal } from '../components/requests/modals/ApprovalModal';
 import { AssignModal } from '../components/requests/modals/AssignModal';
 import { UnassignModal } from '../components/requests/modals/UnassignModal';
-import { Plus, Printer, Loader } from 'lucide-react';
+import { Plus, Printer, Loader, FilterX } from 'lucide-react';
 import { generateWorkListPDF } from '../lib/pdf';
 
 interface RequestsPageProps {
@@ -45,6 +45,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
     const [fApproved, setFApproved] = useState('all');
+    const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null); // New Maintenance Filter
 
     // --- Data Fetching ---
     const refresh = async () => {
@@ -109,6 +110,12 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             if (initialFilters.supplierId) {
                 setFSupplierIds([initialFilters.supplierId]);
             }
+            if (initialFilters.maintenanceId) {
+                setFMaintenanceId(initialFilters.maintenanceId);
+            }
+            if (initialFilters.techId) {
+                setFTechIds([initialFilters.techId]);
+            }
         }
     }, [initialFilters]);
 
@@ -166,9 +173,12 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             if (fApproved === 'yes' && !req.isApproved) return false;
             if (fApproved === 'no' && req.isApproved) return false;
 
+            // 9. Maintenance ID Filter
+            if (fMaintenanceId && req.maintenanceId !== fMaintenanceId) return false;
+
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId]);
 
 
     // Modals
@@ -533,7 +543,18 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         return (
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-slate-800">{t('menu.requests')}</h2>
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-bold text-slate-800">{t('menu.requests')}</h2>
+                        {fMaintenanceId && (
+                            <button 
+                                onClick={() => setFMaintenanceId(null)}
+                                className="flex items-center gap-1 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full hover:bg-purple-200"
+                                title="Zrušit filtr šablony údržby"
+                            >
+                                <FilterX className="w-3 h-3" /> Filtrováno dle údržby
+                            </button>
+                        )}
+                    </div>
                     <div className="flex gap-2">
                         <button 
                             onClick={handleExportPDF}

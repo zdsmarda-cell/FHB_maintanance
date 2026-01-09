@@ -3,10 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash } from 'lucide-react';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List } from 'lucide-react';
 import { Modal, ConfirmModal } from '../components/Shared';
 
-export const MaintenancePage = ({ user }: { user: User }) => {
+interface MaintenancePageProps {
+    user: User;
+    onNavigate: (page: string, params?: any) => void;
+}
+
+export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     const { t } = useI18n();
     
     // --- Data States ---
@@ -93,10 +98,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
 
             if (isMock) {
-                // Mock delete logic would go here if db.maintenances had delete, 
-                // but currently seedData doesn't expose strict delete for maintenances easily in db object 
-                // unless we add it. Assuming db.maintenances has delete or we simulated it.
-                // For now, let's just refresh.
                 const current = db.maintenances.list().filter(x => x.id !== selectedTemplate.id);
                 localStorage.setItem('tmp_maintenances', JSON.stringify(current));
             } else {
@@ -111,6 +112,37 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Calculate Next Run Logic (mirrors worker logic)
+    const calculateNextRun = (m: Maintenance) => {
+        if (!m.isActive) return null;
+        
+        const baseDateStr = m.lastGeneratedDate || m.createdAt;
+        const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
+        baseDate.setHours(0,0,0,0);
+
+        // Theoretical next date
+        const nextDate = new Date(baseDate);
+        nextDate.setDate(baseDate.getDate() + m.interval);
+
+        // Check allowed days
+        let targetDate = new Date(nextDate);
+        let safetyCounter = 0;
+        const allowedDays = m.allowedDays || [];
+
+        // If no allowed days specified, assume all? Usually defaults to [1..5]
+        if (allowedDays.length === 0) return targetDate;
+
+        while (safetyCounter < 30) {
+            const day = targetDate.getDay();
+            if (allowedDays.includes(day)) {
+                return targetDate;
+            }
+            targetDate.setDate(targetDate.getDate() + 1);
+            safetyCounter++;
+        }
+        return targetDate;
     };
 
     // Filter Logic
@@ -242,6 +274,8 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         
         const canEditMaint = user.role !== 'operator';
         const dayNames = selectedTemplate.allowedDays.sort().map(d => t(`day.${d}`)).join(', ');
+        
+        const nextRun = calculateNextRun(selectedTemplate);
 
         return (
             <div className="space-y-6">
@@ -274,16 +308,31 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                 {renderActiveBadge(selectedTemplate.isActive)}
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4 text-sm mt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-6">
                                 <div><span className="text-slate-500 block">{t('form.interval')}</span> {selectedTemplate.interval} {t('common.days')}</div>
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
                                 <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? supplier.name : <span className="text-slate-400 italic">Interní řešení</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
-                                {selectedTemplate.lastGeneratedDate && (
-                                    <div><span className="text-slate-500 block">Poslední generování</span> {new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString()}</div>
-                                )}
+                                <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate ? new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString() : '-'}</div>
+                                <div>
+                                    <span className="text-slate-500 block">Příští generování</span>
+                                    <span className="font-bold text-slate-800 flex items-center gap-2">
+                                        {nextRun ? nextRun.toLocaleDateString() : 'Neaktivní'}
+                                        {nextRun && nextRun <= new Date() && <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 rounded">Dnes/Zítra</span>}
+                                    </span>
+                                </div>
                             </div>
                             
+                            <div className="mt-4 border-t pt-4">
+                                <button 
+                                    onClick={() => onNavigate('requests', { maintenanceId: selectedTemplate.id })}
+                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-2 rounded transition-colors w-full md:w-auto justify-center"
+                                >
+                                    <List className="w-4 h-4" /> 
+                                    Zobrazit {selectedTemplate.generatedRequestCount} vygenerovaných požadavků
+                                </button>
+                            </div>
+
                             <div className="mt-6">
                                 <h4 className="font-bold text-sm text-slate-700 mb-2">{t('form.description')}</h4>
                                 <p className="text-slate-600 bg-slate-50 p-3 rounded">{selectedTemplate.description || '-'}</p>
@@ -375,6 +424,8 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                 <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
                                 <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
+                                <th className="px-4 py-3 whitespace-nowrap">Generování</th>
+                                <th className="px-4 py-3 whitespace-nowrap">{t('col.open_requests')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
@@ -382,19 +433,35 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         </thead>
                         <tbody>
                             {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                                <tr><td colSpan={8} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
                                     const supplier = suppliers.find(s => s.id === m.supplierId);
                                     const responsibleNames = m.responsiblePersonIds
                                         ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                                    const nextRun = calculateNextRun(m);
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
                                             <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Neznámá technologie'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {nextRun ? nextRun.toLocaleDateString() : '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-center">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); onNavigate('requests', { maintenanceId: m.id }); }}
+                                                    className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-xs font-medium border border-blue-100"
+                                                    title="Zobrazit požadavky"
+                                                >
+                                                    <List className="w-3 h-3 mr-1" /> {m.generatedRequestCount || 0}
+                                                </button>
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{supplier?.name || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>

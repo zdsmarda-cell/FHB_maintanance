@@ -27,7 +27,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any) {
@@ -491,7 +491,7 @@ const App = () => {
       case 'suppliers': return <SuppliersPage onNavigate={handleNavigate} />;
       case 'tech_config': return <TechConfigPage onNavigate={handleNavigate} />;
       case 'requests': return <RequestsPage user={user} initialFilters={pageParams} />;
-      case 'maintenance': return <MaintenancePage user={user} />;
+      case 'maintenance': return <MaintenancePage user={user} onNavigate={handleNavigate} />;
       case 'calendar': return <CalendarPage user={user} onNavigate={handleNavigate} />;
       case 'users': return <UsersPage onNavigate={handleNavigate} />;
       case 'settings': return <SettingsPage />;
