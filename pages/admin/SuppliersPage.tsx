@@ -19,7 +19,7 @@ export const SuppliersPage = () => {
     const [confirmDelete, setConfirmDelete] = useState<{show: boolean, type: 'supplier'|'contact', id: string, supId?: string}>({ show: false, type: 'supplier', id: '' });
     
     const emptyAddress: Address = { street: '', number: '', zip: '', city: '', country: 'SK' };
-    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, isVisible: true });
+    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
     const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', position: '' });
     
     const [errors, setErrors] = useState<Record<string, string>>({});

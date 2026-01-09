@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Component, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; 
@@ -21,14 +20,16 @@ import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server, L
 
 // --- Error Boundary Component ---
 interface ErrorBoundaryProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 interface ErrorBoundaryState {
   hasError: boolean;
   error: any;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
