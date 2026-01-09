@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode, Component } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; 
 import { Layout } from './components/Layout';
@@ -27,11 +27,8 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -109,6 +106,24 @@ const App = () => {
   const [generatedLink, setGeneratedLink] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // --- Session Restoration (Fix for logout on refresh) ---
+  useEffect(() => {
+      const storedToken = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('auth_user');
+      
+      if (storedToken && storedUser) {
+          try {
+              const parsedUser = JSON.parse(storedUser);
+              setUser(parsedUser);
+              console.log('Session restored for:', parsedUser.email);
+          } catch (e) {
+              console.error('Failed to restore session:', e);
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+          }
+      }
+  }, []);
+
   // Check URL for Reset Token
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -148,19 +163,16 @@ const App = () => {
             await new Promise(resolve => setTimeout(resolve, 600)); 
 
             const mockUsers = db.users.list();
-            // In mock mode, we just check email existence for simplicity, 
-            // or match specific hardcoded passwords if you prefer.
             const found = mockUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
 
             if (found && found.isBlocked) {
                 setAuthError("Tento uživatel má zablokovaný přístup.");
             } else if (found) {
-                // Check password (simple check for demo)
-                // Assuming 'password' or '1234' or empty for demo convenience
                 if (found.password && found.password !== loginPassword && loginPassword !== 'password') {
                      setAuthError("Neplatné heslo (Demo: použijte 'password').");
                 } else {
                     localStorage.setItem('auth_token', 'mock-token-' + found.id);
+                    localStorage.setItem('auth_user', JSON.stringify(found)); // Store User for persistence
                     setUser(found);
                     setPage('dashboard');
                 }
@@ -186,6 +198,7 @@ const App = () => {
             if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('auth_user', JSON.stringify(data.user)); // Store User for persistence
                 setUser(data.user);
                 setPage('dashboard');
             } else {
@@ -286,6 +299,7 @@ const App = () => {
       setLoginEmail('');
       setLoginPassword('');
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user'); // Clear stored user
   }
 
   if (!user) {

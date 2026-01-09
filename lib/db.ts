@@ -16,15 +16,19 @@ export const api = {
     
     get: async (endpoint: string) => {
         const token = localStorage.getItem('auth_token');
+        if (!token) throw new Error('API Error: No access token found. Please login again.');
+        
         const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
 
     post: async (endpoint: string, body: any) => {
         const token = localStorage.getItem('auth_token');
+        if (!token) throw new Error('API Error: No access token found. Please login again.');
+
         const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
             method: 'POST',
             headers: { 
@@ -33,12 +37,17 @@ export const api = {
             },
             body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) {
+            const errorBody = await res.text();
+            throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorBody}`);
+        }
         return res.json();
     },
     
     put: async (endpoint: string, body: any) => {
         const token = localStorage.getItem('auth_token');
+        if (!token) throw new Error('API Error: No access token found. Please login again.');
+
         const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
             method: 'PUT',
             headers: { 
@@ -47,19 +56,21 @@ export const api = {
             },
             body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
 
     delete: async (endpoint: string) => {
         const token = localStorage.getItem('auth_token');
+        if (!token) throw new Error('API Error: No access token found. Please login again.');
+
         const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
             method: 'DELETE',
             headers: { 
                 'Authorization': `Bearer ${token}`
             }
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
         return res.json();
     }
 };
