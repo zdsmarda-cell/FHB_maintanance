@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import './index.css'; // Import global styles (Tailwind)
+import './index.css'; 
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { LocationsPage } from './pages/admin/LocationsPage';
@@ -18,55 +18,40 @@ import { CalendarPage } from './pages/CalendarPage';
 import { seedData, db } from './lib/db';
 import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
-import { ServerOff, KeyRound, Mail, AlertTriangle, CheckCircle, ArrowLeft, Loader, Database } from 'lucide-react';
+import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database } from 'lucide-react';
 
-// Runtime check for Localhost (This ensures Preview Mode works even if NODE_ENV is production)
+// --- Environment Detection ---
+
+// 1. Check if running on localhost (Browser Runtime Check)
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
     window.location.hostname === '127.0.0.1' || 
     window.location.hostname === '0.0.0.0'
 );
 
-// Define API Base URL based on environment safely
-let API_BASE = '';
-let isEnvDev = false;
+// 2. Vite Environment Variables
+// import.meta.env.DEV is replaced at build time. 
+// In 'npm run build' -> 'npm run preview', DEV is false, PROD is true.
+const isViteDev = import.meta.env.DEV;
 
-try {
-    // @ts-ignore
-    const env = import.meta.env;
-    // @ts-ignore
-    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
-    // @ts-ignore
-    isEnvDev = env.DEV;
-} catch (e) {
-    // Silent catch
-}
+// 3. Determine if we should show Demo/Mock controls
+// Show if we are in actual Dev mode OR if we are running a Prod build on Localhost (Preview)
+const showDemoControls = isViteDev || isLocalhost;
 
-// Fallback API if env failed but we are local
-if (isLocalhost && !API_BASE) {
-    API_BASE = 'https://fhbmain.impossible.cz:3010';
-}
-
-// Combine checks: True if Vite says DEV OR if we are on localhost (fixes Preview mode)
-// The OR operator ensures that even if 'isEnvDev' is false (in preview), 'isLocalhost' keeps it true.
-const isDevMode = isEnvDev || isLocalhost;
-
-// Maintenance Page Component (DB Error)
-const MaintenanceErrorPage = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-600">
-        <ServerOff className="w-16 h-16 mb-4 text-slate-400" />
-        <h1 className="text-2xl font-bold text-slate-800">Systém v údržbě</h1>
-        <p className="mt-2 text-center max-w-md">
-            Omlouváme se, ale systém je momentálně nedostupný z důvodu údržby nebo výpadku spojení se serverem. Zkuste to prosím později.
-        </p>
-    </div>
-);
+// 4. API Configuration
+// Use env var if present, otherwise fallback to production URL only if NOT in demo mode preference
+const ENV_API_URL = import.meta.env.VITE_API_URL;
+// Default production URL
+const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
 const App = () => {
   const { t } = useI18n();
   
-  // Initialize Mock Data if explicitly requested or in DEV/Localhost
-  const [useMockData, setUseMockData] = useState(isDevMode);
+  // Default to Mock Data if we are in Dev or Preview (Localhost), unless manually turned off
+  const [useMockData, setUseMockData] = useState(showDemoControls);
+
+  // Computed API Base
+  const apiBase = useMockData ? '' : (ENV_API_URL || PROD_API_URL);
 
   useEffect(() => {
     if (useMockData) {
@@ -94,7 +79,6 @@ const App = () => {
     const token = params.get('resetToken');
     if (token) {
         setResetToken(token);
-        // Validate token (Local logic only for demo/dev, usually API would handle this too)
         const isValid = db.auth.validateToken(token);
         if (isValid) {
             setAuthView('reset');
@@ -102,17 +86,14 @@ const App = () => {
             setAuthView('login');
             setAuthError(t('auth.token_invalid'));
         }
-        // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [t]);
   
-  // Strict Login Handling
   const handleLogin = async (role: User['role']) => {
     setAuthError(null);
     setIsLoggingIn(true);
 
-    // Hardcoded credentials for Demo Buttons (Mapping roles to seed emails)
     let email = '';
     let password = 'password'; 
 
@@ -122,19 +103,17 @@ const App = () => {
 
     try {
         if (useMockData) {
-            // --- DEMO / MOCK DATA MODE ---
-            console.log('Using Local Storage Login (Demo Mode)');
-            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate tiny delay
+            // --- DEMO / MOCK MODE ---
+            console.log('Logging in via Mock Data...');
+            await new Promise(resolve => setTimeout(resolve, 500)); 
 
             const mockUsers = db.users.list();
             let found = mockUsers.find(u => u.email === email);
-            // Fallback for role button click if email not found exactly
             if (!found) found = mockUsers.find(u => u.role === role);
 
             if (found && found.isBlocked) {
                 setAuthError("Tento uživatel má zablokovaný přístup.");
             } else if (found) {
-                // Set a mock token so other components know we are logged in, but with mock
                 localStorage.setItem('auth_token', 'mock-token-' + found.id);
                 setUser(found);
                 setPage('dashboard');
@@ -143,13 +122,12 @@ const App = () => {
             }
 
         } else {
-            // --- PRODUCTION (API ONLY) ---
+            // --- API MODE ---
+            console.log(`Connecting to API: ${apiBase}`);
             const controller = new AbortController();
-            // Short timeout (5s) for production connection
             const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
-            // Use configured API_BASE
-            const response = await fetch(`${API_BASE}/api/auth/login`, {
+            const response = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -172,9 +150,9 @@ const App = () => {
     } catch (err: any) {
         console.error('Login error:', err);
         if (err.name === 'AbortError') {
-            setAuthError("Server neodpovídá (Timeout). Zkontrolujte připojení nebo zkuste Demo režim.");
+            setAuthError("Server neodpovídá (Timeout).");
         } else {
-            setAuthError("Nepodařilo se připojit k serveru. Zkuste Demo režim.");
+            setAuthError("Nepodařilo se připojit k serveru.");
         }
     } finally {
         setIsLoggingIn(false);
@@ -183,6 +161,7 @@ const App = () => {
 
   const handleSendLink = () => {
       setAuthError(null);
+      // Logic mostly for demo, in prod backend handles this
       const token = db.auth.createResetToken(resetEmail);
       if (token) {
           const link = `${window.location.origin}${window.location.pathname}?resetToken=${token}`;
@@ -195,7 +174,6 @@ const App = () => {
 
   const handleResetPassword = () => {
       if (!resetToken || !newPassword) return;
-      
       const success = db.auth.resetPassword(resetToken, newPassword);
       if (success) {
           setAuthSuccess(t('auth.reset_success'));
@@ -224,7 +202,7 @@ const App = () => {
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
           <div className="mb-4 text-xs font-mono text-slate-400">
-              Build: {isDevMode ? 'DEV/PREVIEW' : 'PROD'}
+              Verze: {import.meta.env.PROD ? 'PROD' : 'DEV'} | {useMockData ? 'MOCK' : 'API'}
           </div>
 
           {authSuccess && (
@@ -255,22 +233,27 @@ const App = () => {
                     </button>
                 </div>
 
-                {isDevMode && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col items-center">
-                        <label className="flex items-center text-sm text-slate-500 cursor-pointer hover:text-slate-700">
+                {showDemoControls && (
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col items-center">
+                        <label className="flex items-center text-sm text-slate-600 cursor-pointer hover:text-slate-900 bg-slate-50 px-3 py-2 rounded border border-slate-200 w-full justify-center">
                             <input 
                                 type="checkbox" 
-                                className="mr-2 rounded" 
+                                className="mr-2 rounded accent-blue-600" 
                                 checked={useMockData} 
                                 onChange={(e) => setUseMockData(e.target.checked)} 
                             />
-                            <Database className="w-4 h-4 mr-1" />
-                            Demo režim (lokální data)
+                            <Database className="w-4 h-4 mr-2 text-slate-500" />
+                            <span>Demo režim (lokální data)</span>
                         </label>
+                        {!useMockData && (
+                            <p className="text-[10px] text-slate-400 mt-1">
+                                API: {apiBase}
+                            </p>
+                        )}
                     </div>
                 )}
 
-                <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="mt-4 pt-2">
                     <button 
                         onClick={() => { setAuthView('forgot'); setAuthError(null); setAuthSuccess(null); }} 
                         className="text-sm text-slate-500 hover:text-blue-600 flex items-center justify-center w-full"
