@@ -22,32 +22,30 @@ import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database } from 'lu
 
 // --- Environment Detection ---
 
-// 1. Check if running on localhost (Browser Runtime Check)
+// 1. Runtime check for Localhost (Works in browser regardless of build mode)
+// This captures 'npm run dev' AND 'npm run preview'
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
     window.location.hostname === '127.0.0.1' || 
     window.location.hostname === '0.0.0.0'
 );
 
-// 2. Vite Environment Variables
-// import.meta.env.DEV is replaced at build time. 
-// In 'npm run build' -> 'npm run preview', DEV is false, PROD is true.
-const isViteDev = import.meta.env.DEV;
+// 2. Determine if we should show Demo/Mock controls
+// If we are on localhost, default to showing demo controls
+const showDemoControls = isLocalhost;
 
-// 3. Determine if we should show Demo/Mock controls
-// Show if we are in actual Dev mode OR if we are running a Prod build on Localhost (Preview)
-const showDemoControls = isViteDev || isLocalhost;
-
-// 4. API Configuration
-// Use env var if present, otherwise fallback to production URL only if NOT in demo mode preference
-const ENV_API_URL = import.meta.env.VITE_API_URL;
-// Default production URL
+// 3. API URL
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
+
+// Safely access env var if replaced by Vite, otherwise fallback
+const ENV_API_URL = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL 
+    ? import.meta.env.VITE_API_URL 
+    : '';
 
 const App = () => {
   const { t } = useI18n();
   
-  // Default to Mock Data if we are in Dev or Preview (Localhost), unless manually turned off
+  // Default to Mock Data if we are on Localhost (Dev or Preview), unless manually turned off
   const [useMockData, setUseMockData] = useState(showDemoControls);
 
   // Computed API Base
@@ -202,7 +200,7 @@ const App = () => {
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
           <div className="mb-4 text-xs font-mono text-slate-400">
-              Verze: {import.meta.env.PROD ? 'PROD' : 'DEV'} | {useMockData ? 'MOCK' : 'API'}
+              Režim: {isLocalhost ? 'Local/Preview' : 'Production'} | {useMockData ? 'MOCK DATA' : 'LIVE API'}
           </div>
 
           {authSuccess && (

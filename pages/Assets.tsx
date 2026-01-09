@@ -7,34 +7,27 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw } from 'lucide-react';
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
-// Runtime check for Localhost (Preview Mode Support)
+// --- Environment Detection ---
+// Check localhost
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
     window.location.hostname === '127.0.0.1' || 
     window.location.hostname === '0.0.0.0'
 );
 
-// API Base URL - Safe Access
-let API_BASE = '';
-let isEnvDev = false;
-try {
-    // @ts-ignore
-    const env = import.meta.env;
-    // @ts-ignore
-    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
-    // @ts-ignore
-    isEnvDev = env.DEV;
-} catch {
-    // Silent fallback
-}
+// Get Prod URL
+const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
-// Fallback API
-if (isLocalhost && !API_BASE) {
-    API_BASE = 'https://fhbmain.impossible.cz:3010';
+// Determine API Base
+// If localhost, use Mock (empty string) or if manually configured otherwise.
+// Ideally, this should come from Context, but for this file-scoped fix:
+// If it's localhost, we default to believing we are in Dev/Preview mode (using mock logic inside component or db.ts)
+// However, the upload logic below needs a real URL if we are *not* using mock.
+let API_BASE = PROD_API_URL;
+if (isLocalhost) {
+    // In Preview/Localhost, we assume the API is either local 3000 or mocked.
+    // If the main App state (from index.tsx) is using Mock Data, the token will be 'mock-token-...'.
 }
-
-// Robust Dev Mode Check
-const isDevMode = isEnvDev || isLocalhost;
 
 interface AssetsPageProps {
   user: User;
@@ -88,9 +81,10 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             setIsUploading(true);
             try {
                 const token = localStorage.getItem('auth_token');
-                const isMockToken = token?.startsWith('mock-token-');
+                const isMockToken = !token || token.startsWith('mock-token-');
 
-                if (isDevMode || isMockToken) {
+                // Allow upload simulation in Localhost/Preview/Dev if using mock token
+                if (isMockToken) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         const newPhotos = [...(data.photoUrls || []), reader.result as string];
@@ -99,6 +93,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
                     };
                     reader.readAsDataURL(file);
                 } else {
+                    // Production / Real API
                     const formData = new FormData();
                     formData.append('image', file);
                     

@@ -8,16 +8,13 @@ import { RefreshCcw, Check, AlertTriangle, Clock, Mail } from 'lucide-react';
 import { Pagination } from '../../components/Shared';
 
 // API Base URL - Safe Access
-let API_BASE = '';
-try {
-    // @ts-ignore
-    const env = import.meta.env;
-    // @ts-ignore
-    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
-} catch {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.hostname !== '0.0.0.0') {
-        API_BASE = 'https://fhbmain.impossible.cz:3010';
-    }
+const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
+let API_BASE = PROD_API_URL;
+
+// Simple localhost check
+if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
+    // In local/preview, use Mock API unless specifically configured otherwise via env var (handled by main App logic usually)
+    // Here we just initialize the var to PROD, but the request logic checks auth token type
 }
 
 export const EmailsPage = () => {
