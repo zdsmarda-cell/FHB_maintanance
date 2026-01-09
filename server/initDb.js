@@ -184,6 +184,16 @@ export const initDb = async () => {
       )
     `);
 
+    // 10. Password Resets
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        email VARCHAR(255) NOT NULL,
+        token VARCHAR(255) NOT NULL PRIMARY KEY,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Default Admin
     const adminEmail = 'zdenek.smarda@fhb.sk';
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [adminEmail]);

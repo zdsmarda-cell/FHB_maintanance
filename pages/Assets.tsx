@@ -15,14 +15,31 @@ interface AssetsPageProps {
   initialFilters?: any;
 }
 
-const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers }: any) => {
+const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers, locations }: any) => {
     const { t } = useI18n();
     const [data, setData] = useState<Partial<Technology>>(initialData || {
         name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
         installDate: '', weight: undefined, description: '', sharepointLink: '', photoUrls: [], isVisible: true
     });
+    
+    // State for Location Filter
+    const [selectedLocId, setSelectedLocId] = useState('');
+
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
+
+    // Initialize Location based on existing Workplace
+    useEffect(() => {
+        if (initialData && initialData.workplaceId && !selectedLocId) {
+            const wp = workplaces.find((w: any) => w.id === initialData.workplaceId);
+            if (wp) setSelectedLocId(wp.locationId);
+        }
+    }, [initialData, workplaces]);
+
+    // Filter workplaces based on selected Location
+    const filteredWorkplaces = selectedLocId 
+        ? workplaces.filter((w: any) => w.locationId === selectedLocId)
+        : workplaces;
 
     const validate = () => {
         const errs: Record<string, string> = {};
@@ -104,21 +121,45 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                         </select>
                      </div>
                 </div>
-                {/* ... other fields similarly populated with props ... */}
+                
+                {/* Location & Workplace */}
                 <div className="grid grid-cols-2 gap-4">
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
-                        <select className={`w-full border p-2 rounded ${errors.workplaceId ? 'border-red-500' : ''}`} value={data.workplaceId} onChange={e => setData({...data, workplaceId: e.target.value})}>
-                            <option value="">-</option>
-                            {workplaces.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')}</label>
+                        <select 
+                            className="w-full border p-2 rounded" 
+                            value={selectedLocId} 
+                            onChange={e => { setSelectedLocId(e.target.value); setData({...data, workplaceId: ''}); }}
+                        >
+                            <option value="">-- {t('common.all')} --</option>
+                            {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
                         </select>
                      </div>
+                     <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
+                        <select 
+                            className={`w-full border p-2 rounded ${errors.workplaceId ? 'border-red-500' : ''}`} 
+                            value={data.workplaceId} 
+                            onChange={e => setData({...data, workplaceId: e.target.value})}
+                            disabled={!selectedLocId && filteredWorkplaces.length > 20} // Optional UX improvement
+                        >
+                            <option value="">-</option>
+                            {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </select>
+                     </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')}</label>
                         <select className="w-full border p-2 rounded" value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                             <option value="">-</option>
                             {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
+                     </div>
+                     <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.install_date')}</label>
+                        <input type="date" className="w-full border p-2 rounded" value={data.installDate || ''} onChange={e => setData({...data, installDate: e.target.value})} />
                      </div>
                 </div>
                 <div>
@@ -353,7 +394,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                 {filtered.length > 0 && <Pagination currentPage={currentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} onPageChange={setCurrentPage} onItemsPerPageChange={setItemsPerPage} />}
             </div>
 
-            {isModalOpen && <AssetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingAsset} onSave={handleSave} techTypes={techTypes} techStates={techStates} workplaces={workplaces} suppliers={suppliers} />}
+            {isModalOpen && <AssetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingAsset} onSave={handleSave} techTypes={techTypes} techStates={techStates} workplaces={workplaces} suppliers={suppliers} locations={locations} />}
         </div>
     );
 };

@@ -13,7 +13,7 @@ import { AssetsPage } from './pages/Assets';
 import { RequestsPage } from './pages/RequestsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { CalendarPage } from './pages/CalendarPage';
-import { seedData, db } from './lib/db';
+import { seedData, db, api } from './lib/db';
 import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server, Lock, User as UserIcon } from 'lucide-react';
@@ -28,7 +28,10 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, error: null };
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -121,6 +124,7 @@ const App = () => {
                 setAuthError(t('auth.token_invalid'));
             }
         } else {
+             // In production we just show reset view and validate on submit
              setAuthView('reset'); 
         }
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -208,7 +212,7 @@ const App = () => {
       setLoginPassword('password');
   };
 
-  const handleSendLink = () => {
+  const handleSendLink = async () => {
       setAuthError(null);
       if (useMockData) {
           const token = db.auth.createResetToken(resetEmail);
@@ -220,11 +224,22 @@ const App = () => {
               setAuthError('Email v systému neexistuje.'); 
           }
       } else {
-          setAuthError("Reset hesla přes API není v tomto demu implementován.");
+          try {
+              setIsLoggingIn(true);
+              // Use API helper or direct fetch
+              const res = await api.post('/auth/forgot-password', { email: resetEmail });
+              setAuthView('link-sent');
+              // For prod, we don't show the link in UI, but the message says it was sent
+              setGeneratedLink('Odkaz byl odeslán na váš email.'); 
+          } catch(e) {
+              setAuthError("Chyba při odesílání požadavku.");
+          } finally {
+              setIsLoggingIn(false);
+          }
       }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
       if (!resetToken || !newPassword) return;
       
       if (useMockData) {
@@ -238,7 +253,18 @@ const App = () => {
               setAuthError(t('auth.token_invalid'));
           }
       } else {
-           setAuthError("Reset hesla přes API není v tomto demu implementován.");
+           try {
+               setIsLoggingIn(true);
+               await api.post('/auth/reset-password', { token: resetToken, password: newPassword });
+               setAuthSuccess(t('auth.reset_success'));
+               setAuthView('login');
+               setNewPassword('');
+               setResetToken(null);
+           } catch(e: any) {
+               setAuthError("Neplatný nebo expirovaný odkaz, nebo chyba serveru.");
+           } finally {
+               setIsLoggingIn(false);
+           }
       }
   };
   
@@ -376,8 +402,8 @@ const App = () => {
                         <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                     </div>
                 </div>
-                <button onClick={handleSendLink} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3">
-                    {t('auth.send_link')}
+                <button onClick={handleSendLink} disabled={isLoggingIn} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3 flex justify-center">
+                    {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : t('auth.send_link')}
                 </button>
                 <button onClick={() => setAuthView('login')} className="text-sm text-slate-500 hover:text-slate-800">
                     {t('common.cancel')}
@@ -395,7 +421,11 @@ const App = () => {
                   <p className="text-sm text-slate-600 mb-4 text-center">{t('auth.link_sent_msg')}</p>
                   
                   <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 break-all text-xs font-mono text-center">
-                      <a href={generatedLink} className="text-blue-600 hover:underline">{generatedLink}</a>
+                      {useMockData ? (
+                          <a href={generatedLink} className="text-blue-600 hover:underline">{generatedLink}</a>
+                      ) : (
+                          <span className="text-slate-600">{generatedLink}</span>
+                      )}
                   </div>
 
                   <button onClick={() => setAuthView('login')} className="w-full py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">
@@ -417,8 +447,8 @@ const App = () => {
                         onChange={e => setNewPassword(e.target.value)}
                     />
                 </div>
-                <button onClick={handleResetPassword} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3">
-                    {t('auth.reset_password')}
+                <button onClick={handleResetPassword} disabled={isLoggingIn} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3 flex justify-center">
+                    {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : t('auth.reset_password')}
                 </button>
                 <button onClick={() => { setAuthView('login'); setResetToken(null); }} className="text-sm text-slate-500 hover:text-slate-800">
                     {t('common.cancel')}
