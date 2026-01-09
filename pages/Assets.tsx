@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { Technology, User } from '../lib/types';
-import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw, Link as LinkIcon, Weight } from 'lucide-react';
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
@@ -19,7 +19,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
     const { t } = useI18n();
     const [data, setData] = useState<Partial<Technology>>(initialData || {
         name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
-        installDate: '', weight: undefined, description: '', sharepointLink: '', photoUrls: [], isVisible: true
+        installDate: '', weight: 0, description: '', sharepointLink: '', photoUrls: [], isVisible: true
     });
     
     // State for Location Filter
@@ -54,7 +54,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
     const handleSave = () => {
         if(validate()) {
             if (data.name && data.workplaceId) {
-                const finalData = { ...data, weight: data.weight || 0 };
+                // Ensure weight is number
+                const finalData = { ...data, weight: data.weight ? Number(data.weight) : 0 };
                 onSave(finalData as any);
             }
         }
@@ -162,6 +163,19 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                         <input type="date" className="w-full border p-2 rounded" value={data.installDate || ''} onChange={e => setData({...data, installDate: e.target.value})} />
                      </div>
                 </div>
+
+                {/* Weight & Sharepoint */}
+                <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><Weight className="w-3 h-3 mr-1"/> {t('form.weight')}</label>
+                        <input type="number" min="0" className="w-full border p-2 rounded" value={data.weight || ''} onChange={e => setData({...data, weight: Number(e.target.value)})} placeholder="kg" />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><LinkIcon className="w-3 h-3 mr-1"/> {t('form.documentation')}</label>
+                        <input type="text" className="w-full border p-2 rounded" value={data.sharepointLink || ''} onChange={e => setData({...data, sharepointLink: e.target.value})} placeholder="https://..." />
+                     </div>
+                </div>
+
                 <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.photos')}</label>
                     <div className="grid grid-cols-4 gap-2 mb-2">

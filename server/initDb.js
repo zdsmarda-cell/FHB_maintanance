@@ -152,6 +152,12 @@ const migrations = [
             // Safe add column if it was missing in some deployments
             `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS weight INT DEFAULT 0`
         ]
+    },
+    {
+        name: '003_add_sharepoint_link',
+        up: [
+            `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS sharepoint_link TEXT`
+        ]
     }
 ];
 
