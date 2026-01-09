@@ -488,7 +488,7 @@ const App = () => {
       case 'dashboard': return <Dashboard user={user} onNavigate={handleNavigate} />;
       case 'assets': return <AssetsPage user={user} onNavigate={handleNavigate} initialFilters={pageParams} />;
       case 'locations': return <LocationsPage onNavigate={handleNavigate} />;
-      case 'suppliers': return <SuppliersPage />;
+      case 'suppliers': return <SuppliersPage onNavigate={handleNavigate} />;
       case 'tech_config': return <TechConfigPage onNavigate={handleNavigate} />;
       case 'requests': return <RequestsPage user={user} initialFilters={pageParams} />;
       case 'maintenance': return <MaintenancePage user={user} />;

@@ -1,20 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../../lib/db';
-import { Edit, Trash, Plus, Loader } from 'lucide-react';
+import { Edit, Trash, Plus, Loader, Box, Search, X } from 'lucide-react';
 import { Address, Supplier } from '../../lib/types';
 import { AddressInput, Modal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
 import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
-export const SuppliersPage = () => {
+interface SuppliersPageProps {
+    onNavigate?: (page: string, params?: any) => void;
+}
+
+export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
     const { t, lang } = useI18n();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [assets, setAssets] = useState<any[]>([]); // To count assets per supplier
     const [contacts, setContacts] = useState<any[]>([]);
     const [viewContactsFor, setViewContactsFor] = useState<string | null>(null);
     const [editingSup, setEditingSup] = useState<any>(null);
+    
+    // Filter State
+    const [search, setSearch] = useState('');
     
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingContact, setEditingContact] = useState<any>(null);
@@ -29,21 +37,37 @@ export const SuppliersPage = () => {
 
     const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
 
-    // Fetch Suppliers
+    // Fetch Data
     const refresh = async () => {
         setLoading(true);
         try {
             if (isMock) {
                 setSuppliers(db.suppliers.list());
+                setAssets(db.technologies.list());
             } else {
-                const data = await api.get('/suppliers');
-                setSuppliers(data);
+                const [supData, assetData] = await Promise.all([
+                    api.get('/suppliers'),
+                    api.get('/technologies')
+                ]);
+                setSuppliers(supData);
+                setAssets(assetData);
             }
         } catch (e) { console.error(e); } 
         finally { setLoading(false); }
     };
 
     useEffect(() => { refresh(); }, []);
+
+    // Filter Logic
+    const filteredSuppliers = suppliers.filter(s => {
+        if (!search) return true;
+        const name = getLocalized(s.name, lang).toLowerCase();
+        return name.includes(search.toLowerCase()) || (s.ic && s.ic.includes(search));
+    });
+
+    const getAssetCount = (supplierId: string) => {
+        return assets.filter(a => a.supplierId === supplierId).length;
+    };
 
     // Fetch Contacts
     const loadContacts = async (supId: string) => {
@@ -173,53 +197,81 @@ export const SuppliersPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-slate-800">{t('menu.suppliers')}</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <h2 className="text-xl font-bold text-slate-800">{t('menu.suppliers')}</h2>
+                    <div className="relative flex-1 md:w-64">
+                        <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" />
+                        <input 
+                            className="w-full pl-8 p-1.5 border rounded text-sm bg-white" 
+                            placeholder={t('common.search')} 
+                            value={search} 
+                            onChange={e => setSearch(e.target.value)} 
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')} className="absolute right-2 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <button onClick={openCreateModal} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
                     <Plus className="w-4 h-4 mr-2" /> {t('headers.new_supplier')}
                 </button>
             </div>
 
             <div className="space-y-4">
-                {suppliers.map(s => (
-                    <div key={s.id} className="bg-white rounded border border-slate-200">
-                        <div className="p-4 flex justify-between items-start">
-                            <div>
-                                <div className="font-bold text-lg">{getLocalized(s.name, lang)}</div>
-                                <div className="text-sm text-slate-500">{s.address.street} {s.address.number}, {s.address.city}</div>
-                                <div className="text-xs text-slate-400 mt-1">{t('form.ic')}: {s.ic} | {t('form.phone')}: {s.phone}</div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => toggleContacts(s.id)} className="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm">{t('headers.contacts')}</button>
-                                <button onClick={() => { setErrors({}); startEditSup(s); }} className="text-blue-600 p-1"><Edit className="w-4 h-4"/></button>
-                            </div>
-                        </div>
-                        {viewContactsFor === s.id && (
-                            <div className="border-t bg-slate-50 p-4">
-                                <h5 className="font-bold text-xs text-slate-500 uppercase mb-2">{t('headers.contacts')}</h5>
-                                {contacts.map(c => (
-                                    <div key={c.id} className="flex justify-between items-center bg-white p-2 rounded mb-2 border border-slate-100 text-sm">
-                                        <div>
-                                            <span className="font-medium">{c.name}</span> <span className="text-slate-400">({c.position})</span>
-                                            <div className="text-xs text-slate-400">{c.email}, {c.phone}</div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { setContactErrors({}); setEditingContact(c); }} className="text-blue-600"><Edit className="w-3 h-3"/></button>
-                                            <button onClick={() => setConfirmDelete({ show: true, type: 'contact', id: c.id, supId: s.id })} className="text-red-500"><Trash className="w-3 h-3"/></button>
-                                        </div>
+                {filteredSuppliers.map(s => {
+                    const assetCount = getAssetCount(s.id);
+                    return (
+                        <div key={s.id} className="bg-white rounded border border-slate-200">
+                            <div className="p-4 flex flex-col md:flex-row justify-between items-start gap-4">
+                                <div>
+                                    <div className="font-bold text-lg flex items-center gap-2">
+                                        {getLocalized(s.name, lang)}
+                                        <button 
+                                            onClick={() => onNavigate && onNavigate('assets', { supplierId: s.id })}
+                                            className="text-xs bg-white border border-slate-300 text-slate-600 px-2 py-0.5 rounded-full hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 flex items-center transition-colors font-normal shadow-sm"
+                                            title="Zobrazit technologie dodavatele"
+                                        >
+                                            <Box className="w-3 h-3 mr-1" /> {assetCount}
+                                        </button>
                                     </div>
-                                ))}
-                                <div className="grid grid-cols-5 gap-2 mt-2 items-start">
-                                    <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
-                                    <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
-                                    <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
-                                    <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
-                                    <button onClick={() => addContact(s.id)} className="bg-blue-600 text-white rounded text-sm py-1">{t('common.add')}</button>
+                                    <div className="text-sm text-slate-500">{s.address.street} {s.address.number}, {s.address.city}</div>
+                                    <div className="text-xs text-slate-400 mt-1">{t('form.ic')}: {s.ic} | {t('form.phone')}: {s.phone}</div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => toggleContacts(s.id)} className="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors">{t('headers.contacts')}</button>
+                                    <button onClick={() => { setErrors({}); startEditSup(s); }} className="text-blue-600 p-1 hover:bg-blue-50 rounded"><Edit className="w-4 h-4"/></button>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                ))}
+                            {viewContactsFor === s.id && (
+                                <div className="border-t bg-slate-50 p-4">
+                                    <h5 className="font-bold text-xs text-slate-500 uppercase mb-2">{t('headers.contacts')}</h5>
+                                    {contacts.map(c => (
+                                        <div key={c.id} className="flex justify-between items-center bg-white p-2 rounded mb-2 border border-slate-100 text-sm">
+                                            <div>
+                                                <span className="font-medium">{c.name}</span> <span className="text-slate-400">({c.position})</span>
+                                                <div className="text-xs text-slate-400">{c.email}, {c.phone}</div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setContactErrors({}); setEditingContact(c); }} className="text-blue-600"><Edit className="w-3 h-3"/></button>
+                                                <button onClick={() => setConfirmDelete({ show: true, type: 'contact', id: c.id, supId: s.id })} className="text-red-500"><Trash className="w-3 h-3"/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="grid grid-cols-5 gap-2 mt-2 items-start">
+                                        <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
+                                        <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
+                                        <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
+                                        <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
+                                        <button onClick={() => addContact(s.id)} className="bg-blue-600 text-white rounded text-sm py-1">{t('common.add')}</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
             
             {isCreateOpen && (

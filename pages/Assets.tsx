@@ -254,6 +254,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
     const [filterStateIds, setFilterStateIds] = useState<string[]>([]);
     const [filterWpIds, setFilterWpIds] = useState<string[]>([]);
+    const [filterSupplierId, setFilterSupplierId] = useState<string>(''); // New Supplier Filter
     const [filterVisible, setFilterVisible] = useState<'all' | 'true' | 'false'>('true');
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
@@ -274,13 +275,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     // Initial Filters
     useEffect(() => {
-        if (initialFilters && workplaces.length > 0) {
+        if (initialFilters) {
             if (initialFilters.typeId) setFilterTypeIds([initialFilters.typeId]);
             if (initialFilters.stateId) setFilterStateIds([initialFilters.stateId]);
             if (initialFilters.workplaceId) setFilterWpIds([initialFilters.workplaceId]);
+            if (initialFilters.supplierId) setFilterSupplierId(initialFilters.supplierId);
             if (initialFilters.locationId) {
+                // Wait for workplaces to load if needed, but here we assume strict effect ordering or eventual consistency
                 const wps = workplaces.filter(w => w.locationId === initialFilters.locationId).map(w => w.id);
-                setFilterWpIds(wps);
+                // Only set if we found workplaces, otherwise might be race condition (re-run when workplaces change)
+                if (workplaces.length > 0) setFilterWpIds(wps);
             }
         }
     }, [initialFilters, workplaces]);
@@ -355,6 +359,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
         if (filterTypeIds.length > 0 && !filterTypeIds.includes(a.typeId)) return false;
         if (filterStateIds.length > 0 && !filterStateIds.includes(a.stateId)) return false;
         if (filterWpIds.length > 0 && !filterWpIds.includes(a.workplaceId)) return false;
+        if (filterSupplierId && a.supplierId !== filterSupplierId) return false; // Supplier Filter Logic
         
         // Date Logic
         if (filterDateFrom && (!a.installDate || a.installDate < filterDateFrom)) return false;
@@ -409,13 +414,23 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                         </div>
                     </div>
 
-                    <div>
-                        <select className="w-full p-1.5 border rounded text-sm mt-5" value={filterVisible} onChange={e => setFilterVisible(e.target.value as any)}>
-                            <option value="all">{t('common.all')}</option>
-                            <option value="true">{t('common.yes')}</option>
-                            <option value="false">{t('common.no')}</option>
-                        </select>
+                    <div className="flex flex-col gap-2">
+                        {/* Supplier Filter dropdown */}
+                        <div className="flex-1">
+                            <select className="w-full p-1.5 border rounded text-sm mt-5" value={filterSupplierId} onChange={e => setFilterSupplierId(e.target.value)}>
+                                <option value="">{t('form.supplier')}: {t('common.all')}</option>
+                                {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
                     </div>
+                </div>
+                {/* Second row of filters for visibility if needed, or inline above */}
+                <div className="mt-2 flex justify-end">
+                     <select className="p-1.5 border rounded text-sm" value={filterVisible} onChange={e => setFilterVisible(e.target.value as any)}>
+                        <option value="all">Viditelnost: {t('common.all')}</option>
+                        <option value="true">Viditelnost: {t('common.yes')}</option>
+                        <option value="false">Viditelnost: {t('common.no')}</option>
+                    </select>
                 </div>
             </div>
 

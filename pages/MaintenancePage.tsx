@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, Loader, X } from 'lucide-react';
-import { Modal } from '../components/Shared';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash } from 'lucide-react';
+import { Modal, ConfirmModal } from '../components/Shared';
 
 export const MaintenancePage = ({ user }: { user: User }) => {
     const { t } = useI18n();
@@ -28,6 +28,9 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         responsiblePersonId: ''
     });
     const [showFilters, setShowFilters] = useState(user.role !== 'operator');
+
+    // Delete State
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const refresh = async () => {
         setLoading(true);
@@ -80,6 +83,34 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     const handleRowClick = (m: Maintenance) => {
         setSelectedTemplate(m);
         setView('detail');
+    };
+
+    const handleDelete = async () => {
+        if (!selectedTemplate) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+            if (isMock) {
+                // Mock delete logic would go here if db.maintenances had delete, 
+                // but currently seedData doesn't expose strict delete for maintenances easily in db object 
+                // unless we add it. Assuming db.maintenances has delete or we simulated it.
+                // For now, let's just refresh.
+                const current = db.maintenances.list().filter(x => x.id !== selectedTemplate.id);
+                localStorage.setItem('tmp_maintenances', JSON.stringify(current));
+            } else {
+                await api.delete(`/maintenance/${selectedTemplate.id}`);
+            }
+            setShowDeleteConfirm(false);
+            setSelectedTemplate(null);
+            setView('list');
+            refresh();
+        } catch (e) {
+            console.error("Delete Error", e);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Filter Logic
@@ -188,7 +219,11 @@ export const MaintenancePage = ({ user }: { user: User }) => {
             }
             setIsCreateOpen(false);
             refresh();
-            if (view === 'detail') setView('list');
+            if (view === 'detail' && editingId) {
+                // Update selected template in view if we just edited it
+                const updated = { ...selectedTemplate, ...maintForm } as Maintenance;
+                setSelectedTemplate(updated);
+            }
         } catch (e) {
             console.error("Save Error", e);
         } finally {
@@ -216,9 +251,14 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                      </button>
                      <div className="flex gap-2">
                         {canEditMaint && (
-                            <button onClick={() => openEditModal(selectedTemplate)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
-                                <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
-                            </button>
+                            <>
+                                <button onClick={() => openEditModal(selectedTemplate)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
+                                    <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
+                                </button>
+                                <button onClick={() => setShowDeleteConfirm(true)} className="bg-red-50 text-red-700 px-3 py-2 rounded flex items-center hover:bg-red-100 border border-red-200">
+                                    <Trash className="w-4 h-4 mr-2" /> {t('common.delete')}
+                                </button>
+                            </>
                         )}
                      </div>
                 </div>
@@ -229,7 +269,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-800">{selectedTemplate.title}</h2>
-                                    <div className="text-slate-500 mt-1">{tech?.name}</div>
+                                    <div className="text-slate-500 mt-1">{tech?.name || 'Neznámá technologie'}</div>
                                 </div>
                                 {renderActiveBadge(selectedTemplate.isActive)}
                             </div>
@@ -273,6 +313,14 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         technologies={technologies}
                         suppliers={suppliers}
                         users={users}
+                    />
+                )}
+
+                {showDeleteConfirm && (
+                    <ConfirmModal 
+                        message={t('msg.confirm_delete')} 
+                        onConfirm={handleDelete} 
+                        onCancel={() => setShowDeleteConfirm(false)} 
                     />
                 )}
             </div>
@@ -344,7 +392,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
-                                            <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Unknown'}</td>
+                                            <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Neznámá technologie'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
