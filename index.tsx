@@ -18,7 +18,7 @@ import { CalendarPage } from './pages/CalendarPage';
 import { seedData, db } from './lib/db';
 import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
-import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server } from 'lucide-react';
+import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server, Lock, User as UserIcon } from 'lucide-react';
 
 // --- Error Boundary Component ---
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
@@ -65,9 +65,6 @@ const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
 // RUNTIME DETECTION:
-// We ignore 'import.meta.env.PROD' because 'npm run preview' is a PROD build serving on Localhost.
-// Instead, we check: Is the current browser hostname the Production Domain?
-// If NOT, we assume we are in Dev/Preview/Staging and force Mock Data.
 const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
 const shouldForceMock = !isProductionDomain;
 
@@ -93,6 +90,11 @@ const App = () => {
   
   // Auth States
   const [authView, setAuthView] = useState<'login' | 'forgot' | 'reset' | 'link-sent'>('login');
+  
+  // Login Inputs
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
   const [resetEmail, setResetEmail] = useState('');
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -122,35 +124,41 @@ const App = () => {
     }
   }, [useMockData, t]);
   
-  const handleLogin = async (role: User['role']) => {
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setAuthError(null);
     setIsLoggingIn(true);
 
-    let email = '';
-    let password = 'password'; 
-
-    if (role === 'admin') email = 'admin@tech.com';
-    else if (role === 'maintenance') email = 'maint@tech.com';
-    else if (role === 'operator') email = 'op@tech.com';
+    if (!loginEmail || !loginPassword) {
+        setAuthError("Zadejte email a heslo.");
+        setIsLoggingIn(false);
+        return;
+    }
 
     try {
         if (useMockData) {
             // --- DEMO / MOCK LOGIC ---
-            // Artificial delay to simulate API
             await new Promise(resolve => setTimeout(resolve, 600)); 
 
             const mockUsers = db.users.list();
-            let found = mockUsers.find(u => u.email === email);
-            if (!found) found = mockUsers.find(u => u.role === role);
+            // In mock mode, we just check email existence for simplicity, 
+            // or match specific hardcoded passwords if you prefer.
+            const found = mockUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
 
             if (found && found.isBlocked) {
                 setAuthError("Tento uživatel má zablokovaný přístup.");
             } else if (found) {
-                localStorage.setItem('auth_token', 'mock-token-' + found.id);
-                setUser(found);
-                setPage('dashboard');
+                // Check password (simple check for demo)
+                // Assuming 'password' or '1234' or empty for demo convenience
+                if (found.password && found.password !== loginPassword && loginPassword !== 'password') {
+                     setAuthError("Neplatné heslo (Demo: použijte 'password').");
+                } else {
+                    localStorage.setItem('auth_token', 'mock-token-' + found.id);
+                    setUser(found);
+                    setPage('dashboard');
+                }
             } else {
-                setAuthError("Chyba přihlášení (uživatel nenalezen v mock datech).");
+                setAuthError("Uživatel s tímto emailem neexistuje (Mock).");
             }
 
         } else {
@@ -162,7 +170,7 @@ const App = () => {
             const response = await fetch(`${PROD_API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email: loginEmail, password: loginPassword }),
                 signal: controller.signal
             });
             
@@ -184,11 +192,17 @@ const App = () => {
         if (err.name === 'AbortError') {
             setAuthError("Server neodpovídá (Timeout).");
         } else {
-            setAuthError("Nepodařilo se připojit k serveru. Zkontrolujte VPN/Internet.");
+            setAuthError("Nepodařilo se připojit k serveru. Zkontrolujte připojení.");
         }
     } finally {
         setIsLoggingIn(false);
     }
+  };
+
+  // Helper for Demo Mode - Quick Fill
+  const demoFill = (email: string) => {
+      setLoginEmail(email);
+      setLoginPassword('password');
   };
 
   const handleSendLink = () => {
@@ -232,6 +246,8 @@ const App = () => {
 
   const handleLogout = () => {
       setUser(null);
+      setLoginEmail('');
+      setLoginPassword('');
       localStorage.removeItem('auth_token');
   }
 
@@ -241,10 +257,10 @@ const App = () => {
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
-          <div className="mb-4 flex justify-center">
+          <div className="mb-6 flex justify-center">
               <span className={`text-xs px-2 py-1 rounded font-mono flex items-center gap-1 ${useMockData ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
                   {useMockData ? <Database className="w-3 h-3"/> : <Server className="w-3 h-3"/>}
-                  {useMockData ? 'MOCK DATA (Local/Preview)' : 'PRODUCTION API'}
+                  {useMockData ? 'MOCK DATA (Local)' : 'PRODUCTION API'}
               </span>
           </div>
 
@@ -263,39 +279,44 @@ const App = () => {
           {/* LOGIN VIEW */}
           {authView === 'login' && (
             <>
-                <p className="mb-6 text-slate-500">Vyberte roli pro přihlášení:</p>
-                <div className="space-y-3">
-                    <button onClick={() => handleLogin('admin')} disabled={isLoggingIn} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex justify-center">
-                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : 'Administrátor'}
-                    </button>
-                    <button onClick={() => handleLogin('maintenance')} disabled={isLoggingIn} className="w-full py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 flex justify-center">
-                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : 'Údržba'}
-                    </button>
-                    <button onClick={() => handleLogin('operator')} disabled={isLoggingIn} className="w-full py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 flex justify-center">
-                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : 'Obsluha'}
-                    </button>
-                </div>
-
-                {/* Environment Switcher - Visible if detected purely as localhost or non-prod, allows toggle */}
-                {shouldForceMock && (
-                    <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col items-center">
-                        <label className="flex items-center text-sm text-slate-600 cursor-pointer hover:text-slate-900 bg-slate-50 px-3 py-2 rounded border border-slate-200 w-full justify-center">
+                <form onSubmit={handleLogin} className="text-left space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('common.email')}</label>
+                        <div className="relative">
                             <input 
-                                type="checkbox" 
-                                className="mr-2 rounded accent-blue-600" 
-                                checked={useMockData} 
-                                onChange={(e) => setUseMockData(e.target.checked)} 
+                                type="email" 
+                                className="w-full border p-2 pl-9 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
+                                placeholder="name@company.com"
+                                value={loginEmail}
+                                onChange={e => setLoginEmail(e.target.value)}
+                                disabled={isLoggingIn}
                             />
-                            <Database className="w-4 h-4 mr-2 text-slate-500" />
-                            <span>Používat lokální data (Mock)</span>
-                        </label>
-                        {!useMockData && (
-                            <p className="text-[10px] text-red-500 mt-1 font-bold bg-red-50 px-2 py-1 rounded">
-                                ⚠️ Pozor: Připojuji se k ostré DB!
-                            </p>
-                        )}
+                            <UserIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                        </div>
                     </div>
-                )}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Heslo</label>
+                        <div className="relative">
+                            <input 
+                                type="password" 
+                                className="w-full border p-2 pl-9 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
+                                placeholder="••••••••"
+                                value={loginPassword}
+                                onChange={e => setLoginPassword(e.target.value)}
+                                disabled={isLoggingIn}
+                            />
+                            <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                        </div>
+                    </div>
+
+                    <button 
+                        type="submit"
+                        disabled={isLoggingIn} 
+                        className="w-full py-2.5 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 flex justify-center items-center transition-colors shadow-sm"
+                    >
+                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : 'Přihlásit se'}
+                    </button>
+                </form>
 
                 <div className="mt-4 pt-2">
                     <button 
@@ -305,6 +326,33 @@ const App = () => {
                         <KeyRound className="w-3 h-3 mr-1" /> {t('auth.forgot_password')}
                     </button>
                 </div>
+
+                {/* DEMO HELPERS - Only Visible in Mock Mode */}
+                {useMockData && (
+                    <div className="mt-6 pt-4 border-t border-slate-100">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Demo účty (klikni pro vyplnění)</p>
+                        <div className="flex justify-center gap-2 text-xs">
+                            <button onClick={() => demoFill('admin@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Admin</button>
+                            <button onClick={() => demoFill('maint@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Údržba</button>
+                            <button onClick={() => demoFill('op@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Obsluha</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Environment Switcher */}
+                {shouldForceMock && (
+                    <div className="mt-4 flex flex-col items-center">
+                        <label className="flex items-center text-xs text-slate-400 cursor-pointer hover:text-slate-600">
+                            <input 
+                                type="checkbox" 
+                                className="mr-1.5 rounded accent-blue-600" 
+                                checked={useMockData} 
+                                onChange={(e) => setUseMockData(e.target.checked)} 
+                            />
+                            <span>Lokální data (Mock)</span>
+                        </label>
+                    </div>
+                )}
             </>
           )}
 
