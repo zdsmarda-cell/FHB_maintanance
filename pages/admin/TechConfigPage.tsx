@@ -4,17 +4,19 @@ import { db, api, isProductionDomain } from '../../lib/db';
 import { Edit, Trash, Plus, Box, Loader } from 'lucide-react';
 import { Modal, ConfirmModal, AlertModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
+import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 interface TechConfigPageProps {
     onNavigate?: (page: string, params?: any) => void;
 }
 
 export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [types, setTypes] = useState<any[]>([]);
     const [states, setStates] = useState<any[]>([]);
-    const [assets, setAssets] = useState<any[]>([]); // For counting usage
+    const [assets, setAssets] = useState<any[]>([]); 
     
     const [newType, setNewType] = useState({ name: '' });
     const [newState, setNewState] = useState({ name: '' });
@@ -73,7 +75,6 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
                 if(deleteModal.type === 'type') db.techTypes.delete(deleteModal.id);
                 else db.techStates.delete(deleteModal.id);
             } else {
-                // Using fetch directly because generic API helper might need adjustment for DELETE
                 const token = localStorage.getItem('auth_token');
                 const res = await fetch(`${api.baseUrl}/api${endpoint}/${deleteModal.id}`, {
                     method: 'DELETE',
@@ -88,51 +89,74 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
 
     const saveType = async () => { 
         if(!editingType) return;
+        setSaving(true);
         try {
-            if(isMock) db.techTypes.update(editingType.id, editingType);
-            else await api.put(`/config/types/${editingType.id}`, editingType);
+            const translated = await prepareMultilingual(editingType.name);
+            const payload = { ...editingType, name: translated };
+
+            if(isMock) db.techTypes.update(editingType.id, payload);
+            else await api.put(`/config/types/${editingType.id}`, payload);
             setEditingType(null); 
             refresh(); 
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     }
 
     const saveState = async () => { 
         if(!editingState) return;
+        setSaving(true);
         try {
-            if(isMock) db.techStates.update(editingState.id, editingState);
-            else await api.put(`/config/states/${editingState.id}`, editingState);
+            const translated = await prepareMultilingual(editingState.name);
+            const payload = { ...editingState, name: translated };
+
+            if(isMock) db.techStates.update(editingState.id, payload);
+            else await api.put(`/config/states/${editingState.id}`, payload);
             setEditingState(null); 
             refresh(); 
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     }
 
     const handleAddType = async () => {
         setErrors({});
         if(!newType.name) { setErrors({name: t('validation.required')}); return; }
+        setSaving(true);
         try {
-            if(isMock) db.techTypes.add(newType);
-            else await api.post('/config/types', newType);
+            const translated = await prepareMultilingual(newType.name);
+            const payload = { ...newType, name: translated };
+
+            if(isMock) db.techTypes.add(payload);
+            else await api.post('/config/types', payload);
             setNewType({ name: '' });
             setIsCreateTypeOpen(false);
             refresh();
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     }
 
     const handleAddState = async () => {
         setErrors({});
         if(!newState.name) { setErrors({name: t('validation.required')}); return; }
+        setSaving(true);
         try {
-            if(isMock) db.techStates.add(newState);
-            else await api.post('/config/states', newState);
+            const translated = await prepareMultilingual(newState.name);
+            const payload = { ...newState, name: translated };
+
+            if(isMock) db.techStates.add(payload);
+            else await api.post('/config/states', payload);
             setNewState({ name: '' });
             setIsCreateStateOpen(false);
             refresh();
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     }
     
+    // Decode for editing
+    const startEditType = (t: any) => { setEditingType({...t, name: getLocalized(t.name, lang)}); };
+    const startEditState = (s: any) => { setEditingState({...s, name: getLocalized(s.name, lang)}); };
+
     if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
-    // View JSX remains similar, just data binding updates
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -144,11 +168,11 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
                     {types.map(t => (
                         <div key={t.id} className="p-2 flex justify-between items-center group">
                             <div className="flex items-center gap-2">
-                                <span>{t.name}</span>
+                                <span>{getLocalized(t.name, lang)}</span>
                                 {isUsed('type', t.id) && <button onClick={() => onNavigate && onNavigate('assets', { typeId: t.id })} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"><Box className="w-3 h-3 mr-1" /></button>}
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setEditingType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                <button onClick={() => startEditType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
                                 <button onClick={() => initiateDelete('type', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
                             </div>
                         </div>
@@ -164,11 +188,11 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
                     {states.map(t => (
                         <div key={t.id} className="p-2 flex justify-between items-center group">
                             <div className="flex items-center gap-2">
-                                <span>{t.name}</span>
+                                <span>{getLocalized(t.name, lang)}</span>
                                 {isUsed('state', t.id) && <button onClick={() => onNavigate && onNavigate('assets', { stateId: t.id })} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"><Box className="w-3 h-3 mr-1" /></button>}
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setEditingState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                <button onClick={() => startEditState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
                                 <button onClick={() => initiateDelete('state', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
                             </div>
                         </div>
@@ -179,27 +203,31 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
             {isCreateTypeOpen && (
                 <Modal title={t('headers.new_tech_type')} onClose={() => setIsCreateTypeOpen(false)}>
                     <input value={newType.name} placeholder={t('form.name')} onChange={e => setNewType({...newType, name: e.target.value})} className={`border p-2 w-full rounded mb-1 ${errors.name ? 'border-red-500' : ''}`} />
-                    <div className="flex justify-end pt-4 border-t border-slate-100"><button onClick={handleAddType} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.create')}</button></div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                        <button onClick={handleAddType} disabled={saving} className="bg-blue-600 text-white px-3 py-2 rounded flex items-center">{saving && <Loader className="animate-spin w-3 h-3 mr-1"/>} {t('common.create')}</button>
+                    </div>
                 </Modal>
             )}
 
             {isCreateStateOpen && (
                 <Modal title={t('headers.new_tech_state')} onClose={() => setIsCreateStateOpen(false)}>
                     <input value={newState.name} placeholder={t('form.name')} onChange={e => setNewState({...newState, name: e.target.value})} className={`border p-2 w-full rounded mb-1 ${errors.name ? 'border-red-500' : ''}`} />
-                    <div className="flex justify-end pt-4 border-t border-slate-100"><button onClick={handleAddState} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.create')}</button></div>
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                        <button onClick={handleAddState} disabled={saving} className="bg-blue-600 text-white px-3 py-2 rounded flex items-center">{saving && <Loader className="animate-spin w-3 h-3 mr-1"/>} {t('common.create')}</button>
+                    </div>
                 </Modal>
             )}
             
             {editingType && (
                 <Modal title={t('common.edit')} onClose={() => setEditingType(null)}>
                     <input value={editingType.name} onChange={e => setEditingType({...editingType, name: e.target.value})} className="border p-2 w-full rounded" />
-                    <button onClick={saveType} className="mt-2 bg-blue-600 text-white px-3 py-1 rounded">{t('common.save')}</button>
+                    <button onClick={saveType} disabled={saving} className="mt-2 bg-blue-600 text-white px-3 py-1 rounded flex items-center justify-center w-full">{saving ? <Loader className="animate-spin w-4 h-4"/> : t('common.save')}</button>
                 </Modal>
             )}
             {editingState && (
                 <Modal title={t('common.edit')} onClose={() => setEditingState(null)}>
                     <input value={editingState.name} onChange={e => setEditingState({...editingState, name: e.target.value})} className="border p-2 w-full rounded" />
-                    <button onClick={saveState} className="mt-2 bg-blue-600 text-white px-3 py-1 rounded">{t('common.save')}</button>
+                    <button onClick={saveState} disabled={saving} className="mt-2 bg-blue-600 text-white px-3 py-1 rounded flex items-center justify-center w-full">{saving ? <Loader className="animate-spin w-4 h-4"/> : t('common.save')}</button>
                 </Modal>
             )}
 

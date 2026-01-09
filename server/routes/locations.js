@@ -9,7 +9,14 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM locations');
-    res.json(rows);
+    // Map DB columns to frontend interface
+    const mapped = rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        address: typeof r.address === 'string' ? JSON.parse(r.address) : r.address,
+        isVisible: !!r.is_visible // Map is_visible -> isVisible
+    }));
+    res.json(mapped);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -41,7 +48,15 @@ router.post('/', async (req, res) => {
 router.get('/workplaces', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM workplaces');
-    res.json(rows);
+    // Map DB columns to frontend interface to fix visibility issue
+    const mapped = rows.map(r => ({
+        id: r.id,
+        locationId: r.location_id, // Map location_id -> locationId
+        name: r.name,
+        description: r.description,
+        isVisible: !!r.is_visible // Map is_visible -> isVisible
+    }));
+    res.json(mapped);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -5,10 +5,12 @@ import { Edit, Trash, Plus, Loader } from 'lucide-react';
 import { Address, Supplier } from '../../lib/types';
 import { AddressInput, Modal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
+import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 export const SuppliersPage = () => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [contacts, setContacts] = useState<any[]>([]);
     const [viewContactsFor, setViewContactsFor] = useState<string | null>(null);
@@ -69,24 +71,34 @@ export const SuppliersPage = () => {
 
     const handleAddSup = async () => {
         if(!validateForm(newSup)) return;
+        setSaving(true);
         try {
-            if(isMock) db.suppliers.add(newSup);
-            else await api.post('/suppliers', newSup);
+            const translatedName = await prepareMultilingual(newSup.name);
+            const payload = { ...newSup, name: translatedName };
+
+            if(isMock) db.suppliers.add(payload);
+            else await api.post('/suppliers', payload);
             setNewSup({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
             setIsCreateOpen(false);
             refresh();
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     };
 
     const handleUpdateSup = async () => {
         if(!editingSup) return;
         if(!validateForm(editingSup)) return;
+        setSaving(true);
         try {
-            if(isMock) db.suppliers.update(editingSup.id, editingSup);
-            else await api.put(`/suppliers/${editingSup.id}`, editingSup);
+            const translatedName = await prepareMultilingual(editingSup.name);
+            const payload = { ...editingSup, name: translatedName };
+
+            if(isMock) db.suppliers.update(editingSup.id, payload);
+            else await api.put(`/suppliers/${editingSup.id}`, payload);
             setEditingSup(null);
             refresh();
         } catch(e) { console.error(e); }
+        finally { setSaving(false); }
     }
     
     const openCreateModal = () => {
@@ -153,6 +165,10 @@ export const SuppliersPage = () => {
         setConfirmDelete({ show: false, type: 'supplier', id: '' });
     }
 
+    const startEditSup = (s: any) => {
+        setEditingSup({ ...s, name: getLocalized(s.name, lang) });
+    };
+
     if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
     return (
@@ -169,13 +185,13 @@ export const SuppliersPage = () => {
                     <div key={s.id} className="bg-white rounded border border-slate-200">
                         <div className="p-4 flex justify-between items-start">
                             <div>
-                                <div className="font-bold text-lg">{s.name}</div>
+                                <div className="font-bold text-lg">{getLocalized(s.name, lang)}</div>
                                 <div className="text-sm text-slate-500">{s.address.street} {s.address.number}, {s.address.city}</div>
                                 <div className="text-xs text-slate-400 mt-1">{t('form.ic')}: {s.ic} | {t('form.phone')}: {s.phone}</div>
                             </div>
                             <div className="flex gap-2">
                                 <button onClick={() => toggleContacts(s.id)} className="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm">{t('headers.contacts')}</button>
-                                <button onClick={() => { setErrors({}); setEditingSup(s); }} className="text-blue-600 p-1"><Edit className="w-4 h-4"/></button>
+                                <button onClick={() => { setErrors({}); startEditSup(s); }} className="text-blue-600 p-1"><Edit className="w-4 h-4"/></button>
                             </div>
                         </div>
                         {viewContactsFor === s.id && (
@@ -206,7 +222,6 @@ export const SuppliersPage = () => {
                 ))}
             </div>
             
-            {/* Create/Edit Modals logic same as before, using handleAddSup/handleUpdateSup */}
             {isCreateOpen && (
                 <Modal title={t('headers.new_supplier')} onClose={() => setIsCreateOpen(false)}>
                      <div className="grid grid-cols-2 gap-2 mb-2">
@@ -220,7 +235,11 @@ export const SuppliersPage = () => {
                         <div className="col-span-2"><input placeholder={t('form.email')} className="p-2 border rounded w-full" value={newSup.email} onChange={e => setNewSup({...newSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={newSup.address} onChange={a => setNewSup({...newSup, address: a})} errors={errors} />
-                    <div className="flex justify-end mt-4"><button onClick={handleAddSup} className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button></div>
+                    <div className="flex justify-end mt-4">
+                        <button onClick={handleAddSup} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+                            {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.create')}
+                        </button>
+                    </div>
                 </Modal>
             )}
 
@@ -234,7 +253,11 @@ export const SuppliersPage = () => {
                         <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.email} onChange={e => setEditingSup({...editingSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={editingSup.address} onChange={a => setEditingSup({...editingSup, address: a})} errors={errors} />
-                    <div className="flex justify-end mt-4"><button onClick={handleUpdateSup} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button></div>
+                    <div className="flex justify-end mt-4">
+                        <button onClick={handleUpdateSup} disabled={saving} className="bg-blue-600 text-white px-3 py-2 rounded flex items-center">
+                            {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.save')}
+                        </button>
+                    </div>
                 </Modal>
             )}
 

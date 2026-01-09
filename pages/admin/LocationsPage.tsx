@@ -5,10 +5,12 @@ import { Edit, Trash, Plus, Eye, EyeOff, Loader } from 'lucide-react';
 import { Address } from '../../lib/types';
 import { AddressInput, Modal, AlertModal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
+import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 export const LocationsPage = () => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false); // New state for save loading
   const [locations, setLocations] = useState<any[]>([]);
   const [workplaces, setWorkplaces] = useState<any[]>([]);
   
@@ -62,34 +64,84 @@ export const LocationsPage = () => {
 
   const handleAddLoc = async () => {
     if(!validateForm(newLoc, 'location')) return;
+    setSaving(true);
     try {
-        if(isMock) db.locations.add(newLoc);
-        else await api.post('/locations', newLoc);
+        const translatedName = await prepareMultilingual(newLoc.name);
+        const payload = { ...newLoc, name: translatedName };
+
+        if(isMock) db.locations.add(payload);
+        else await api.post('/locations', payload);
         
         setNewLoc({ name: '', address: emptyAddress, isVisible: true });
         setIsCreateOpen(false);
         refresh();
     } catch(e) { console.error(e); }
+    finally { setSaving(false); }
   };
 
   const handleUpdateLoc = async () => {
       if(!editingLoc) return;
       if(!validateForm(editingLoc, 'location')) return;
+      setSaving(true);
       try {
-          if(isMock) db.locations.update(editingLoc.id, editingLoc);
-          else await api.put(`/locations/${editingLoc.id}`, editingLoc);
+          // Note: If user edited the name, we re-translate. 
+          // If editingLoc.name is already JSON string (because user didn't touch it in modal, but modal decoded it?), 
+          // we should handle that. But the modal inputs usually show the *localized* string.
+          // So we always re-save as new translation bundle.
+          const translatedName = await prepareMultilingual(editingLoc.name);
+          const payload = { ...editingLoc, name: translatedName };
+
+          if(isMock) db.locations.update(editingLoc.id, payload);
+          else await api.put(`/locations/${editingLoc.id}`, payload);
           
           setEditingLoc(null);
           refresh();
       } catch(e) { console.error(e); }
+      finally { setSaving(false); }
   };
+
+  const handleUpdateWp = async () => {
+      if(!editingWp) return;
+      if(!validateForm(editingWp, 'workplace')) return;
+      setSaving(true);
+      try {
+          const translatedName = await prepareMultilingual(editingWp.name);
+          const translatedDesc = await prepareMultilingual(editingWp.description);
+          const payload = { ...editingWp, name: translatedName, description: translatedDesc };
+
+          if(isMock) db.workplaces.update(editingWp.id, payload);
+          else await api.put(`/locations/workplaces/${editingWp.id}`, payload);
+          
+          setEditingWp(null);
+          refresh();
+      } catch(e) { console.error(e); }
+      finally { setSaving(false); }
+  }
+
+  const handleAddWp = async () => {
+      if(!createWpLocationId) return;
+      if(!validateForm(newWp, 'workplace')) return;
+      setSaving(true);
+      try {
+          const translatedName = await prepareMultilingual(newWp.name);
+          const translatedDesc = await prepareMultilingual(newWp.description);
+          
+          const payload = { ...newWp, locationId: createWpLocationId, name: translatedName, description: translatedDesc };
+          if(isMock) db.workplaces.add(payload);
+          else await api.post('/locations/workplaces', payload);
+          
+          setIsCreateWpOpen(false);
+          setCreateWpLocationId(null);
+          refresh();
+      } catch(e) { console.error(e); }
+      finally { setSaving(false); }
+  }
 
   const confirmDeleteWp = async () => {
       if (deleteWpId) {
           try {
               if (isMock) db.workplaces.delete(deleteWpId);
               else {
-                  // Using fetch because API helper currently lacks generic DELETE
                   const token = localStorage.getItem('auth_token');
                   const res = await fetch(`${api.baseUrl}/api/locations/workplaces/${deleteWpId}`, {
                       method: 'DELETE',
@@ -102,32 +154,18 @@ export const LocationsPage = () => {
           } catch(e: any) { setAlertMsg("Nelze smazat pracoviště (může být používáno)."); }
       }
   }
-  
-  const handleUpdateWp = async () => {
-      if(!editingWp) return;
-      if(!validateForm(editingWp, 'workplace')) return;
-      try {
-          if(isMock) db.workplaces.update(editingWp.id, editingWp);
-          else await api.put(`/locations/workplaces/${editingWp.id}`, editingWp);
-          
-          setEditingWp(null);
-          refresh();
-      } catch(e) { console.error(e); }
-  }
 
-  const handleAddWp = async () => {
-      if(!createWpLocationId) return;
-      if(!validateForm(newWp, 'workplace')) return;
-      try {
-          const payload = { ...newWp, locationId: createWpLocationId };
-          if(isMock) db.workplaces.add(payload);
-          else await api.post('/locations/workplaces', payload);
-          
-          setIsCreateWpOpen(false);
-          setCreateWpLocationId(null);
-          refresh();
-      } catch(e) { console.error(e); }
-  }
+  // Pre-process for editing: Decode JSON to current lang for input field
+  const startEditLoc = (loc: any) => {
+      setEditingLoc({ ...loc, name: getLocalized(loc.name, lang) });
+  };
+  const startEditWp = (wp: any) => {
+      setEditingWp({ 
+          ...wp, 
+          name: getLocalized(wp.name, lang),
+          description: getLocalized(wp.description, lang)
+      });
+  };
 
   if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
@@ -149,13 +187,13 @@ export const LocationsPage = () => {
                            <div className="flex items-start gap-2">
                                {!loc.isVisible && <div title="Skryto"><EyeOff className="w-5 h-5 text-slate-400 mt-1" /></div>}
                                <div>
-                                   <div className="font-bold text-lg">{loc.name}</div>
+                                   <div className="font-bold text-lg">{getLocalized(loc.name, lang)}</div>
                                    <div className="text-sm text-slate-500">
                                        {loc.address.street} {loc.address.number}, {loc.address.zip} {loc.address.city}, {loc.address.country}
                                    </div>
                                </div>
                            </div>
-                           <button onClick={() => { setErrors({}); setEditingLoc(loc); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded"><Edit className="w-4 h-4"/></button>
+                           <button onClick={() => { setErrors({}); startEditLoc(loc); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded"><Edit className="w-4 h-4"/></button>
                       </div>
                       <div className="p-4">
                           <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t('headers.workplaces')}</h5>
@@ -164,10 +202,10 @@ export const LocationsPage = () => {
                               <div key={wp.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm border-slate-100">
                                   <div className="flex items-center gap-2">
                                       {!wp.isVisible && <div title="Skryto"><EyeOff className="w-4 h-4 text-slate-400" /></div>}
-                                      <span className="font-medium text-slate-700">{wp.name} <span className="font-normal text-slate-400 ml-2">{wp.description}</span></span>
+                                      <span className="font-medium text-slate-700">{getLocalized(wp.name, lang)} <span className="font-normal text-slate-400 ml-2">{getLocalized(wp.description, lang)}</span></span>
                                   </div>
                                   <div className="flex gap-2">
-                                      <button onClick={() => { setErrors({}); setEditingWp(wp); }} className="text-blue-600 hover:text-blue-800"><Edit className="w-3 h-3"/></button>
+                                      <button onClick={() => { setErrors({}); startEditWp(wp); }} className="text-blue-600 hover:text-blue-800"><Edit className="w-3 h-3"/></button>
                                       <button onClick={() => setDeleteWpId(wp.id)} className="text-red-400 hover:text-red-600"><Trash className="w-3 h-3"/></button>
                                   </div>
                               </div>
@@ -183,7 +221,6 @@ export const LocationsPage = () => {
           })}
        </div>
 
-       {/* Modals identical to previous but using Async handlers */}
        {isCreateOpen && (
            <Modal title={t('headers.new_location')} onClose={() => setIsCreateOpen(false)}>
                <div className="mb-2">
@@ -192,7 +229,11 @@ export const LocationsPage = () => {
                </div>
                <AddressInput address={newLoc.address} onChange={a => setNewLoc({...newLoc, address: a})} errors={errors} />
                <div className="mt-4"><label className="flex items-center gap-2"><input type="checkbox" checked={newLoc.isVisible} onChange={e => setNewLoc({...newLoc, isVisible: e.target.checked})} /> <span className="text-sm">{t('form.is_visible')}</span></label></div>
-               <div className="flex justify-end mt-4"><button onClick={handleAddLoc} className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button></div>
+               <div className="flex justify-end mt-4">
+                   <button onClick={handleAddLoc} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+                       {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.create')}
+                   </button>
+               </div>
            </Modal>
        )}
        
@@ -201,7 +242,11 @@ export const LocationsPage = () => {
                <div className="mb-2"><input className={`w-full border p-2 rounded ${errors.name ? 'border-red-500' : ''}`} placeholder={t('form.name')} value={newWp.name} onChange={e => setNewWp({...newWp, name: e.target.value})} /></div>
                <div className="mb-2"><input className="w-full border p-2 rounded" placeholder={t('form.description')} value={newWp.description} onChange={e => setNewWp({...newWp, description: e.target.value})} /></div>
                <div className="mt-4"><label className="flex items-center gap-2"><input type="checkbox" checked={newWp.isVisible} onChange={e => setNewWp({...newWp, isVisible: e.target.checked})} /> <span className="text-sm">{t('form.is_visible')}</span></label></div>
-               <div className="flex justify-end mt-4"><button onClick={handleAddWp} className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button></div>
+               <div className="flex justify-end mt-4">
+                   <button onClick={handleAddWp} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+                       {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.create')}
+                   </button>
+               </div>
            </Modal>
        )}
 
@@ -210,7 +255,11 @@ export const LocationsPage = () => {
                <div className="mb-2"><input className={`w-full border p-2 rounded ${errors.name ? 'border-red-500' : ''}`} value={editingLoc.name} onChange={e => setEditingLoc({...editingLoc, name: e.target.value})} /></div>
                <AddressInput address={editingLoc.address} onChange={a => setEditingLoc({...editingLoc, address: a})} errors={errors} />
                <div className="mt-4"><label className="flex items-center gap-2"><input type="checkbox" checked={editingLoc.isVisible} onChange={e => setEditingLoc({...editingLoc, isVisible: e.target.checked})} /> <span className="text-sm">{t('form.is_visible')}</span></label></div>
-               <div className="flex justify-end mt-4"><button onClick={handleUpdateLoc} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button></div>
+               <div className="flex justify-end mt-4">
+                   <button onClick={handleUpdateLoc} disabled={saving} className="bg-blue-600 text-white px-3 py-2 rounded flex items-center">
+                       {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.save')}
+                   </button>
+               </div>
            </Modal>
        )}
 
@@ -219,7 +268,11 @@ export const LocationsPage = () => {
                <div className="mb-2"><input className={`w-full border p-2 mb-2 rounded ${errors.name ? 'border-red-500' : ''}`} placeholder={t('form.name')} value={editingWp.name} onChange={e => setEditingWp({...editingWp, name: e.target.value})} /></div>
                <div className="mb-2"><input className="w-full border p-2 mb-2 rounded" placeholder={t('form.description')} value={editingWp.description} onChange={e => setEditingWp({...editingWp, description: e.target.value})} /></div>
                <div className="mt-2"><label className="flex items-center gap-2"><input type="checkbox" checked={editingWp.isVisible} onChange={e => setEditingWp({...editingWp, isVisible: e.target.checked})} /> <span className="text-sm">{t('form.is_visible')}</span></label></div>
-               <div className="flex justify-end mt-4"><button onClick={handleUpdateWp} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button></div>
+               <div className="flex justify-end mt-4">
+                   <button onClick={handleUpdateWp} disabled={saving} className="bg-blue-600 text-white px-3 py-2 rounded flex items-center">
+                       {saving && <Loader className="animate-spin w-4 h-4 mr-2" />} {t('common.save')}
+                   </button>
+               </div>
            </Modal>
        )}
 

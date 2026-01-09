@@ -19,10 +19,11 @@ import techRoutes from './routes/technologies.js';
 import requestRoutes from './routes/requests.js';
 import settingsRoutes from './routes/settings.js';
 import emailRoutes from './routes/emails.js';
-import locationRoutes from './routes/locations.js'; // NEW
-import supplierRoutes from './routes/suppliers.js'; // NEW
-import configRoutes from './routes/config.js'; // NEW (Types/States)
-import maintenanceRoutes from './routes/maintenance.js'; // NEW
+import locationRoutes from './routes/locations.js'; 
+import supplierRoutes from './routes/suppliers.js'; 
+import configRoutes from './routes/config.js'; 
+import maintenanceRoutes from './routes/maintenance.js'; 
+import translateRoutes from './routes/translate.js'; // NEW
 
 dotenv.config();
 
@@ -59,12 +60,12 @@ app.use('/api/locations', authenticateToken, locationRoutes);
 app.use('/api/suppliers', authenticateToken, supplierRoutes);
 app.use('/api/config', authenticateToken, configRoutes);
 app.use('/api/maintenance', authenticateToken, maintenanceRoutes);
+app.use('/api/translate', authenticateToken, translateRoutes); // NEW
 
 const PORT = process.env.PORT || 3010;
 
 initDb().then(() => {
   console.log('--- Server Startup Diagnostics ---');
-  // ... (SSL Logic remains same)
   let sslKeyPath = process.env.SSL_KEY_PATH;
   let sslCertPath = process.env.SSL_CERT_PATH;
   if (sslKeyPath && !path.isAbsolute(sslKeyPath)) sslKeyPath = path.resolve(rootDir, sslKeyPath);
