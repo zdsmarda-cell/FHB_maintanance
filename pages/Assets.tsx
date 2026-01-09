@@ -59,7 +59,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMockToken = token?.startsWith('mock-token-');
-                const isDev = import.meta.env && import.meta.env.DEV;
+                const isDev = (import.meta as any).env && (import.meta as any).env.DEV;
 
                 if (isDev || isMockToken) {
                     const reader = new FileReader();

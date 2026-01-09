@@ -34,7 +34,7 @@ const App = () => {
   const { t } = useI18n();
   
   // Detect if we are likely in a dev/demo environment capability
-  const isDevEnv = import.meta.env && import.meta.env.DEV;
+  const isDevEnv = (import.meta as any).env && (import.meta as any).env.DEV;
 
   // Initialize Mock Data if explicitly requested or in DEV
   const [useMockData, setUseMockData] = useState(isDevEnv);

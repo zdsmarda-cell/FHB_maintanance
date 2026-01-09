@@ -242,9 +242,7 @@ export const generateWorkListPDF = async (
             fontSize: 10
         },
         headStyles: {
-            fontStyle: 'bold',
-            borderBottomWidth: 1,
-            borderBottomColor: [0, 0, 0]
+            fontStyle: 'bold'
         },
         tableWidth: 'wrap',
         margin: { left: 14 }
