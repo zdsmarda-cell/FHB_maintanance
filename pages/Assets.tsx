@@ -1,4 +1,4 @@
-
+/// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/db';
 import { useI18n } from '../lib/i18n';
@@ -7,15 +7,8 @@ import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Rot
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
 // API Base URL - Safe Access
-const getEnvVar = (key: string) => {
-    try {
-        return import.meta.env ? import.meta.env[key] : undefined;
-    } catch {
-        return undefined;
-    }
-};
-const isProd = import.meta.env ? import.meta.env.PROD : false;
-const API_BASE = getEnvVar('VITE_API_URL') || (isProd ? 'https://fhbmain.impossible.cz:3010' : '');
+const env = (import.meta.env || {}) as any;
+const API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
 
 interface AssetsPageProps {
   user: User;
@@ -70,8 +63,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMockToken = token?.startsWith('mock-token-');
-                // Safe check for DEV mode
-                const isDev = import.meta.env ? import.meta.env.DEV : false;
+                // Direct env access with types reference
+                const isDev = env.DEV;
 
                 if (isDev || isMockToken) {
                     const reader = new FileReader();

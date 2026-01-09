@@ -1,4 +1,4 @@
-
+/// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; // Import global styles (Tailwind)
@@ -20,17 +20,9 @@ import { useI18n } from './lib/i18n';
 import { ServerOff, KeyRound, Mail, AlertTriangle, CheckCircle, ArrowLeft, Loader, Database } from 'lucide-react';
 
 // Define API Base URL based on environment
-// SAFE CHECK: Ensure import.meta.env exists before accessing properties to prevent runtime crash in Preview
-const getEnvVar = (key: string) => {
-    try {
-        return import.meta.env ? import.meta.env[key] : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-const isProd = import.meta.env ? import.meta.env.PROD : false;
-const API_BASE = getEnvVar('VITE_API_URL') || (isProd ? 'https://fhbmain.impossible.cz:3010' : '');
+// Safe access: Ensure env object exists before accessing properties
+const env = (import.meta.env || {}) as any;
+const API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
 
 // Maintenance Page Component (DB Error)
 const MaintenanceErrorPage = () => (
@@ -47,7 +39,7 @@ const App = () => {
   const { t } = useI18n();
   
   // Detect if we are likely in a dev/demo environment capability
-  const isDevEnv = import.meta.env ? import.meta.env.DEV : false;
+  const isDevEnv = env.DEV;
 
   // Initialize Mock Data if explicitly requested or in DEV
   const [useMockData, setUseMockData] = useState(isDevEnv);
@@ -208,7 +200,7 @@ const App = () => {
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
           <div className="mb-4 text-xs font-mono text-slate-400">
-              Build: {isDevEnv ? 'DEV' : 'PROD'}
+              Build: {env.DEV ? 'DEV' : 'PROD'}
           </div>
 
           {authSuccess && (
