@@ -260,7 +260,7 @@ export const RequestDetail = ({
                                             <div className="font-medium text-slate-700">{t(`action.${h.action}`)} {u ? `(${u.name})` : ''}</div>
                                             {h.note && <div className="text-slate-500 italic mt-1">{h.note}</div>}
                                             {h.oldValue && h.newValue && (
-                                                <div className="text-slate-400 mt-0.5">{t(`status.${h.oldValue}`)} -> {t(`status.${h.newValue}`)}</div>
+                                                <div className="text-slate-400 mt-0.5">{t(`status.${h.oldValue}`)} &rarr; {t(`status.${h.newValue}`)}</div>
                                             )}
                                         </div>
                                     )

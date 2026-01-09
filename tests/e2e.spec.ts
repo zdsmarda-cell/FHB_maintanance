@@ -6,6 +6,14 @@ test.describe('TechMaintain Pro E2E - Full Admin Suite', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate and login as Admin
     await page.goto('/');
+    
+    // Ensure "Demo Mode" is enabled for these tests to work without backend
+    // Check if checkbox is visible and not checked, then click it
+    const demoCheckbox = page.getByLabel('Demo režim (lokální data)');
+    if (await demoCheckbox.isVisible() && !(await demoCheckbox.isChecked())) {
+        await demoCheckbox.click();
+    }
+
     await page.getByRole('button', { name: 'Administrátor' }).click();
     await expect(page.locator('h1')).toContainText('TechMaintain Pro');
   });
@@ -179,6 +187,34 @@ test.describe('TechMaintain Pro E2E - Full Admin Suite', () => {
     
     // Verify Green Badge
     await expect(reqRow.getByText('Schváleno')).toBeVisible();
+  });
+
+  // --- 5. Email System Check ---
+  test('Admin: Email System Check', async ({ page }) => {
+      // 1. Go to Emails page and note count or just check existence
+      await page.getByRole('button', { name: 'Emaily' }).click();
+      await expect(page.getByRole('heading', { name: 'Správa Emailů' })).toBeVisible();
+
+      // 2. Create a new Request that triggers email
+      await page.getByRole('button', { name: 'Požadavky' }).click();
+      await page.getByRole('button', { name: 'Nový Požadavek' }).click();
+      
+      const reqTitle = `EmailTrigger_${Date.now()}`;
+      
+      // Select Technology
+      await page.getByText('Technologie *').click();
+      await page.locator('select').nth(2).selectOption({ index: 1 });
+      
+      await page.getByPlaceholder('Název').fill(reqTitle);
+      await page.getByPlaceholder('Popis').fill('Testing email generation');
+      await page.getByRole('button', { name: 'Vytvořit' }).click();
+
+      // 3. Go back to Emails page
+      await page.getByRole('button', { name: 'Emaily' }).click();
+
+      // 4. Check if the new email exists
+      // Subject should contain the request title
+      await expect(page.getByText(`Nový požadavek: ${reqTitle}`)).toBeVisible();
   });
 
 });

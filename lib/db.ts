@@ -246,7 +246,7 @@ const db = {
           note: 'Požadavek vytvořen'
       };
 
-      list.push({ 
+      const newRequest = { 
           ...r, 
           id: uid(), 
           createdDate: createdDate,
@@ -256,8 +256,25 @@ const db = {
           estimatedTime: time,
           isApproved: isApproved,
           history: [newHistory] 
-      } as Request);
+      } as Request;
+
+      list.push(newRequest);
       db.set('tmp_requests', list);
+      
+      // MOCK EMAIL GENERATION
+      // Simulating the backend worker behavior for E2E tests in Demo mode
+      const emails = db.get<Email>('tmp_emails');
+      emails.push({
+          id: uid(),
+          to_address: 'maintenance@tech.com',
+          subject: `Nový požadavek: ${r.title || 'Bez názvu'}`,
+          body: r.description,
+          attempts: 0,
+          sent_at: null,
+          error: null,
+          created_at: new Date().toISOString()
+      });
+      db.set('tmp_emails', emails);
     },
     update: (id: string, diff: Partial<Request>) => {
         const list = db.requests.list().map(r => {
