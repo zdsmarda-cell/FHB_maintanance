@@ -6,6 +6,17 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw } from 'lucide-react';
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
+// API Base URL - Safe Access
+const getEnvVar = (key: string) => {
+    try {
+        return import.meta.env ? import.meta.env[key] : undefined;
+    } catch {
+        return undefined;
+    }
+};
+const isProd = import.meta.env ? import.meta.env.PROD : false;
+const API_BASE = getEnvVar('VITE_API_URL') || (isProd ? 'https://fhbmain.impossible.cz:3010' : '');
+
 interface AssetsPageProps {
   user: User;
   onNavigate: (page: string, params?: any) => void;
@@ -59,7 +70,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMockToken = token?.startsWith('mock-token-');
-                const isDev = (import.meta as any).env && (import.meta as any).env.DEV;
+                // Safe check for DEV mode
+                const isDev = import.meta.env ? import.meta.env.DEV : false;
 
                 if (isDev || isMockToken) {
                     const reader = new FileReader();
@@ -73,7 +85,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
                     const formData = new FormData();
                     formData.append('image', file);
                     
-                    const response = await fetch('/api/upload', {
+                    const response = await fetch(`${API_BASE}/api/upload`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` },
                         body: formData
@@ -81,7 +93,9 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
 
                     if (response.ok) {
                         const resData = await response.json();
-                        const fullUrl = `${resData.url}`;
+                        // For production, if the backend returns a relative path, prefix it with the API_BASE
+                        // so images are loaded from the backend server port
+                        const fullUrl = resData.url.startsWith('http') ? resData.url : `${API_BASE}${resData.url}`;
                         setData({ ...data, photoUrls: [...(data.photoUrls || []), fullUrl] });
                     }
                     setIsUploading(false);

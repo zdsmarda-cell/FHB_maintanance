@@ -19,6 +19,19 @@ import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { ServerOff, KeyRound, Mail, AlertTriangle, CheckCircle, ArrowLeft, Loader, Database } from 'lucide-react';
 
+// Define API Base URL based on environment
+// SAFE CHECK: Ensure import.meta.env exists before accessing properties to prevent runtime crash in Preview
+const getEnvVar = (key: string) => {
+    try {
+        return import.meta.env ? import.meta.env[key] : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+const isProd = import.meta.env ? import.meta.env.PROD : false;
+const API_BASE = getEnvVar('VITE_API_URL') || (isProd ? 'https://fhbmain.impossible.cz:3010' : '');
+
 // Maintenance Page Component (DB Error)
 const MaintenanceErrorPage = () => (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-600">
@@ -34,7 +47,7 @@ const App = () => {
   const { t } = useI18n();
   
   // Detect if we are likely in a dev/demo environment capability
-  const isDevEnv = (import.meta as any).env && (import.meta as any).env.DEV;
+  const isDevEnv = import.meta.env ? import.meta.env.DEV : false;
 
   // Initialize Mock Data if explicitly requested or in DEV
   const [useMockData, setUseMockData] = useState(isDevEnv);
@@ -116,10 +129,11 @@ const App = () => {
         } else {
             // --- PRODUCTION (API ONLY) ---
             const controller = new AbortController();
-            // Short timeout (2s) to prevent infinite spinner feeling
-            const timeoutId = setTimeout(() => controller.abort(), 2000); 
+            // Short timeout (5s) for production connection
+            const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
-            const response = await fetch('/api/auth/login', {
+            // Use configured API_BASE
+            const response = await fetch(`${API_BASE}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),

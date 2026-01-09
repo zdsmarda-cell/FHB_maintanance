@@ -58,8 +58,30 @@ const PORT = process.env.PORT || 3010;
 
 // Initialize DB then start server
 initDb().then(() => {
-  const sslKeyPath = process.env.SSL_KEY_PATH;
-  const sslCertPath = process.env.SSL_CERT_PATH;
+  // SSL Certificate Logic
+  // Resolve paths relative to root if they are not absolute
+  let sslKeyPath = process.env.SSL_KEY_PATH;
+  let sslCertPath = process.env.SSL_CERT_PATH;
+
+  if (sslKeyPath && !path.isAbsolute(sslKeyPath)) {
+      sslKeyPath = path.resolve(rootDir, sslKeyPath);
+  }
+  if (sslCertPath && !path.isAbsolute(sslCertPath)) {
+      sslCertPath = path.resolve(rootDir, sslCertPath);
+  }
+
+  // Debug SSL
+  console.log('--- SSL Configuration Check ---');
+  console.log('Key Path:', sslKeyPath);
+  console.log('Cert Path:', sslCertPath);
+  
+  if (sslKeyPath && sslCertPath) {
+      console.log('Key exists:', fs.existsSync(sslKeyPath));
+      console.log('Cert exists:', fs.existsSync(sslCertPath));
+  } else {
+      console.log('SSL Paths not provided in .env');
+  }
+  console.log('-------------------------------');
 
   // Check if SSL certs are provided and exist
   if (sslKeyPath && sslCertPath && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
@@ -75,7 +97,11 @@ initDb().then(() => {
         console.log(`Images stored in: ${imgPath}`);
       });
     } catch (e) {
-      console.error('Failed to start HTTPS server:', e);
+      console.error('Failed to start HTTPS server (Certificate Load Error):', e);
+      // Fallback to HTTP if HTTPS fails
+      app.listen(PORT, () => {
+        console.warn('FALLBACK: Server running on port', PORT, '(HTTP)');
+      });
     }
   } else {
     app.listen(PORT, () => {

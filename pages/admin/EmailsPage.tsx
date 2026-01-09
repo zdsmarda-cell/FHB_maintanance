@@ -6,6 +6,17 @@ import { Email } from '../../lib/types';
 import { RefreshCcw, Check, AlertTriangle, Clock, Mail } from 'lucide-react';
 import { Pagination } from '../../components/Shared';
 
+// API Base URL - Safe Access
+const getEnvVar = (key: string) => {
+    try {
+        return import.meta.env ? import.meta.env[key] : undefined;
+    } catch {
+        return undefined;
+    }
+};
+const isProd = import.meta.env ? import.meta.env.PROD : false;
+const API_BASE = getEnvVar('VITE_API_URL') || (isProd ? 'https://fhbmain.impossible.cz:3010' : '');
+
 export const EmailsPage = () => {
     const { t } = useI18n();
     const [emails, setEmails] = useState<Email[]>([]);
@@ -28,7 +39,7 @@ export const EmailsPage = () => {
                 setEmails(db.emails.list());
             } else {
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch('/api/emails', {
+                const response = await fetch(`${API_BASE}/api/emails`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (response.ok) {
@@ -57,7 +68,7 @@ export const EmailsPage = () => {
             } else {
                 try {
                     const token = localStorage.getItem('auth_token');
-                    const response = await fetch('/api/emails/retry', {
+                    const response = await fetch(`${API_BASE}/api/emails/retry`, {
                         method: 'POST',
                         headers: { 
                             'Authorization': `Bearer ${token}`,
