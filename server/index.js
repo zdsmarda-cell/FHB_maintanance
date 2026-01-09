@@ -26,6 +26,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- DEBUG LOGGER MIDDLEWARE ---
+// This will log every request reaching the server to the console
+app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${req.method} ${req.url} (IP: ${req.ip})`);
+    next();
+});
+
 // Setup paths for ESM static serving
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,9 +41,6 @@ const rootDir = path.join(__dirname, '../');
 
 // Serve uploaded files statically based on IMG_PATH
 const imgPath = path.resolve(rootDir, process.env.IMG_PATH || 'uploads/images');
-
-// Removed mkdirSync to prevent permissions issues in production environment where creating folders at root might fail.
-// Ensure the directory exists via deployment scripts or manual creation.
 
 // Mount specific image path
 app.use('/uploads/images', express.static(imgPath));
@@ -58,11 +63,16 @@ const PORT = process.env.PORT || 3010;
 
 // Initialize DB then start server
 initDb().then(() => {
+  console.log('--- Server Startup Diagnostics ---');
+  console.log(`Current Root Dir: ${rootDir}`);
+  console.log(`Env SSL_KEY_PATH: ${process.env.SSL_KEY_PATH || 'Not set'}`);
+  console.log(`Env SSL_CERT_PATH: ${process.env.SSL_CERT_PATH || 'Not set'}`);
+
   // SSL Certificate Logic
-  // Resolve paths relative to root if they are not absolute
   let sslKeyPath = process.env.SSL_KEY_PATH;
   let sslCertPath = process.env.SSL_CERT_PATH;
 
+  // Resolve absolute paths
   if (sslKeyPath && !path.isAbsolute(sslKeyPath)) {
       sslKeyPath = path.resolve(rootDir, sslKeyPath);
   }
@@ -70,21 +80,14 @@ initDb().then(() => {
       sslCertPath = path.resolve(rootDir, sslCertPath);
   }
 
-  // Debug SSL
-  console.log('--- SSL Configuration Check ---');
-  console.log('Key Path:', sslKeyPath);
-  console.log('Cert Path:', sslCertPath);
-  
-  if (sslKeyPath && sslCertPath) {
-      console.log('Key exists:', fs.existsSync(sslKeyPath));
-      console.log('Cert exists:', fs.existsSync(sslCertPath));
-  } else {
-      console.log('SSL Paths not provided in .env');
-  }
-  console.log('-------------------------------');
+  // Check existence
+  const keyExists = sslKeyPath && fs.existsSync(sslKeyPath);
+  const certExists = sslCertPath && fs.existsSync(sslCertPath);
 
-  // Check if SSL certs are provided and exist
-  if (sslKeyPath && sslCertPath && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+  console.log(`Resolved Key Path: ${sslKeyPath} (${keyExists ? 'FOUND' : 'MISSING'})`);
+  console.log(`Resolved Cert Path: ${sslCertPath} (${certExists ? 'FOUND' : 'MISSING'})`);
+
+  if (keyExists && certExists) {
     try {
       const httpsOptions = {
         key: fs.readFileSync(sslKeyPath),
@@ -92,22 +95,22 @@ initDb().then(() => {
       };
       
       https.createServer(httpsOptions, app).listen(PORT, () => {
-        console.log(`Secure Server running on port ${PORT} (HTTPS)`);
-        console.log(`URL: ${process.env.APP_URL || `https://localhost:${PORT}`}`);
-        console.log(`Images stored in: ${imgPath}`);
+        console.log(`✅ SECURE HTTPS Server running on port ${PORT}`);
+        console.log(`   URL: https://fhbmain.impossible.cz:${PORT}`);
       });
     } catch (e) {
-      console.error('Failed to start HTTPS server (Certificate Load Error):', e);
-      // Fallback to HTTP if HTTPS fails
+      console.error('❌ CRITICAL: Failed to start HTTPS server despite finding files:', e.message);
+      console.log('⚠️  Falling back to HTTP due to SSL error...');
       app.listen(PORT, () => {
-        console.warn('FALLBACK: Server running on port', PORT, '(HTTP)');
+        console.log(`⚠️  Server running on port ${PORT} (HTTP ONLY)`);
       });
     }
   } else {
+    console.warn('⚠️  SSL Certificates not found or not configured.');
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT} (HTTP)`);
-      console.log(`URL: ${process.env.APP_URL || `http://localhost:${PORT}`}`);
-      console.log(`Images stored in: ${imgPath}`);
+      console.log(`⚠️  Server running on port ${PORT} (HTTP ONLY)`);
+      console.log(`   NOTE: Connect using http://, not https://`);
     });
   }
+  console.log('----------------------------------');
 });
