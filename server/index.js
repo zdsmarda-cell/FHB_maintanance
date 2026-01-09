@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 // Middleware
 import { authenticateToken } from './middleware/auth.js';
 import { initDb } from './initDb.js';
+import { startWorker } from './worker.js';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -77,12 +78,19 @@ initDb().then(() => {
     try {
       https.createServer({ key: fs.readFileSync(sslKeyPath), cert: fs.readFileSync(sslCertPath) }, app).listen(PORT, () => {
         console.log(`✅ SECURE HTTPS Server running on port ${PORT}`);
+        startWorker(); // Start background jobs
       });
     } catch (e) {
       console.error('❌ SSL Error, falling back to HTTP:', e.message);
-      app.listen(PORT, () => console.log(`⚠️ Server running on port ${PORT} (HTTP)`));
+      app.listen(PORT, () => {
+          console.log(`⚠️ Server running on port ${PORT} (HTTP)`);
+          startWorker(); // Start background jobs
+      });
     }
   } else {
-    app.listen(PORT, () => console.log(`⚠️ Server running on port ${PORT} (HTTP)`));
+    app.listen(PORT, () => {
+        console.log(`⚠️ Server running on port ${PORT} (HTTP)`);
+        startWorker(); // Start background jobs
+    });
   }
 });

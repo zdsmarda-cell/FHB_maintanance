@@ -7,8 +7,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-console.log('Worker started. Jobs: Email (60s), Maintenance Generator (60s), Overdue Checker (Daily 00:01)');
-
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -167,28 +165,33 @@ const generateMaintenanceRequests = async () => {
     }
 }
 
-// Initial Run
-processEmailQueue();
-generateMaintenanceRequests();
+// --- Scheduler Function ---
+export const startWorker = () => {
+    console.log('--- Worker Background Process Started ---');
+    console.log('Jobs: Email (60s), Maintenance Generator (60s), Overdue Checker (Daily 00:01)');
 
-// --- Scheduler ---
-let lastOverdueCheck = null;
-
-setInterval(() => {
-    const now = new Date();
-    
-    // Regular jobs (every minute)
+    // Initial Run on Startup
     processEmailQueue();
     generateMaintenanceRequests();
 
-    // Daily Job at 00:01
-    // We check if hour is 0, minute is 1, and we haven't run it yet today
-    const currentDay = now.getDate();
-    if (now.getHours() === 0 && now.getMinutes() === 1) {
-        if (lastOverdueCheck !== currentDay) {
-            checkDailyOverdue();
-            lastOverdueCheck = currentDay;
-        }
-    }
+    let lastOverdueCheck = null;
 
-}, 60000); // 60s Interval
+    setInterval(() => {
+        const now = new Date();
+        
+        // Regular jobs (every minute)
+        processEmailQueue();
+        generateMaintenanceRequests();
+
+        // Daily Job at 00:01
+        // We check if hour is 0, minute is 1, and we haven't run it yet today
+        const currentDay = now.getDate();
+        if (now.getHours() === 0 && now.getMinutes() === 1) {
+            if (lastOverdueCheck !== currentDay) {
+                checkDailyOverdue();
+                lastOverdueCheck = currentDay;
+            }
+        }
+
+    }, 60000); // 60s Interval
+};
