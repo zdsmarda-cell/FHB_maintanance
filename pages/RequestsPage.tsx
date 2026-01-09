@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { User, Request, RequestPriority, Workplace, Technology, Supplier } from '../lib/types';
+import { User, Request, RequestPriority, Workplace, Technology, Supplier, Location } from '../lib/types';
 import { RequestsTable } from '../components/requests/RequestsTable';
 import { RequestDetail } from '../components/requests/RequestDetail';
 import { RequestForm } from '../components/requests/RequestForm';
@@ -28,6 +28,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [requests, setRequests] = useState<Request[]>([]);
     const [technologies, setTechnologies] = useState<Technology[]>([]);
     const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]); // Added state for locations
     const [users, setUsers] = useState<User[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
@@ -56,21 +57,24 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 setRequests(db.requests.list());
                 setTechnologies(db.technologies.list());
                 setWorkplaces(db.workplaces.list());
+                setLocations(db.locations.list());
                 setUsers(db.users.list());
                 setSuppliers(db.suppliers.list());
             } else {
-                const [reqData, techData, wpData, userData, supData] = await Promise.all([
+                const [reqData, techData, wpData, userData, supData, locData] = await Promise.all([
                     api.get('/requests'),
                     api.get('/technologies'),
                     api.get('/locations/workplaces'),
                     api.get('/users'),
-                    api.get('/suppliers')
+                    api.get('/suppliers'),
+                    api.get('/locations')
                 ]);
                 setRequests(reqData);
                 setTechnologies(techData);
                 setWorkplaces(wpData);
                 setUsers(userData);
                 setSuppliers(supData);
+                setLocations(locData);
             }
 
             // Refresh selected request reference
@@ -231,6 +235,9 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         if (!data.title) errs.title = t('validation.required');
         if (!data.techId) errs.techId = t('validation.required');
         if (!data.description) errs.description = t('validation.required');
+        // Validation for mandatory plannedResolutionDate
+        if (!data.plannedResolutionDate) errs.plannedResolutionDate = t('validation.required');
+        
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
@@ -497,7 +504,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                     <h2 className="text-xl font-bold mb-4">{isEdit ? t('common.edit') : t('headers.new_request')}</h2>
                     <RequestForm 
                         formData={requestForm} setFormData={setRequestForm} errors={errors} user={currentUser}
-                        locations={db.locations.list()} workplaces={workplaces} technologies={technologies}
+                        locations={locations} workplaces={workplaces} technologies={technologies}
                         handleImageUpload={handleImageUpload} removePhoto={removePhoto} isEditMode={isEdit} isUploading={isUploading}
                     />
                     <div className="flex justify-end gap-2 mt-4 pt-4 border-t">

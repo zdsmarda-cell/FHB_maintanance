@@ -164,6 +164,12 @@ const migrations = [
         up: [
             `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS photo_urls JSON`
         ]
+    },
+    {
+        name: '005_add_estimated_time_requests',
+        up: [
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS estimated_time INT DEFAULT 0`
+        ]
     }
 ];
 

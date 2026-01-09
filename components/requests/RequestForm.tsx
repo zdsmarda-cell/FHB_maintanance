@@ -173,16 +173,17 @@ export const RequestForm = ({
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.planned_resolution_date')} (nepovinné)</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.planned_resolution_date')} *</label>
                     <div className="relative">
                          <input 
                             type="date" 
-                            className="w-full p-2 pl-8 rounded border"
+                            className={`w-full p-2 pl-8 rounded border ${errors.plannedResolutionDate ? 'border-red-500' : ''}`}
                             value={formData.plannedResolutionDate || ''} 
                             onChange={e => setFormData({...formData, plannedResolutionDate: e.target.value})} 
                         />
                         <Calendar className="w-4 h-4 absolute left-2 top-2.5 text-slate-400" />
                     </div>
+                    {errors.plannedResolutionDate && <span className="text-xs text-red-500">{errors.plannedResolutionDate}</span>}
                 </div>
             </div>
 
