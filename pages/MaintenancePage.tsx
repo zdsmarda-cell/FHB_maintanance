@@ -4,7 +4,7 @@ import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
 import { Plus, Filter, ArrowLeft, Edit, Loader, X } from 'lucide-react';
-import { Modal, MultiSelect } from '../components/Shared';
+import { Modal } from '../components/Shared';
 
 export const MaintenancePage = ({ user }: { user: User }) => {
     const { t } = useI18n();
@@ -24,7 +24,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     // Filter States
     const [filters, setFilters] = useState({
         techName: '',
-        type: '',
         supplierId: '',
         responsiblePersonId: ''
     });
@@ -59,14 +58,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                 setLocations(locData);
                 setWorkplaces(wpData);
             }
-            
-            // Refresh selected template if detail view is open
-            if (selectedTemplate) {
-                // We need to re-find the updated template from the new list (which we don't have in state yet, 
-                // but for simplicity in this async flow, we rely on the next render or fetch it manually if needed)
-                // In production app we might need to fetch the single item again.
-                // For now, we leave it as is, data will refresh on next list render.
-            }
         } catch (e) {
             console.error("Failed to load maintenance data", e);
         } finally {
@@ -81,7 +72,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     const resetFilters = () => {
         setFilters({
             techName: '',
-            type: '',
             supplierId: '',
             responsiblePersonId: ''
         });
@@ -112,7 +102,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
 
         const tech = technologies.find(t => t.id === m.techId);
         if (filters.techName && !tech?.name.toLowerCase().includes(filters.techName.toLowerCase())) return false;
-        if (filters.type && m.type !== filters.type) return false;
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
         if (filters.responsiblePersonId) { if (!m.responsiblePersonIds?.includes(filters.responsiblePersonId)) return false; }
         return true;
@@ -132,7 +121,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     const [selectedLocId, setSelectedLocId] = useState('');
     const [selectedWpId, setSelectedWpId] = useState('');
     const [maintForm, setMaintForm] = useState<Partial<Maintenance>>({
-        type: 'planned', title: '', techId: '', supplierId: '', responsiblePersonIds: [],
+        title: '', techId: '', supplierId: '', responsiblePersonIds: [],
         description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -141,7 +130,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     const openCreateModal = () => {
         setEditingId(null);
         setMaintForm({
-            type: 'planned', title: '', techId: '', supplierId: '', responsiblePersonIds: [],
+            title: '', techId: '', supplierId: '', responsiblePersonIds: [],
             description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
         });
         setSelectedLocId(''); setSelectedWpId('');
@@ -250,7 +239,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
                                 <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? supplier.name : <span className="text-slate-400 italic">Interní řešení</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
-                                <div><span className="text-slate-500 block">{t('form.maintenance_type')}</span> {selectedTemplate.type === 'operational' ? 'Provozní' : 'Plánovaná'}</div>
                                 {selectedTemplate.lastGeneratedDate && (
                                     <div><span className="text-slate-500 block">Poslední generování</span> {new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString()}</div>
                                 )}
@@ -321,14 +309,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                             <input className="w-full p-1.5 border rounded" value={filters.techName} onChange={e => setFilters({...filters, techName: e.target.value})} />
                         </div>
                         <div>
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.maintenance_type')}</label>
-                            <select className="w-full p-1.5 border rounded" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
-                                <option value="">{t('common.all')}</option>
-                                <option value="planned">Plánovaná</option>
-                                <option value="operational">Provozní</option>
-                            </select>
-                        </div>
-                        <div>
                              <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
                              <select className="w-full p-1.5 border rounded" value={filters.supplierId} onChange={e => setFilters({...filters, supplierId: e.target.value})}>
                                 <option value="">{t('common.all')}</option>
@@ -346,7 +326,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                             <tr>
                                 <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
                                 <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
-                                <th className="px-4 py-3 whitespace-nowrap">Typ</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
@@ -355,7 +334,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         </thead>
                         <tbody>
                             {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
@@ -367,7 +346,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
                                             <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Unknown'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{m.type === 'operational' ? 'Provozní' : 'Plánovaná'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{supplier?.name || '-'}</td>
@@ -414,11 +392,6 @@ const MaintModal = ({
     locations, workplaces, technologies, suppliers, users
 }: any) => {
     
-    const removeResponsiblePerson = (id: string) => {
-        const updated = (data.responsiblePersonIds || []).filter((pid: string) => pid !== id);
-        setData({...data, responsiblePersonIds: updated});
-    }
-
     const toggleAllowedDay = (day: number) => {
         const currentDays = data.allowedDays || [];
         const newDays = currentDays.includes(day) 
@@ -478,13 +451,7 @@ const MaintModal = ({
                     <input className={`w-full border p-2 rounded ${errors.title ? 'border-red-500' : ''}`} value={data.title} onChange={e => setData({...data, title: e.target.value})} />
                     {errors.title && <span className="text-xs text-red-500">{errors.title}</span>}
             </div>
-            <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.maintenance_type')}</label>
-                    <select className="w-full border p-2 rounded" value={data.type} onChange={e => setData({...data, type: e.target.value as any})}>
-                        <option value="planned">Plánovaná</option>
-                        <option value="operational">Provozní</option>
-                    </select>
-            </div>
+            
             <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')}</label>
                     <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
@@ -533,31 +500,25 @@ const MaintModal = ({
             </div>
             
             <div className="col-span-2 border-t pt-4 mt-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.responsible_person')}</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.responsible_person')} (max 1)</label>
                     <div className={`${errors.responsiblePersonIds ? 'border border-red-500 rounded' : ''}`}>
-                        <MultiSelect 
-                        label=""
-                        options={users.filter((u: any) => (u.role === 'admin' || u.role === 'maintenance') && !u.isBlocked).map((u: any) => ({ id: u.id, name: u.name }))}
-                        selectedIds={data.responsiblePersonIds || []}
-                        onChange={ids => setData({...data, responsiblePersonIds: ids})}
-                        />
-                    </div>
-                    {/* Selected Persons Tags */}
-                    {data.responsiblePersonIds && data.responsiblePersonIds.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {data.responsiblePersonIds.map((id: string) => {
-                                const user = users.find((u: any) => u.id === id);
-                                return (
-                                    <span key={id} className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs">
-                                        {user?.name}
-                                        <button onClick={() => removeResponsiblePerson(id)} className="ml-1 hover:text-blue-950"><X className="w-3 h-3" /></button>
-                                    </span>
-                                )
+                        <select 
+                            className="w-full border p-2 rounded"
+                            value={data.responsiblePersonIds?.[0] || ''}
+                            onChange={e => setData({
+                                ...data, 
+                                responsiblePersonIds: e.target.value ? [e.target.value] : [] 
                             })}
-                        </div>
-                    )}
-
-                    {errors.responsiblePersonIds && <span className="text-xs text-red-500">{errors.responsiblePersonIds}</span>}
+                        >
+                            <option value="">-- Nepřiřazeno --</option>
+                            {users
+                                .filter((u: any) => (u.role === 'admin' || u.role === 'maintenance') && !u.isBlocked)
+                                .map((u: any) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))
+                            }
+                        </select>
+                    </div>
             </div>
 
             <div className="col-span-2">

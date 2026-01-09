@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { Technology, User } from '../lib/types';
-import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon, Calendar } from 'lucide-react';
 import { Modal, MultiSelect, Pagination } from '../components/Shared';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
 
@@ -255,6 +255,8 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const [filterStateIds, setFilterStateIds] = useState<string[]>([]);
     const [filterWpIds, setFilterWpIds] = useState<string[]>([]);
     const [filterVisible, setFilterVisible] = useState<'all' | 'true' | 'false'>('true');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -353,6 +355,11 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
         if (filterTypeIds.length > 0 && !filterTypeIds.includes(a.typeId)) return false;
         if (filterStateIds.length > 0 && !filterStateIds.includes(a.stateId)) return false;
         if (filterWpIds.length > 0 && !filterWpIds.includes(a.workplaceId)) return false;
+        
+        // Date Logic
+        if (filterDateFrom && (!a.installDate || a.installDate < filterDateFrom)) return false;
+        if (filterDateTo && (!a.installDate || a.installDate > filterDateTo)) return false;
+
         return true;
     });
 
@@ -383,7 +390,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
             </div>
 
             <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" />
                         <input className="w-full pl-8 p-1.5 border rounded text-sm" placeholder={t('common.search')} value={search} onChange={e => setSearch(e.target.value)} />
@@ -391,6 +398,17 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                     <div><MultiSelect label={t('headers.tech_types')} options={techTypes} selectedIds={filterTypeIds} onChange={setFilterTypeIds} /></div>
                     <div><MultiSelect label={t('headers.tech_states')} options={techStates} selectedIds={filterStateIds} onChange={setFilterStateIds} /></div>
                     <div><MultiSelect label={t('form.workplace')} options={workplaces.map(w => ({ id: w.id, name: w.name }))} selectedIds={filterWpIds} onChange={setFilterWpIds} /></div>
+                    
+                    {/* Date Filters */}
+                    <div>
+                        <div className="mb-1 text-xs text-slate-500 font-medium">{t('form.install_date')}</div>
+                        <div className="flex items-center gap-1">
+                            <input type="date" className="w-full p-1.5 border rounded text-xs" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Od" />
+                            <span className="text-slate-400">-</span>
+                            <input type="date" className="w-full p-1.5 border rounded text-xs" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Do" />
+                        </div>
+                    </div>
+
                     <div>
                         <select className="w-full p-1.5 border rounded text-sm mt-5" value={filterVisible} onChange={e => setFilterVisible(e.target.value as any)}>
                             <option value="all">{t('common.all')}</option>
@@ -407,11 +425,11 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                             <tr>
                                 <th className="px-4 py-3">{t('form.name')} / S.N.</th>
+                                <th className="px-4 py-3">{t('form.install_date')}</th>
                                 <th className="px-4 py-3">{t('form.type')}</th>
                                 <th className="px-4 py-3">{t('form.state')}</th>
                                 <th className="px-4 py-3">{t('form.location')}</th>
                                 <th className="px-4 py-3">{t('form.supplier')}</th>
-                                <th className="px-4 py-3 text-center">{t('form.photos')}</th>
                                 <th className="px-4 py-3 text-center">{t('form.is_visible')}</th>
                                 <th className="px-4 py-3 text-center">{t('col.open_requests')}</th>
                                 <th className="px-4 py-3 text-right">{t('common.actions')}</th>
@@ -425,12 +443,25 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                 const loc = locations.find(l => l.id === wp?.locationId);
                                 const sup = suppliers.find(s => s.id === asset.supplierId);
                                 const reqCount = getOpenRequestCount(asset.id);
+                                const hasPhotos = asset.photoUrls && asset.photoUrls.length > 0;
 
                                 return (
                                     <tr key={asset.id} className={`border-b hover:bg-slate-50 ${!asset.isVisible ? 'bg-slate-50 opacity-70' : ''}`}>
                                         <td className="px-4 py-3 font-medium text-slate-900">
-                                            <div>{asset.name}</div>
-                                            {asset.serialNumber && <div className="text-xs text-slate-500 font-mono">{asset.serialNumber}</div>}
+                                            <div className="flex items-center gap-2">
+                                                {hasPhotos && (
+                                                    <button onClick={(e) => openGallery(e, asset.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                                        <ImageIcon className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <div>
+                                                    <div>{asset.name}</div>
+                                                    {asset.serialNumber && <div className="text-xs text-slate-500 font-mono">{asset.serialNumber}</div>}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-600">
+                                            {asset.installDate ? new Date(asset.installDate).toLocaleDateString() : '-'}
                                         </td>
                                         <td className="px-4 py-3">{type || '-'}</td>
                                         <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border">{state || '-'}</span></td>
@@ -439,13 +470,6 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                             <div className="text-xs text-slate-500">{loc?.name}</div>
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{sup?.name || '-'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {asset.photoUrls && asset.photoUrls.length > 0 && (
-                                                <button onClick={(e) => openGallery(e, asset.photoUrls)} className="p-1 text-slate-500 hover:text-blue-600 transition-colors" title="Zobrazit fotky">
-                                                    <ImageIcon className="w-4 h-4 mx-auto" />
-                                                </button>
-                                            )}
-                                        </td>
                                         <td className="px-4 py-3 text-center">
                                             {asset.isVisible ? <Eye className="w-4 h-4 text-green-500 mx-auto" /> : <EyeOff className="w-4 h-4 text-slate-400 mx-auto" />}
                                         </td>

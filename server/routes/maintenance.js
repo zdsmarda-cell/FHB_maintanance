@@ -21,10 +21,11 @@ router.post('/', async (req, res) => {
     const data = req.body;
     const id = crypto.randomUUID();
     try {
+        // Removed 'type' from query as requested
         await pool.query(`INSERT INTO maintenances 
-            (id, tech_id, title, description, interval_days, allowed_days, is_active, type, supplier_id, responsible_person_ids) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.type, data.supplierId, JSON.stringify(data.responsiblePersonIds)]
+            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds)]
         );
         res.json({ id, ...data });
     } catch (err) {
@@ -36,10 +37,11 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const data = req.body;
     try {
+        // Removed 'type' from query as requested
         await pool.query(`UPDATE maintenances SET 
-            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, type=?, supplier_id=?, responsible_person_ids=?
+            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?
             WHERE id=?`,
-            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.type, data.supplierId, JSON.stringify(data.responsiblePersonIds), id]
+            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), id]
         );
         res.json({ id, ...data });
     } catch (err) {
