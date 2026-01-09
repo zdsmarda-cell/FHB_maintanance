@@ -47,6 +47,14 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         if(!data.workplaceId) errs.workplaceId = t('validation.required');
         if(!data.typeId) errs.typeId = t('validation.required');
         if(!data.stateId) errs.stateId = t('validation.required');
+        
+        // New Mandatory Fields
+        if(!data.supplierId) errs.supplierId = t('validation.required');
+        if(!data.installDate) errs.installDate = t('validation.required');
+        
+        // Weight Validation
+        if(data.weight !== undefined && data.weight < 0) errs.weight = "Váha nesmí být záporná";
+
         setErrors(errs);
         return Object.keys(errs).length === 0;
     }
@@ -152,15 +160,15 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
 
                 <div className="grid grid-cols-2 gap-4">
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')}</label>
-                        <select className="w-full border p-2 rounded" value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')} *</label>
+                        <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                             <option value="">-</option>
                             {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                      </div>
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.install_date')}</label>
-                        <input type="date" className="w-full border p-2 rounded" value={data.installDate || ''} onChange={e => setData({...data, installDate: e.target.value})} />
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.install_date')} *</label>
+                        <input type="date" className={`w-full border p-2 rounded ${errors.installDate ? 'border-red-500' : ''}`} value={data.installDate || ''} onChange={e => setData({...data, installDate: e.target.value})} />
                      </div>
                 </div>
 
@@ -168,7 +176,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                 <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><Weight className="w-3 h-3 mr-1"/> {t('form.weight')}</label>
-                        <input type="number" min="0" className="w-full border p-2 rounded" value={data.weight || ''} onChange={e => setData({...data, weight: Number(e.target.value)})} placeholder="kg" />
+                        <input type="number" min="0" className={`w-full border p-2 rounded ${errors.weight ? 'border-red-500' : ''}`} value={data.weight || ''} onChange={e => setData({...data, weight: Number(e.target.value)})} placeholder="kg" />
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><LinkIcon className="w-3 h-3 mr-1"/> {t('form.documentation')}</label>

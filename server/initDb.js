@@ -158,6 +158,12 @@ const migrations = [
         up: [
             `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS sharepoint_link TEXT`
         ]
+    },
+    {
+        name: '004_add_photo_urls',
+        up: [
+            `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS photo_urls JSON`
+        ]
     }
 ];
 
