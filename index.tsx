@@ -22,30 +22,29 @@ import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server } 
 
 // --- Environment Detection ---
 
-// 1. Check if running on localhost (covers npm run dev AND npm run preview)
-const isLocalhost = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' || 
-    window.location.hostname === '0.0.0.0'
-);
-
-// 2. Production API URL
+const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
+
+// RUNTIME DETECTION:
+// We ignore 'import.meta.env.PROD' because 'npm run preview' is a PROD build serving on Localhost.
+// Instead, we check: Is the current browser hostname the Production Domain?
+// If NOT, we assume we are in Dev/Preview/Staging and force Mock Data.
+const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
+const shouldForceMock = !isProductionDomain;
 
 const App = () => {
   const { t } = useI18n();
   
-  // Default to Mock Data if on Localhost.
-  // This ensures Preview mode uses Mock data instead of failing on PROD API calls.
-  const [useMockData, setUseMockData] = useState(isLocalhost);
+  // Initialize state based on runtime domain check
+  const [useMockData, setUseMockData] = useState(shouldForceMock);
 
   // Initialize Mock Data if enabled
   useEffect(() => {
     if (useMockData) {
         seedData();
-        console.log("Environment: Localhost/Preview -> Using Mock Data");
+        console.log(`Environment: ${window.location.hostname} -> Using Mock Data (Preview/Dev Mode)`);
     } else {
-        console.log(`Environment: Production -> Using API at ${PROD_API_URL}`);
+        console.log(`Environment: ${window.location.hostname} -> Using Production API`);
     }
   }, [useMockData]);
 
@@ -69,7 +68,6 @@ const App = () => {
     const token = params.get('resetToken');
     if (token) {
         setResetToken(token);
-        // Only validate against DB if in mock mode, otherwise API handles it on submit
         if (useMockData) {
             const isValid = db.auth.validateToken(token);
             if (isValid) {
@@ -79,7 +77,7 @@ const App = () => {
                 setAuthError(t('auth.token_invalid'));
             }
         } else {
-             setAuthView('reset'); // Assume valid for UI, validate on submit
+             setAuthView('reset'); 
         }
         window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -99,7 +97,8 @@ const App = () => {
     try {
         if (useMockData) {
             // --- DEMO / MOCK LOGIC ---
-            await new Promise(resolve => setTimeout(resolve, 600)); // Simulate network
+            // Artificial delay to simulate API
+            await new Promise(resolve => setTimeout(resolve, 600)); 
 
             const mockUsers = db.users.list();
             let found = mockUsers.find(u => u.email === email);
@@ -155,7 +154,6 @@ const App = () => {
 
   const handleSendLink = () => {
       setAuthError(null);
-      // In Mock mode we simulate generation
       if (useMockData) {
           const token = db.auth.createResetToken(resetEmail);
           if (token) {
@@ -166,7 +164,6 @@ const App = () => {
               setAuthError('Email v systému neexistuje.'); 
           }
       } else {
-          // Production API would handle this
           setAuthError("Reset hesla přes API není v tomto demu implementován.");
       }
   };
@@ -208,7 +205,7 @@ const App = () => {
           <div className="mb-4 flex justify-center">
               <span className={`text-xs px-2 py-1 rounded font-mono flex items-center gap-1 ${useMockData ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
                   {useMockData ? <Database className="w-3 h-3"/> : <Server className="w-3 h-3"/>}
-                  {useMockData ? 'MOCK DATA (Preview)' : 'PRODUCTION API'}
+                  {useMockData ? 'MOCK DATA (Local/Preview)' : 'PRODUCTION API'}
               </span>
           </div>
 
@@ -240,8 +237,8 @@ const App = () => {
                     </button>
                 </div>
 
-                {/* Environment Switcher - Only visible on localhost */}
-                {isLocalhost && (
+                {/* Environment Switcher - Visible if detected purely as localhost or non-prod, allows toggle */}
+                {shouldForceMock && (
                     <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col items-center">
                         <label className="flex items-center text-sm text-slate-600 cursor-pointer hover:text-slate-900 bg-slate-50 px-3 py-2 rounded border border-slate-200 w-full justify-center">
                             <input 

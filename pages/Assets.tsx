@@ -8,26 +8,13 @@ import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Rot
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
 // --- Environment Detection ---
-// Check localhost
-const isLocalhost = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' || 
-    window.location.hostname === '0.0.0.0'
-);
-
-// Get Prod URL
+// Inverse Logic: If we are NOT on the production domain, we are in Dev/Preview/Staging
+const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
-
-// Determine API Base
-// If localhost, use Mock (empty string) or if manually configured otherwise.
-// Ideally, this should come from Context, but for this file-scoped fix:
-// If it's localhost, we default to believing we are in Dev/Preview mode (using mock logic inside component or db.ts)
-// However, the upload logic below needs a real URL if we are *not* using mock.
 let API_BASE = PROD_API_URL;
-if (isLocalhost) {
-    // In Preview/Localhost, we assume the API is either local 3000 or mocked.
-    // If the main App state (from index.tsx) is using Mock Data, the token will be 'mock-token-...'.
-}
+
+const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
+const isMockEnv = !isProductionDomain;
 
 interface AssetsPageProps {
   user: User;
@@ -37,7 +24,6 @@ interface AssetsPageProps {
 
 const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean, onClose: () => void, initialData: Technology | null, onSave: (data: Omit<Technology, 'id'> | Technology) => void }) => {
     const { t } = useI18n();
-    // Initialize weight as undefined for new items to show empty input
     const [data, setData] = useState<Partial<Technology>>(initialData || {
         name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
         installDate: '', weight: undefined, description: '', sharepointLink: '', photoUrls: [], isVisible: true
@@ -45,7 +31,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
 
-    // Helper to get visible workplaces
     const visibleWorkplaces = db.workplaces.list().filter(w => w.isVisible);
 
     const validate = () => {
@@ -53,8 +38,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
         if(!data.name) errs.name = t('validation.required');
         if(!data.workplaceId) errs.workplaceId = t('validation.required');
         if(!data.description?.trim()) errs.description = t('validation.required');
-        
-        // Mandatory fields
         if(!data.supplierId) errs.supplierId = t('validation.required');
         if(!data.installDate) errs.installDate = t('validation.required');
         if(!data.typeId) errs.typeId = t('validation.required');
@@ -67,8 +50,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
     const handleSave = () => {
         if(validate()) {
             if (data.name && data.workplaceId) {
-                // Ensure weight is saved as 0 if left undefined/empty, or keep as undefined depending on DB requirement. 
-                // Here we cast to number or 0 for safety before saving.
                 const finalData = { ...data, weight: data.weight || 0 };
                 onSave(finalData as any);
             }
@@ -81,10 +62,13 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             setIsUploading(true);
             try {
                 const token = localStorage.getItem('auth_token');
-                const isMockToken = !token || token.startsWith('mock-token-');
+                
+                // If Hostname is NOT prod, force Mock Upload logic
+                // Or if token indicates mock
+                const shouldMock = isMockEnv || (!token || token.startsWith('mock-token-'));
 
-                // Allow upload simulation in Localhost/Preview/Dev if using mock token
-                if (isMockToken) {
+                if (shouldMock) {
+                    console.log("Using Local/Mock Upload (Env: " + window.location.hostname + ")");
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         const newPhotos = [...(data.photoUrls || []), reader.result as string];
@@ -105,8 +89,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
 
                     if (response.ok) {
                         const resData = await response.json();
-                        // For production, if the backend returns a relative path, prefix it with the API_BASE
-                        // so images are loaded from the backend server port
                         const fullUrl = resData.url.startsWith('http') ? resData.url : `${API_BASE}${resData.url}`;
                         setData({ ...data, photoUrls: [...(data.photoUrls || []), fullUrl] });
                     }

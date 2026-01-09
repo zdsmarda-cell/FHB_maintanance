@@ -7,15 +7,13 @@ import { Email } from '../../lib/types';
 import { RefreshCcw, Check, AlertTriangle, Clock, Mail } from 'lucide-react';
 import { Pagination } from '../../components/Shared';
 
-// API Base URL - Safe Access
+const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 let API_BASE = PROD_API_URL;
 
-// Simple localhost check
-if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
-    // In local/preview, use Mock API unless specifically configured otherwise via env var (handled by main App logic usually)
-    // Here we just initialize the var to PROD, but the request logic checks auth token type
-}
+// Runtime Check for Environment
+const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
+const isMockEnv = !isProductionDomain;
 
 export const EmailsPage = () => {
     const { t } = useI18n();
@@ -30,20 +28,24 @@ export const EmailsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
-    const isMock = !localStorage.getItem('auth_token') || localStorage.getItem('auth_token')?.startsWith('mock-token-');
-
     const fetchEmails = async () => {
         setLoading(true);
         try {
-            if (isMock) {
+            // Force Mock if not on production domain, regardless of token status
+            if (isMockEnv) {
                 setEmails(db.emails.list());
             } else {
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch(`${API_BASE}/api/emails`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    setEmails(await response.json());
+                // Even in production, if token is mock-token (legacy/test login), fall back to mock
+                if (!token || token.startsWith('mock-token-')) {
+                     setEmails(db.emails.list());
+                } else {
+                    const response = await fetch(`${API_BASE}/api/emails`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        setEmails(await response.json());
+                    }
                 }
             }
         } catch (err) {
@@ -61,7 +63,7 @@ export const EmailsPage = () => {
         if (selectedIds.length === 0) return;
         
         if (confirm(`Opravdu chcete znovu odeslat ${selectedIds.length} označených emailů?`)) {
-            if (isMock) {
+            if (isMockEnv) {
                 db.emails.retry(selectedIds);
                 fetchEmails();
                 setSelectedIds([]);
