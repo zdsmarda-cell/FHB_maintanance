@@ -18,42 +18,34 @@ import { CalendarPage } from './pages/CalendarPage';
 import { seedData, db } from './lib/db';
 import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
-import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database } from 'lucide-react';
+import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server } from 'lucide-react';
 
 // --- Environment Detection ---
 
-// 1. Runtime check for Localhost (Works in browser regardless of build mode)
-// This captures 'npm run dev' AND 'npm run preview'
+// 1. Check if running on localhost (covers npm run dev AND npm run preview)
 const isLocalhost = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || 
     window.location.hostname === '127.0.0.1' || 
     window.location.hostname === '0.0.0.0'
 );
 
-// 2. Determine if we should show Demo/Mock controls
-// If we are on localhost, default to showing demo controls
-const showDemoControls = isLocalhost;
-
-// 3. API URL
+// 2. Production API URL
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
-
-// Safely access env var if replaced by Vite, otherwise fallback
-const ENV_API_URL = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL 
-    : '';
 
 const App = () => {
   const { t } = useI18n();
   
-  // Default to Mock Data if we are on Localhost (Dev or Preview), unless manually turned off
-  const [useMockData, setUseMockData] = useState(showDemoControls);
+  // Default to Mock Data if on Localhost.
+  // This ensures Preview mode uses Mock data instead of failing on PROD API calls.
+  const [useMockData, setUseMockData] = useState(isLocalhost);
 
-  // Computed API Base
-  const apiBase = useMockData ? '' : (ENV_API_URL || PROD_API_URL);
-
+  // Initialize Mock Data if enabled
   useEffect(() => {
     if (useMockData) {
         seedData();
+        console.log("Environment: Localhost/Preview -> Using Mock Data");
+    } else {
+        console.log(`Environment: Production -> Using API at ${PROD_API_URL}`);
     }
   }, [useMockData]);
 
@@ -77,16 +69,21 @@ const App = () => {
     const token = params.get('resetToken');
     if (token) {
         setResetToken(token);
-        const isValid = db.auth.validateToken(token);
-        if (isValid) {
-            setAuthView('reset');
+        // Only validate against DB if in mock mode, otherwise API handles it on submit
+        if (useMockData) {
+            const isValid = db.auth.validateToken(token);
+            if (isValid) {
+                setAuthView('reset');
+            } else {
+                setAuthView('login');
+                setAuthError(t('auth.token_invalid'));
+            }
         } else {
-            setAuthView('login');
-            setAuthError(t('auth.token_invalid'));
+             setAuthView('reset'); // Assume valid for UI, validate on submit
         }
         window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [t]);
+  }, [useMockData, t]);
   
   const handleLogin = async (role: User['role']) => {
     setAuthError(null);
@@ -101,9 +98,8 @@ const App = () => {
 
     try {
         if (useMockData) {
-            // --- DEMO / MOCK MODE ---
-            console.log('Logging in via Mock Data...');
-            await new Promise(resolve => setTimeout(resolve, 500)); 
+            // --- DEMO / MOCK LOGIC ---
+            await new Promise(resolve => setTimeout(resolve, 600)); // Simulate network
 
             const mockUsers = db.users.list();
             let found = mockUsers.find(u => u.email === email);
@@ -120,12 +116,12 @@ const App = () => {
             }
 
         } else {
-            // --- API MODE ---
-            console.log(`Connecting to API: ${apiBase}`);
+            // --- PRODUCTION API LOGIC ---
+            console.log(`Authenticating against: ${PROD_API_URL}`);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); 
+            const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
-            const response = await fetch(`${apiBase}/api/auth/login`, {
+            const response = await fetch(`${PROD_API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -142,7 +138,7 @@ const App = () => {
             } else {
                 if (response.status === 401) setAuthError("Neplatné přihlašovací údaje.");
                 else if (response.status === 403) setAuthError("Přístup zablokován.");
-                else setAuthError("Chyba serveru. Zkuste to později.");
+                else setAuthError(`Chyba serveru (${response.status}).`);
             }
         }
     } catch (err: any) {
@@ -150,7 +146,7 @@ const App = () => {
         if (err.name === 'AbortError') {
             setAuthError("Server neodpovídá (Timeout).");
         } else {
-            setAuthError("Nepodařilo se připojit k serveru.");
+            setAuthError("Nepodařilo se připojit k serveru. Zkontrolujte VPN/Internet.");
         }
     } finally {
         setIsLoggingIn(false);
@@ -159,27 +155,37 @@ const App = () => {
 
   const handleSendLink = () => {
       setAuthError(null);
-      // Logic mostly for demo, in prod backend handles this
-      const token = db.auth.createResetToken(resetEmail);
-      if (token) {
-          const link = `${window.location.origin}${window.location.pathname}?resetToken=${token}`;
-          setGeneratedLink(link);
-          setAuthView('link-sent');
+      // In Mock mode we simulate generation
+      if (useMockData) {
+          const token = db.auth.createResetToken(resetEmail);
+          if (token) {
+              const link = `${window.location.origin}${window.location.pathname}?resetToken=${token}`;
+              setGeneratedLink(link);
+              setAuthView('link-sent');
+          } else {
+              setAuthError('Email v systému neexistuje.'); 
+          }
       } else {
-          setAuthError('Email v systému neexistuje.'); 
+          // Production API would handle this
+          setAuthError("Reset hesla přes API není v tomto demu implementován.");
       }
   };
 
   const handleResetPassword = () => {
       if (!resetToken || !newPassword) return;
-      const success = db.auth.resetPassword(resetToken, newPassword);
-      if (success) {
-          setAuthSuccess(t('auth.reset_success'));
-          setAuthView('login');
-          setNewPassword('');
-          setResetToken(null);
+      
+      if (useMockData) {
+          const success = db.auth.resetPassword(resetToken, newPassword);
+          if (success) {
+              setAuthSuccess(t('auth.reset_success'));
+              setAuthView('login');
+              setNewPassword('');
+              setResetToken(null);
+          } else {
+              setAuthError(t('auth.token_invalid'));
+          }
       } else {
-          setAuthError(t('auth.token_invalid'));
+           setAuthError("Reset hesla přes API není v tomto demu implementován.");
       }
   };
   
@@ -199,8 +205,11 @@ const App = () => {
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
-          <div className="mb-4 text-xs font-mono text-slate-400">
-              Režim: {isLocalhost ? 'Local/Preview' : 'Production'} | {useMockData ? 'MOCK DATA' : 'LIVE API'}
+          <div className="mb-4 flex justify-center">
+              <span className={`text-xs px-2 py-1 rounded font-mono flex items-center gap-1 ${useMockData ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                  {useMockData ? <Database className="w-3 h-3"/> : <Server className="w-3 h-3"/>}
+                  {useMockData ? 'MOCK DATA (Preview)' : 'PRODUCTION API'}
+              </span>
           </div>
 
           {authSuccess && (
@@ -231,7 +240,8 @@ const App = () => {
                     </button>
                 </div>
 
-                {showDemoControls && (
+                {/* Environment Switcher - Only visible on localhost */}
+                {isLocalhost && (
                     <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col items-center">
                         <label className="flex items-center text-sm text-slate-600 cursor-pointer hover:text-slate-900 bg-slate-50 px-3 py-2 rounded border border-slate-200 w-full justify-center">
                             <input 
@@ -241,11 +251,11 @@ const App = () => {
                                 onChange={(e) => setUseMockData(e.target.checked)} 
                             />
                             <Database className="w-4 h-4 mr-2 text-slate-500" />
-                            <span>Demo režim (lokální data)</span>
+                            <span>Používat lokální data (Mock)</span>
                         </label>
                         {!useMockData && (
-                            <p className="text-[10px] text-slate-400 mt-1">
-                                API: {apiBase}
+                            <p className="text-[10px] text-red-500 mt-1 font-bold bg-red-50 px-2 py-1 rounded">
+                                ⚠️ Pozor: Připojuji se k ostré DB!
                             </p>
                         )}
                     </div>
