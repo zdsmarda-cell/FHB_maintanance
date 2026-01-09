@@ -20,9 +20,16 @@ import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { ServerOff, KeyRound, Mail, AlertTriangle, CheckCircle, ArrowLeft, Loader, Database } from 'lucide-react';
 
+// Runtime check for Localhost (This ensures Preview Mode works even if NODE_ENV is production)
+const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' || 
+    window.location.hostname === '0.0.0.0'
+);
+
 // Define API Base URL based on environment safely
 let API_BASE = '';
-let isDevEnv = false;
+let isEnvDev = false;
 
 try {
     // @ts-ignore
@@ -30,17 +37,19 @@ try {
     // @ts-ignore
     API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
     // @ts-ignore
-    isDevEnv = env.DEV;
+    isEnvDev = env.DEV;
 } catch (e) {
-    // Silent catch: environment variables might be missing in built preview, handled by fallback below
+    // Silent catch
 }
 
-// Override: Always treat Localhost as DEV environment (fixes "Build: PROD" in Preview mode)
-if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
-    isDevEnv = true;
-    // Fallback API if env failed
-    if (!API_BASE) API_BASE = 'https://fhbmain.impossible.cz:3010';
+// Fallback API if env failed but we are local
+if (isLocalhost && !API_BASE) {
+    API_BASE = 'https://fhbmain.impossible.cz:3010';
 }
+
+// Combine checks: True if Vite says DEV OR if we are on localhost (fixes Preview mode)
+// The OR operator ensures that even if 'isEnvDev' is false (in preview), 'isLocalhost' keeps it true.
+const isDevMode = isEnvDev || isLocalhost;
 
 // Maintenance Page Component (DB Error)
 const MaintenanceErrorPage = () => (
@@ -56,8 +65,8 @@ const MaintenanceErrorPage = () => (
 const App = () => {
   const { t } = useI18n();
   
-  // Initialize Mock Data if explicitly requested or in DEV
-  const [useMockData, setUseMockData] = useState(isDevEnv);
+  // Initialize Mock Data if explicitly requested or in DEV/Localhost
+  const [useMockData, setUseMockData] = useState(isDevMode);
 
   useEffect(() => {
     if (useMockData) {
@@ -215,7 +224,7 @@ const App = () => {
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
           <div className="mb-4 text-xs font-mono text-slate-400">
-              Build: {isDevEnv ? 'DEV' : 'PROD'}
+              Build: {isDevMode ? 'DEV/PREVIEW' : 'PROD'}
           </div>
 
           {authSuccess && (
@@ -246,7 +255,7 @@ const App = () => {
                     </button>
                 </div>
 
-                {isDevEnv && (
+                {isDevMode && (
                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col items-center">
                         <label className="flex items-center text-sm text-slate-500 cursor-pointer hover:text-slate-700">
                             <input 

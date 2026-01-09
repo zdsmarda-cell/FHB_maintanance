@@ -7,25 +7,34 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw } from 'lucide-react';
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
+// Runtime check for Localhost (Preview Mode Support)
+const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' || 
+    window.location.hostname === '0.0.0.0'
+);
+
 // API Base URL - Safe Access
 let API_BASE = '';
-let isDev = false;
+let isEnvDev = false;
 try {
     // @ts-ignore
     const env = import.meta.env;
     // @ts-ignore
     API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
     // @ts-ignore
-    isDev = env.DEV;
+    isEnvDev = env.DEV;
 } catch {
     // Silent fallback
 }
 
-// Override: Always treat Localhost as DEV (allow mock uploads)
-if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
-    isDev = true;
-    if (!API_BASE) API_BASE = 'https://fhbmain.impossible.cz:3010';
+// Fallback API
+if (isLocalhost && !API_BASE) {
+    API_BASE = 'https://fhbmain.impossible.cz:3010';
 }
+
+// Robust Dev Mode Check
+const isDevMode = isEnvDev || isLocalhost;
 
 interface AssetsPageProps {
   user: User;
@@ -81,7 +90,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
                 const token = localStorage.getItem('auth_token');
                 const isMockToken = token?.startsWith('mock-token-');
 
-                if (isDev || isMockToken) {
+                if (isDevMode || isMockToken) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         const newPhotos = [...(data.photoUrls || []), reader.result as string];
