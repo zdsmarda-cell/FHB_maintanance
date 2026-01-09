@@ -75,7 +75,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                 // Ensure weight is number (allow 0)
                 const finalData = { 
                     ...data, 
-                    weight: (data.weight !== undefined && data.weight !== '') ? Number(data.weight) : 0 
+                    weight: data.weight ?? 0 
                 };
                 onSave(finalData as any);
             }
