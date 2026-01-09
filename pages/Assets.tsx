@@ -1,3 +1,4 @@
+
 /// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/db';
@@ -7,8 +8,24 @@ import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Rot
 import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
 
 // API Base URL - Safe Access
-const env = (import.meta.env || {}) as any;
-const API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+let API_BASE = '';
+let isDev = false;
+try {
+    // @ts-ignore
+    const env = import.meta.env;
+    // @ts-ignore
+    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+    // @ts-ignore
+    isDev = env.DEV;
+} catch {
+    // Silent fallback
+}
+
+// Override: Always treat Localhost as DEV (allow mock uploads)
+if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
+    isDev = true;
+    if (!API_BASE) API_BASE = 'https://fhbmain.impossible.cz:3010';
+}
 
 interface AssetsPageProps {
   user: User;
@@ -63,8 +80,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: boolean,
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMockToken = token?.startsWith('mock-token-');
-                // Direct env access with types reference
-                const isDev = env.DEV;
 
                 if (isDev || isMockToken) {
                     const reader = new FileReader();

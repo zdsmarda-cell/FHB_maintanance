@@ -1,3 +1,4 @@
+
 /// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../../lib/i18n';
@@ -7,8 +8,17 @@ import { RefreshCcw, Check, AlertTriangle, Clock, Mail } from 'lucide-react';
 import { Pagination } from '../../components/Shared';
 
 // API Base URL - Safe Access
-const env = (import.meta.env || {}) as any;
-const API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+let API_BASE = '';
+try {
+    // @ts-ignore
+    const env = import.meta.env;
+    // @ts-ignore
+    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+} catch {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.hostname !== '0.0.0.0') {
+        API_BASE = 'https://fhbmain.impossible.cz:3010';
+    }
+}
 
 export const EmailsPage = () => {
     const { t } = useI18n();

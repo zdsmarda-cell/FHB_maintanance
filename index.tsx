@@ -1,3 +1,4 @@
+
 /// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -19,10 +20,27 @@ import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { ServerOff, KeyRound, Mail, AlertTriangle, CheckCircle, ArrowLeft, Loader, Database } from 'lucide-react';
 
-// Define API Base URL based on environment
-// Safe access: Ensure env object exists before accessing properties
-const env = (import.meta.env || {}) as any;
-const API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+// Define API Base URL based on environment safely
+let API_BASE = '';
+let isDevEnv = false;
+
+try {
+    // @ts-ignore
+    const env = import.meta.env;
+    // @ts-ignore
+    API_BASE = env.VITE_API_URL || (env.PROD ? 'https://fhbmain.impossible.cz:3010' : '');
+    // @ts-ignore
+    isDevEnv = env.DEV;
+} catch (e) {
+    // Silent catch: environment variables might be missing in built preview, handled by fallback below
+}
+
+// Override: Always treat Localhost as DEV environment (fixes "Build: PROD" in Preview mode)
+if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')) {
+    isDevEnv = true;
+    // Fallback API if env failed
+    if (!API_BASE) API_BASE = 'https://fhbmain.impossible.cz:3010';
+}
 
 // Maintenance Page Component (DB Error)
 const MaintenanceErrorPage = () => (
@@ -38,9 +56,6 @@ const MaintenanceErrorPage = () => (
 const App = () => {
   const { t } = useI18n();
   
-  // Detect if we are likely in a dev/demo environment capability
-  const isDevEnv = env.DEV;
-
   // Initialize Mock Data if explicitly requested or in DEV
   const [useMockData, setUseMockData] = useState(isDevEnv);
 
@@ -200,7 +215,7 @@ const App = () => {
           <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
           
           <div className="mb-4 text-xs font-mono text-slate-400">
-              Build: {env.DEV ? 'DEV' : 'PROD'}
+              Build: {isDevEnv ? 'DEV' : 'PROD'}
           </div>
 
           {authSuccess && (
