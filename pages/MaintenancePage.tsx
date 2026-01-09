@@ -3,35 +3,30 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, MessageSquare, CheckCircle, PlayCircle, Calendar } from 'lucide-react';
+import { Plus, Filter, ArrowLeft, Edit, MessageSquare, CheckCircle, Calendar, X, Hash } from 'lucide-react';
 import { Modal, MultiSelect } from '../components/Shared';
 
 export const MaintenancePage = ({ user }: { user: User }) => {
     const { t } = useI18n();
-    // RBAC Check
-    if (user.role === 'operator') {
-        return <div className="p-10 text-center text-red-500">Access Denied</div>;
-    }
-
-    const [maintenances, setMaintenances] = useState(db.maintenances.list());
+    
+    // Maintenance is now treated as "Templates"
+    const [templates, setTemplates] = useState(db.maintenances.list());
     const [view, setView] = useState<'list' | 'detail'>('list');
-    const [selectedMaint, setSelectedMaint] = useState<Maintenance | null>(null);
+    const [selectedTemplate, setSelectedTemplate] = useState<Maintenance | null>(null);
 
     // Filter States
     const [filters, setFilters] = useState({
         techName: '',
         type: '',
-        dateFrom: '',
-        state: 'active',
         supplierId: '',
         responsiblePersonId: ''
     });
-    const [showFilters, setShowFilters] = useState(true);
+    const [showFilters, setShowFilters] = useState(user.role !== 'operator');
 
     const refresh = () => {
-        setMaintenances(db.maintenances.list());
-        if (selectedMaint) {
-            setSelectedMaint(db.maintenances.list().find(m => m.id === selectedMaint.id) || null);
+        setTemplates(db.maintenances.list());
+        if (selectedTemplate) {
+            setSelectedTemplate(db.maintenances.list().find(m => m.id === selectedTemplate.id) || null);
         }
     };
 
@@ -39,51 +34,58 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         setFilters({
             techName: '',
             type: '',
-            dateFrom: '',
-            state: 'active',
             supplierId: '',
             responsiblePersonId: ''
         });
     };
 
     const handleRowClick = (m: Maintenance) => {
-        setSelectedMaint(m);
+        setSelectedTemplate(m);
         setView('detail');
     };
 
     // Filter Logic
-    const filteredMaintenances = maintenances.filter(m => {
+    const filteredTemplates = templates.filter(m => {
+        // Operator Restriction Logic
+        if (user.role === 'operator') {
+            const tech = db.technologies.list().find(t => t.id === m.techId);
+            if (!tech) return false;
+            
+            // Check if tech belongs to a workplace/location accessible by the operator
+            const workplace = db.workplaces.list().find(w => w.id === tech.workplaceId);
+            if (!workplace) return false;
+
+            const hasAccess = 
+                user.assignedWorkplaceIds.includes(workplace.id) || 
+                user.assignedLocationIds.includes(workplace.locationId);
+            
+            if (!hasAccess) return false;
+        }
+
         const tech = db.technologies.list().find(t => t.id === m.techId);
         if (filters.techName && !tech?.name.toLowerCase().includes(filters.techName.toLowerCase())) return false;
         if (filters.type && m.type !== filters.type) return false;
-        if (filters.dateFrom && m.planDateFrom < filters.dateFrom) return false;
-        if (filters.state === 'active') { if (m.state === 'done') return false; } 
-        else if (filters.state && filters.state !== 'all') { if (m.state !== filters.state) return false; }
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
         if (filters.responsiblePersonId) { if (!m.responsiblePersonIds?.includes(filters.responsiblePersonId)) return false; }
         return true;
     });
 
-    const renderStatusBadge = (status: string) => {
-        const styles: any = {
-            'planned': 'bg-blue-100 text-blue-800',
-            'in_progress': 'bg-amber-100 text-amber-800',
-            'done': 'bg-green-100 text-green-800',
-        };
-        return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>{t(`status.${status}`)}</span>;
+    const renderActiveBadge = (isActive: boolean) => {
+        return isActive 
+            ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{t('status.planned')}</span>
+            : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{t('status.done')}</span>
     };
 
     // --- MODALS STATES ---
     const [isCreateOpen, setIsCreateOpen] = useState(false); // Used for both Create and Edit
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [isCompleteOpen, setIsCompleteOpen] = useState(false);
     
     // --- FORM STATES ---
     const [selectedLocId, setSelectedLocId] = useState('');
     const [selectedWpId, setSelectedWpId] = useState('');
     const [maintForm, setMaintForm] = useState<Partial<Maintenance>>({
         type: 'planned', title: '', techId: '', supplierId: '', responsiblePersonIds: [],
-        planDateFrom: '', planDateTo: '', planHours: 0, description: '', state: 'planned'
+        description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -107,7 +109,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         setEditingId(null);
         setMaintForm({
             type: 'planned', title: '', techId: '', supplierId: '', responsiblePersonIds: [],
-            planDateFrom: '', planDateTo: '', planHours: 0, description: '', state: 'planned'
+            description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
         });
         setSelectedLocId(''); setSelectedWpId('');
         setErrors({});
@@ -130,14 +132,18 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         setIsCreateOpen(true);
     };
 
+    // --- VALIDATION LOGIC ---
     const validate = () => {
         const newErrors: Record<string, string> = {};
         if (!maintForm.techId) newErrors.techId = t('validation.required');
         if (!maintForm.title) newErrors.title = t('validation.required');
-        if (!maintForm.planDateFrom) newErrors.planDateFrom = t('validation.required');
-        if (!maintForm.planDateTo) newErrors.planDateTo = t('validation.required');
-        if (!maintForm.supplierId) newErrors.supplierId = t('validation.required');
-        if (!maintForm.responsiblePersonIds || maintForm.responsiblePersonIds.length === 0) newErrors.responsiblePersonIds = t('validation.required');
+        // Supplier and Responsible Persons are now OPTIONAL
+        // if (!maintForm.supplierId) newErrors.supplierId = t('validation.required');
+        // if (!maintForm.responsiblePersonIds || maintForm.responsiblePersonIds.length === 0) newErrors.responsiblePersonIds = t('validation.required');
+        
+        if (!maintForm.interval || maintForm.interval < 1) newErrors.interval = t('validation.required');
+        if (!maintForm.allowedDays || maintForm.allowedDays.length === 0) newErrors.allowedDays = t('validation.required');
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -153,60 +159,16 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         refresh();
     };
 
-    // --- STATUS CHANGE & COMPLETION ---
-    const [finalReportData, setFinalReportData] = useState({ report: '', realDateFrom: '', realDateTo: '' });
-    
-    const handleChangeStatus = (newState: Maintenance['state']) => {
-        if (!selectedMaint) return;
-        if (newState === 'done') {
-            setFinalReportData({ 
-                report: '', 
-                realDateFrom: selectedMaint.planDateFrom, 
-                realDateTo: selectedMaint.planDateTo 
-            });
-            setIsCompleteOpen(true);
-        } else {
-            db.maintenances.update(selectedMaint.id, { state: newState });
-            refresh();
-        }
-    };
-
-    const handleComplete = () => {
-        if (!selectedMaint) return;
-        if (!finalReportData.report) { alert(t('validation.required')); return; }
-        
-        db.maintenances.update(selectedMaint.id, { 
-            state: 'done', 
-            finalReport: finalReportData.report,
-            realDateFrom: finalReportData.realDateFrom,
-            realDateTo: finalReportData.realDateTo
-        });
-        setIsCompleteOpen(false);
-        refresh();
-    };
-
-    // --- NOTES ---
-    const [newNote, setNewNote] = useState('');
-    const handleAddNote = () => {
-        if (!selectedMaint || !newNote.trim()) return;
-        db.maintenanceNotes.add({
-            maintenanceId: selectedMaint.id,
-            authorId: user.id,
-            content: newNote,
-            attachmentUrls: []
-        });
-        setNewNote('');
-        refresh(); // Ideally just refresh notes, but full refresh is safe
-    };
-
-
     // --- VIEW RENDER ---
-    if (view === 'detail' && selectedMaint) {
-        const tech = db.technologies.list().find(t => t.id === selectedMaint.techId);
-        const supplier = db.suppliers.list().find(s => s.id === selectedMaint.supplierId);
-        const notes = db.maintenanceNotes.list(selectedMaint.id);
-        const responsibleNames = selectedMaint.responsiblePersonIds
+    if (view === 'detail' && selectedTemplate) {
+        const tech = db.technologies.list().find(t => t.id === selectedTemplate.techId);
+        const supplier = db.suppliers.list().find(s => s.id === selectedTemplate.supplierId);
+        const responsibleNames = selectedTemplate.responsiblePersonIds
             ?.map(id => db.users.list().find(u => u.id === id)?.name).filter(Boolean).join(', ');
+        
+        const canEditMaint = user.role !== 'operator';
+
+        const dayNames = selectedTemplate.allowedDays.sort().map(d => t(`day.${d}`)).join(', ');
 
         return (
             <div className="space-y-6">
@@ -215,90 +177,39 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         <ArrowLeft className="w-4 h-4 mr-1"/> {t('common.back')}
                      </button>
                      <div className="flex gap-2">
-                        {selectedMaint.state === 'planned' && (
-                            <button onClick={() => handleChangeStatus('in_progress')} className="bg-amber-500 text-white px-3 py-2 rounded flex items-center shadow-sm hover:bg-amber-600">
-                                <PlayCircle className="w-4 h-4 mr-2" /> Zahájit
+                        {canEditMaint && (
+                            <button onClick={() => openEditModal(selectedTemplate)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
+                                <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
                             </button>
                         )}
-                        {selectedMaint.state === 'in_progress' && (
-                            <button onClick={() => handleChangeStatus('done')} className="bg-green-600 text-white px-3 py-2 rounded flex items-center shadow-sm hover:bg-green-700">
-                                <CheckCircle className="w-4 h-4 mr-2" /> Dokončit
-                            </button>
-                        )}
-                        <button onClick={() => openEditModal(selectedMaint)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
-                            <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
-                        </button>
                      </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-6">
                         <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-slate-800">{selectedMaint.title}</h2>
+                                    <h2 className="text-2xl font-bold text-slate-800">{selectedTemplate.title}</h2>
                                     <div className="text-slate-500 mt-1">{tech?.name}</div>
                                 </div>
-                                {renderStatusBadge(selectedMaint.state)}
+                                {renderActiveBadge(selectedTemplate.isActive)}
                             </div>
                             
                             <div className="grid grid-cols-2 gap-4 text-sm mt-6">
-                                <div><span className="text-slate-500 block">{t('form.date_from')}</span> {selectedMaint.planDateFrom}</div>
-                                <div><span className="text-slate-500 block">{t('form.date_to')}</span> {selectedMaint.planDateTo}</div>
-                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier?.name}</div>
-                                <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames}</div>
-                                <div><span className="text-slate-500 block">{t('form.plan_hours')}</span> {selectedMaint.planHours} h</div>
-                                <div><span className="text-slate-500 block">{t('form.maintenance_type')}</span> {selectedMaint.type === 'operational' ? 'Provozní' : 'Plánovaná'}</div>
+                                <div><span className="text-slate-500 block">{t('form.interval')}</span> {selectedTemplate.interval} {t('common.days')}</div>
+                                <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
+                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? supplier.name : <span className="text-slate-400 italic">Interní řešení</span>}</div>
+                                <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
+                                <div><span className="text-slate-500 block">{t('form.maintenance_type')}</span> {selectedTemplate.type === 'operational' ? 'Provozní' : 'Plánovaná'}</div>
+                                {selectedTemplate.lastGeneratedDate && (
+                                    <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate}</div>
+                                )}
                             </div>
                             
                             <div className="mt-6">
                                 <h4 className="font-bold text-sm text-slate-700 mb-2">{t('form.description')}</h4>
-                                <p className="text-slate-600 bg-slate-50 p-3 rounded">{selectedMaint.description || '-'}</p>
-                            </div>
-
-                            {selectedMaint.state === 'done' && (
-                                <div className="mt-6 border-t pt-4">
-                                     <h4 className="font-bold text-sm text-green-700 mb-2">{t('form.final_report')}</h4>
-                                     <div className="bg-green-50 p-4 rounded border border-green-100 text-green-900">
-                                         <p>{selectedMaint.finalReport}</p>
-                                         <div className="text-xs mt-2 opacity-75">
-                                             Realizace: {selectedMaint.realDateFrom} - {selectedMaint.realDateTo}
-                                         </div>
-                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="lg:col-span-1">
-                        <div className="bg-white rounded border border-slate-200 flex flex-col h-full shadow-sm max-h-[600px]">
-                            <div className="p-4 border-b border-slate-200 bg-slate-50 font-bold flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4"/> {t('headers.notes')}
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {notes.length === 0 && <div className="text-center text-slate-400 text-sm">Žádné poznámky</div>}
-                                {notes.map(n => {
-                                    const author = db.users.list().find(u => u.id === n.authorId);
-                                    return (
-                                        <div key={n.id} className="bg-slate-50 p-3 rounded border border-slate-100 text-sm">
-                                            <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                                <span className="font-bold text-slate-700">{author?.name}</span>
-                                                <span>{new Date(n.date).toLocaleString()}</span>
-                                            </div>
-                                            <p>{n.content}</p>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                            <div className="p-4 border-t border-slate-200">
-                                <textarea 
-                                    className="w-full border rounded p-2 text-sm mb-2" 
-                                    rows={2} 
-                                    placeholder={t('form.add_note')}
-                                    value={newNote}
-                                    onChange={e => setNewNote(e.target.value)}
-                                />
-                                <button onClick={handleAddNote} className="w-full bg-blue-600 text-white py-1.5 rounded text-sm hover:bg-blue-700">Odeslat</button>
+                                <p className="text-slate-600 bg-slate-50 p-3 rounded">{selectedTemplate.description || '-'}</p>
                             </div>
                         </div>
                     </div>
@@ -321,30 +232,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         t={t}
                     />
                 )}
-
-                {/* --- COMPLETE MODAL --- */}
-                {isCompleteOpen && (
-                    <Modal title={t('headers.complete_maintenance')} onClose={() => setIsCompleteOpen(false)}>
-                        <div className="space-y-4">
-                             <div>
-                                 <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.real_date_from')}</label>
-                                 <input type="date" className="w-full border p-2 rounded" value={finalReportData.realDateFrom} onChange={e => setFinalReportData({...finalReportData, realDateFrom: e.target.value})} />
-                             </div>
-                             <div>
-                                 <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.real_date_to')}</label>
-                                 <input type="date" className="w-full border p-2 rounded" value={finalReportData.realDateTo} onChange={e => setFinalReportData({...finalReportData, realDateTo: e.target.value})} />
-                             </div>
-                             <div>
-                                 <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.final_report')} *</label>
-                                 <textarea className="w-full border p-2 rounded h-32" value={finalReportData.report} onChange={e => setFinalReportData({...finalReportData, report: e.target.value})} />
-                             </div>
-                             <div className="flex justify-end gap-2 pt-4">
-                                 <button onClick={() => setIsCompleteOpen(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">{t('common.cancel')}</button>
-                                 <button onClick={handleComplete} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">{t('common.confirm')}</button>
-                             </div>
-                        </div>
-                    </Modal>
-                )}
             </div>
         );
     }
@@ -358,9 +245,11 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                     <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 rounded border ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-600'}`}>
                          <Filter className="w-5 h-5" />
                     </button>
-                    <button onClick={openCreateModal} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
-                        <Plus className="w-4 h-4 mr-2" /> {t('headers.new_maintenance')}
-                    </button>
+                    {user.role !== 'operator' && (
+                        <button onClick={openCreateModal} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
+                            <Plus className="w-4 h-4 mr-2" /> {t('headers.new_maintenance')}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -371,8 +260,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         <span className="font-bold text-slate-700">{t('common.filter')}</span>
                         <button onClick={resetFilters} className="text-xs text-blue-600 hover:underline">Reset</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        {/* Same filters as before */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         <div>
                             <label className="block text-xs text-slate-500 mb-1">Název technologie</label>
                             <input className="w-full p-1.5 border rounded" value={filters.techName} onChange={e => setFilters({...filters, techName: e.target.value})} />
@@ -386,31 +274,10 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                             </select>
                         </div>
                         <div>
-                             <label className="block text-xs text-slate-500 mb-1">{t('form.date_from')}</label>
-                             <input type="date" className="w-full p-1.5 border rounded" value={filters.dateFrom} onChange={e => setFilters({...filters, dateFrom: e.target.value})} />
-                        </div>
-                        <div>
-                             <label className="block text-xs text-slate-500 mb-1">{t('common.status')}</label>
-                             <select className="w-full p-1.5 border rounded" value={filters.state} onChange={e => setFilters({...filters, state: e.target.value})}>
-                                <option value="active">Neuzavřené</option>
-                                <option value="all">{t('common.all')}</option>
-                                <option value="planned">{t('status.planned')}</option>
-                                <option value="in_progress">{t('status.in_progress')}</option>
-                                <option value="done">{t('status.done')}</option>
-                             </select>
-                        </div>
-                        <div>
-                             <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')}</label>
+                             <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
                              <select className="w-full p-1.5 border rounded" value={filters.supplierId} onChange={e => setFilters({...filters, supplierId: e.target.value})}>
                                 <option value="">{t('common.all')}</option>
                                 {db.suppliers.list().map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                             </select>
-                        </div>
-                        <div>
-                             <label className="block text-xs text-slate-500 mb-1">{t('form.responsible_person')}</label>
-                             <select className="w-full p-1.5 border rounded" value={filters.responsiblePersonId} onChange={e => setFilters({...filters, responsiblePersonId: e.target.value})}>
-                                <option value="">{t('common.all')}</option>
-                                {db.users.list().filter(u => u.role !== 'operator').map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                              </select>
                         </div>
                     </div>
@@ -423,18 +290,19 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                             <tr>
                                 <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
+                                <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
                                 <th className="px-4 py-3 whitespace-nowrap">Typ</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('common.date')}</th>
+                                <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredMaintenances.length === 0 ? (
-                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Žádná údržba</td></tr>
+                            {filteredTemplates.length === 0 ? (
+                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
-                                filteredMaintenances.map(m => {
+                                filteredTemplates.map(m => {
                                     const tech = db.technologies.list().find(t => t.id === m.techId);
                                     const supplier = db.suppliers.list().find(s => s.id === m.supplierId);
                                     const responsibleNames = m.responsiblePersonIds
@@ -443,10 +311,11 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
                                             <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Unknown'}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.type === 'operational' ? 'Provozní' : 'Plánovaná'}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{m.planDateFrom} - {m.planDateTo}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{renderStatusBadge(m.state)}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{supplier?.name}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap">{supplier?.name || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>
                                         </tr>
                                     );
@@ -478,7 +347,22 @@ export const MaintenancePage = ({ user }: { user: User }) => {
 };
 
 // Refactored Modal for better readability
-const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t }: any) => (
+const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t }: any) => {
+    
+    const removeResponsiblePerson = (id: string) => {
+        const updated = (data.responsiblePersonIds || []).filter((pid: string) => pid !== id);
+        setData({...data, responsiblePersonIds: updated});
+    }
+
+    const toggleAllowedDay = (day: number) => {
+        const currentDays = data.allowedDays || [];
+        const newDays = currentDays.includes(day) 
+            ? currentDays.filter((d:number) => d !== day) 
+            : [...currentDays, day];
+        setData({...data, allowedDays: newDays});
+    }
+
+    return (
     <Modal title={isEdit ? t('headers.edit_maintenance') : t('headers.new_maintenance')} onClose={onClose}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto p-1">
             {!isEdit && (
@@ -525,7 +409,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
             )}
 
             <div className="col-span-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.name')} *</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.name')}</label>
                     <input className={`w-full border p-2 rounded ${errors.title ? 'border-red-500' : ''}`} value={data.title} onChange={e => setData({...data, title: e.target.value})} />
                     {errors.title && <span className="text-xs text-red-500">{errors.title}</span>}
             </div>
@@ -537,26 +421,54 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                     </select>
             </div>
             <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')} *</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')}</label>
                     <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
-                    <option value="">-</option>
+                    <option value="">-- Interní řešení --</option>
                     {db.suppliers.list().map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                     {errors.supplierId && <span className="text-xs text-red-500">{errors.supplierId}</span>}
             </div>
-            <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.date_from')} *</label>
-                    <input type="date" className={`w-full border p-2 rounded ${errors.planDateFrom ? 'border-red-500' : ''}`} value={data.planDateFrom} onChange={e => setData({...data, planDateFrom: e.target.value})} />
-                    {errors.planDateFrom && <span className="text-xs text-red-500">{errors.planDateFrom}</span>}
-            </div>
-            <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.date_to')} *</label>
-                    <input type="date" className={`w-full border p-2 rounded ${errors.planDateTo ? 'border-red-500' : ''}`} value={data.planDateTo} onChange={e => setData({...data, planDateTo: e.target.value})} />
-                    {errors.planDateTo && <span className="text-xs text-red-500">{errors.planDateTo}</span>}
-            </div>
             
             <div className="col-span-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.responsible_person')} *</label>
+                 <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.interval')}</label>
+                        <div className="flex items-center">
+                            <input type="number" min="1" className={`w-full border p-2 rounded ${errors.interval ? 'border-red-500' : ''}`} value={data.interval} onChange={e => setData({...data, interval: parseInt(e.target.value)})} />
+                            <span className="ml-2 text-sm text-slate-500">{t('common.days')}</span>
+                        </div>
+                        {errors.interval && <span className="text-xs text-red-500">{errors.interval}</span>}
+                     </div>
+                 </div>
+            </div>
+
+            <div className="col-span-2">
+                 <label className="block text-xs font-medium text-slate-700 mb-2">{t('form.allowed_days')}</label>
+                 <div className="flex gap-2 flex-wrap">
+                     {[1,2,3,4,5,6,0].map(day => (
+                         <label key={day} className={`
+                             cursor-pointer px-3 py-1.5 rounded text-sm border transition-colors
+                             ${data.allowedDays?.includes(day) 
+                                ? 'bg-blue-600 text-white border-blue-600' 
+                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}
+                         `}>
+                             <input type="checkbox" className="hidden" checked={data.allowedDays?.includes(day)} onChange={() => toggleAllowedDay(day)} />
+                             {t(`day.${day}`)}
+                         </label>
+                     ))}
+                 </div>
+                 {errors.allowedDays && <span className="text-xs text-red-500 block mt-1">{errors.allowedDays}</span>}
+            </div>
+
+            <div className="col-span-2 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={data.isActive} onChange={e => setData({...data, isActive: e.target.checked})} />
+                    <span className="text-sm font-medium">Šablona je aktivní</span>
+                </label>
+            </div>
+            
+            <div className="col-span-2 border-t pt-4 mt-2">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.responsible_person')}</label>
                     <div className={`${errors.responsiblePersonIds ? 'border border-red-500 rounded' : ''}`}>
                         <MultiSelect 
                         label=""
@@ -565,12 +477,22 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                         onChange={ids => setData({...data, responsiblePersonIds: ids})}
                         />
                     </div>
-                    {errors.responsiblePersonIds && <span className="text-xs text-red-500">{errors.responsiblePersonIds}</span>}
-            </div>
+                    {/* Selected Persons Tags */}
+                    {data.responsiblePersonIds && data.responsiblePersonIds.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {data.responsiblePersonIds.map((id: string) => {
+                                const user = db.users.list().find(u => u.id === id);
+                                return (
+                                    <span key={id} className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs">
+                                        {user?.name}
+                                        <button onClick={() => removeResponsiblePerson(id)} className="ml-1 hover:text-blue-950"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )
+                            })}
+                        </div>
+                    )}
 
-                <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.plan_hours')}</label>
-                    <input type="number" className="w-full border p-2 rounded" value={data.planHours} onChange={e => setData({...data, planHours: parseFloat(e.target.value)})} />
+                    {errors.responsiblePersonIds && <span className="text-xs text-red-500">{errors.responsiblePersonIds}</span>}
             </div>
 
             <div className="col-span-2">
@@ -583,4 +505,4 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
             <button onClick={onSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t('common.save')}</button>
         </div>
     </Modal>
-);
+)};

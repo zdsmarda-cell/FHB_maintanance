@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { Edit, Trash, Plus, Eye, EyeOff } from 'lucide-react';
@@ -12,6 +13,9 @@ export const LocationsPage = () => {
   
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateWpOpen, setIsCreateWpOpen] = useState(false);
+  const [createWpLocationId, setCreateWpLocationId] = useState<string | null>(null);
+
   const [editingLoc, setEditingLoc] = useState<any>(null);
   const [editingWp, setEditingWp] = useState<any>(null);
 
@@ -33,12 +37,15 @@ export const LocationsPage = () => {
   const validateForm = (data: any, type: 'location' | 'workplace') => {
       const newErrors: Record<string, string> = {};
       
-      if (!data.name) newErrors.name = t('validation.required');
+      if (!data.name || data.name.length < 2) newErrors.name = "Název musí mít alespoň 2 znaky.";
       
       if (type === 'location') {
-          if (!data.address.street) newErrors.street = t('validation.required');
-          if (!data.address.city) newErrors.city = t('validation.required');
-          if (!data.address.zip) newErrors.zip = t('validation.required');
+          if (!data.address.street || data.address.street.length < 1) newErrors.street = "Ulice je povinná.";
+          if (!data.address.number || data.address.number.length < 1) newErrors.number = "Číslo je povinné.";
+          if (!data.address.city || data.address.city.length < 2) newErrors.city = "Město musí mít alespoň 2 znaky.";
+          
+          const zip = data.address.zip.replace(/\s/g, '');
+          if (!zip || !/^\d{5,}$/.test(zip)) newErrors.zip = "PSČ musí obsahovat alespoň 5 číslic.";
       }
 
       setErrors(newErrors);
@@ -95,15 +102,20 @@ export const LocationsPage = () => {
       refresh();
   }
 
-  const handleAddWp = (locId: string) => {
-      const data = { ...newWp, locationId: locId, isVisible: true };
-      if(!data.name) {
-          setAlertMsg(t('validation.required')); 
-          return;
-      }
+  const handleOpenCreateWp = (locId: string) => {
+      setErrors({});
+      setCreateWpLocationId(locId);
+      setNewWp({ name: '', description: '', locationId: locId, isVisible: true });
+      setIsCreateWpOpen(true);
+  }
+
+  const handleAddWp = () => {
+      if(!createWpLocationId) return;
+      if(!validateForm(newWp, 'workplace')) return;
       
-      db.workplaces.add(data);
-      setNewWp({ name: '', description: '', locationId: '', isVisible: true });
+      db.workplaces.add(newWp);
+      setIsCreateWpOpen(false);
+      setCreateWpLocationId(null);
       refresh();
   }
 
@@ -127,7 +139,7 @@ export const LocationsPage = () => {
                                <div>
                                    <div className="font-bold text-lg">{loc.name}</div>
                                    <div className="text-sm text-slate-500">
-                                       {loc.address.street}, {loc.address.zip} {loc.address.city}, {loc.address.country}
+                                       {loc.address.street} {loc.address.number}, {loc.address.zip} {loc.address.city}, {loc.address.country}
                                    </div>
                                </div>
                            </div>
@@ -148,20 +160,10 @@ export const LocationsPage = () => {
                                   </div>
                               </div>
                           ))}
-                          <div className="mt-3 flex gap-2 pt-2">
-                              <input 
-                                placeholder={t('form.name')} 
-                                className="border p-1.5 text-sm rounded flex-1 focus:outline-none focus:border-blue-500 transition-colors" 
-                                value={newWp.locationId === loc.id ? newWp.name : ''} 
-                                onChange={e => setNewWp({...newWp, locationId: loc.id, name: e.target.value})} 
-                              />
-                              <input 
-                                placeholder={t('form.description')} 
-                                className="border p-1.5 text-sm rounded flex-1 focus:outline-none focus:border-blue-500 transition-colors" 
-                                value={newWp.locationId === loc.id ? newWp.description : ''} 
-                                onChange={e => setNewWp({...newWp, locationId: loc.id, description: e.target.value})} 
-                              />
-                              <button onClick={() => handleAddWp(loc.id)} className="bg-slate-100 text-slate-600 px-3 rounded text-sm font-medium hover:bg-slate-200">{t('common.add')}</button>
+                          <div className="mt-4 border-t pt-2">
+                              <button onClick={() => handleOpenCreateWp(loc.id)} className="w-full py-2 bg-slate-50 text-slate-600 border border-dashed border-slate-300 rounded hover:bg-slate-100 text-sm flex items-center justify-center">
+                                  <Plus className="w-4 h-4 mr-2"/> Přidat pracoviště
+                              </button>
                           </div>
                       </div>
                   </div>
@@ -169,7 +171,7 @@ export const LocationsPage = () => {
           })}
        </div>
 
-       {/* Create Modal */}
+       {/* Create Location Modal */}
        {isCreateOpen && (
            <Modal title={t('headers.new_location')} onClose={() => setIsCreateOpen(false)}>
                <div className="mb-2">
@@ -191,6 +193,41 @@ export const LocationsPage = () => {
                <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
                    <button onClick={() => setIsCreateOpen(false)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
                    <button onClick={handleAddLoc} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t('common.create')}</button>
+               </div>
+           </Modal>
+       )}
+       
+       {/* Create Workplace Modal */}
+       {isCreateWpOpen && (
+           <Modal title="Přidat Pracoviště" onClose={() => setIsCreateWpOpen(false)}>
+               <div className="mb-2">
+                   <label className="block text-xs text-slate-500 mb-1">{t('form.name')}</label>
+                   <input 
+                        className={`w-full border p-2 rounded ${errors.name ? 'border-red-500' : ''}`} 
+                        placeholder={t('form.name')}
+                        value={newWp.name} 
+                        onChange={e => setNewWp({...newWp, name: e.target.value})} 
+                   />
+                   {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
+               </div>
+               <div className="mb-2">
+                   <label className="block text-xs text-slate-500 mb-1">{t('form.description')}</label>
+                   <input 
+                        className="w-full border p-2 rounded" 
+                        placeholder={t('form.description')} 
+                        value={newWp.description} 
+                        onChange={e => setNewWp({...newWp, description: e.target.value})} 
+                   />
+               </div>
+               <div className="mt-4">
+                   <label className="flex items-center gap-2 cursor-pointer">
+                       <input type="checkbox" checked={newWp.isVisible} onChange={e => setNewWp({...newWp, isVisible: e.target.checked})} />
+                       <span className="text-sm font-medium">{t('form.is_visible')}</span>
+                   </label>
+               </div>
+               <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
+                   <button onClick={() => setIsCreateWpOpen(false)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
+                   <button onClick={handleAddWp} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t('common.create')}</button>
                </div>
            </Modal>
        )}

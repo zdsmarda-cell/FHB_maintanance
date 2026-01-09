@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { X, AlertTriangle, CheckCircle, ChevronDown, Check } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, ChevronDown, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Address } from '../lib/types';
 import { useI18n } from '../lib/i18n';
 
@@ -51,12 +52,14 @@ export const AddressInput = ({ address, onChange, errors = {} }: AddressInputPro
 
 export const Modal = ({ title, onClose, children }: any) => (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-lg sticky top-0 z-10">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
                 <h3 className="font-bold truncate pr-4">{title}</h3>
-                <button onClick={onClose}><X className="w-5 h-5 text-slate-500 flex-shrink-0" /></button>
+                <button onClick={onClose}><X className="w-5 h-5 text-slate-500 flex-shrink-0 hover:text-slate-800" /></button>
             </div>
-            <div className="p-4">{children}</div>
+            <div className="p-4 overflow-y-auto">
+                {children}
+            </div>
         </div>
     </div>
 );
@@ -65,7 +68,7 @@ export const ConfirmModal = ({ title, message, onConfirm, onCancel }: { title?: 
     const { t } = useI18n();
     return (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center overflow-hidden">
                 <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                 <h3 className="text-lg font-bold mb-2">{title || t('common.confirmation')}</h3>
                 <p className="text-slate-600 mb-6">{message}</p>
@@ -82,7 +85,7 @@ export const AlertModal = ({ title, message, onClose }: { title?: string, messag
     const { t } = useI18n();
     return (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center overflow-hidden">
                 <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                 <h3 className="text-lg font-bold mb-2">{title || t('common.warning')}</h3>
                 <p className="text-slate-600 mb-6">{message}</p>
@@ -156,6 +159,73 @@ export const MultiSelect = ({ label, options, selectedIds, onChange }: MultiSele
                     ))}
                 </div>
             )}
+        </div>
+    );
+};
+
+interface PaginationProps {
+    currentPage: number;
+    totalItems: number;
+    itemsPerPage: number;
+    onPageChange: (page: number) => void;
+    onItemsPerPageChange: (limit: number) => void;
+}
+
+export const Pagination = ({ currentPage, totalItems, itemsPerPage, onPageChange, onItemsPerPageChange }: PaginationProps) => {
+    const { t } = useI18n();
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    // Ensure current page is valid
+    if (currentPage > totalPages && totalPages > 0) {
+        onPageChange(totalPages);
+    }
+
+    const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+    return (
+        <div className="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-white border-t border-slate-200 text-sm">
+            <div className="flex items-center gap-2 mb-2 md:mb-0">
+                <span className="text-slate-600">{t('common.per_page')}:</span>
+                <select 
+                    className="border rounded p-1 bg-slate-50"
+                    value={itemsPerPage}
+                    onChange={e => onItemsPerPageChange(Number(e.target.value))}
+                >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                </select>
+            </div>
+            
+            <div className="flex items-center gap-4">
+                <span className="text-slate-500">
+                    {t('common.showing')} <span className="font-semibold text-slate-800">{startItem}-{endItem}</span> {t('common.of')} <span className="font-semibold text-slate-800">{totalItems}</span>
+                </span>
+                
+                <div className="flex gap-1">
+                    <button 
+                        onClick={() => onPageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="p-1 rounded border hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    
+                    <span className="flex items-center px-2 font-medium text-slate-700">
+                        {currentPage} / {totalPages || 1}
+                    </span>
+
+                    <button 
+                        onClick={() => onPageChange(currentPage + 1)}
+                        disabled={currentPage >= totalPages}
+                        className="p-1 rounded border hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

@@ -1,10 +1,15 @@
+
 import React, { useState } from 'react';
 import { db } from '../../lib/db';
-import { Edit, Trash, Plus } from 'lucide-react';
+import { Edit, Trash, Plus, Box } from 'lucide-react';
 import { Modal, ConfirmModal, AlertModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
 
-export const TechConfigPage = () => {
+interface TechConfigPageProps {
+    onNavigate?: (page: string, params?: any) => void;
+}
+
+export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
     const { t } = useI18n();
     const [types, setTypes] = useState(db.techTypes.list());
     const [states, setStates] = useState(db.techStates.list());
@@ -79,6 +84,12 @@ export const TechConfigPage = () => {
     const openCreateType = () => { setErrors({}); setIsCreateTypeOpen(true); }
     const openCreateState = () => { setErrors({}); setIsCreateStateOpen(true); }
 
+    const getActiveCount = (kind: 'type' | 'state', id: string) => {
+        const allTechs = db.technologies.list().filter(t => t.isVisible);
+        if (kind === 'type') return allTechs.filter(t => t.typeId === id).length;
+        return allTechs.filter(t => t.stateId === id).length;
+    };
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -89,15 +100,29 @@ export const TechConfigPage = () => {
                     </button>
                 </div>
                 <div className="bg-white rounded border border-slate-200 divide-y">
-                    {types.map(t => (
-                        <div key={t.id} className="p-2 flex justify-between items-center group">
-                            <span>{t.name}</span>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100">
-                                <button onClick={() => setEditingType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
-                                <button onClick={() => initiateDelete('type', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                    {types.map(t => {
+                        const count = getActiveCount('type', t.id);
+                        return (
+                            <div key={t.id} className="p-2 flex justify-between items-center group">
+                                <div className="flex items-center gap-2">
+                                    <span>{t.name}</span>
+                                    {count > 0 && (
+                                        <button 
+                                            onClick={() => onNavigate && onNavigate('assets', { typeId: t.id })}
+                                            className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"
+                                            title="Zobrazit technologie"
+                                        >
+                                            <Box className="w-3 h-3 mr-1" /> {count}
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                    <button onClick={() => initiateDelete('type', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
              <div>
@@ -108,15 +133,29 @@ export const TechConfigPage = () => {
                     </button>
                 </div>
                 <div className="bg-white rounded border border-slate-200 divide-y">
-                    {states.map(t => (
-                        <div key={t.id} className="p-2 flex justify-between items-center group">
-                            <span>{t.name}</span>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100">
-                                <button onClick={() => setEditingState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
-                                <button onClick={() => initiateDelete('state', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                    {states.map(t => {
+                        const count = getActiveCount('state', t.id);
+                        return (
+                            <div key={t.id} className="p-2 flex justify-between items-center group">
+                                <div className="flex items-center gap-2">
+                                    <span>{t.name}</span>
+                                    {count > 0 && (
+                                        <button 
+                                            onClick={() => onNavigate && onNavigate('assets', { stateId: t.id })}
+                                            className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"
+                                            title="Zobrazit technologie"
+                                        >
+                                            <Box className="w-3 h-3 mr-1" /> {count}
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                    <button onClick={() => initiateDelete('state', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
             

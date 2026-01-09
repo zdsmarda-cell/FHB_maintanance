@@ -1,5 +1,5 @@
 
-import { User, Location, Workplace, Supplier, SupplierContact, TechType, TechState, Technology, Maintenance, MaintenanceNote, Request, RequestComment, AppSettings } from './types';
+import { User, Location, Workplace, Supplier, SupplierContact, TechType, TechState, Technology, Maintenance, MaintenanceNote, Request, RequestComment, AppSettings, PasswordResetToken, RequestHistoryEntry, Email } from './types';
 
 // Helper to generate IDs
 const uid = () => Math.random().toString(36).substr(2, 9);
@@ -18,9 +18,9 @@ const seedData = () => {
   const techId = uid();
 
   const users: User[] = [
-    { id: userId, name: 'Admin User', email: 'admin@tech.com', phone: '123456789', role: 'admin', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [] },
-    { id: maintId, name: 'Maint Guy', email: 'maint@tech.com', phone: '987654321', role: 'maintenance', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId] },
-    { id: uid(), name: 'Operator Jane', email: 'op@tech.com', phone: '111222333', role: 'operator', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId] },
+    { id: userId, name: 'Admin User', email: 'admin@tech.com', phone: '123456789', role: 'admin', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [], approvalLimits: {} },
+    { id: maintId, name: 'Maint Guy', email: 'maint@tech.com', phone: '987654321', role: 'maintenance', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId], approvalLimits: { [locId]: 100 } },
+    { id: uid(), name: 'Operator Jane', email: 'op@tech.com', phone: '111222333', role: 'operator', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId], approvalLimits: { [locId]: 0 } },
   ];
   
   const locations: Location[] = [{ 
@@ -44,12 +44,19 @@ const seedData = () => {
   
   const techs: Technology[] = [{
     id: techId, workplaceId: wpId, supplierId: supId, typeId: typeId, stateId: stateId,
-    name: 'Hydraulický Lis H500', description: 'Hlavní lis pro karoserie',
+    name: 'Hydraulický Lis H500', serialNumber: 'SN-2023-001-X', description: 'Hlavní lis pro karoserie',
     installDate: '2023-01-15', weight: 5000, sharepointLink: '#', photoUrls: [],
     isVisible: true
   }];
 
   const settings: AppSettings = { enableOnlineTranslation: false };
+
+  // Seed Emails
+  const emails: Email[] = [
+      { id: 1, to_address: 'admin@tech.com', subject: 'Test Email 1', body: 'Test content', attempts: 0, sent_at: new Date().toISOString(), error: null, created_at: new Date(Date.now() - 86400000).toISOString() },
+      { id: 2, to_address: 'fail@tech.com', subject: 'Failed Email', body: 'Error content', attempts: 3, sent_at: null, error: 'Connection timeout', created_at: new Date(Date.now() - 43000000).toISOString() },
+      { id: 3, to_address: 'maint@tech.com', subject: 'Pending Email', body: 'Pending content', attempts: 0, sent_at: null, error: null, created_at: new Date().toISOString() },
+  ];
 
   localStorage.setItem('tmp_users', JSON.stringify(users));
   localStorage.setItem('tmp_locations', JSON.stringify(locations));
@@ -63,6 +70,8 @@ const seedData = () => {
   localStorage.setItem('tmp_maintenance_notes', JSON.stringify([]));
   localStorage.setItem('tmp_requests', JSON.stringify([]));
   localStorage.setItem('tmp_req_comments', JSON.stringify([]));
+  localStorage.setItem('tmp_reset_tokens', JSON.stringify([]));
+  localStorage.setItem('tmp_emails', JSON.stringify(emails));
   localStorage.setItem('tmp_settings', JSON.stringify(settings));
 };
 
@@ -70,8 +79,6 @@ const seedData = () => {
 const db = {
   // Simulate DB Connection check
   checkConnection: async (): Promise<boolean> => {
-      // Logic to check if DB is reachable. 
-      // In this localstorage mock, we always return true unless forced false for testing maintenance page.
       return new Promise((resolve) => setTimeout(() => resolve(true), 500)); 
   },
 
@@ -81,6 +88,67 @@ const db = {
   settings: {
     get: (): AppSettings => JSON.parse(localStorage.getItem('tmp_settings') || '{"enableOnlineTranslation": false}'),
     save: (s: AppSettings) => localStorage.setItem('tmp_settings', JSON.stringify(s)),
+  },
+
+  auth: {
+    createResetToken: (email: string): string | null => {
+        const users = db.users.list();
+        const user = users.find(u => u.email === email);
+        if (!user) return null;
+
+        const tokenString = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const tokens = db.get<PasswordResetToken>('tmp_reset_tokens');
+        tokens.push({
+            token: tokenString,
+            email: email,
+            used: false,
+            createdAt: new Date().toISOString()
+        });
+        db.set('tmp_reset_tokens', tokens);
+        return tokenString;
+    },
+    validateToken: (tokenString: string): boolean => {
+        const tokens = db.get<PasswordResetToken>('tmp_reset_tokens');
+        // Find token and check if NOT used
+        const token = tokens.find(t => t.token === tokenString);
+        if (!token) return false;
+        if (token.used) return false;
+        return true;
+    },
+    resetPassword: (tokenString: string, newPass: string): boolean => {
+        const tokens = db.get<PasswordResetToken>('tmp_reset_tokens');
+        const tokenIdx = tokens.findIndex(t => t.token === tokenString);
+        
+        if (tokenIdx === -1) return false;
+        if (tokens[tokenIdx].used) return false;
+
+        // 1. Mark token as used
+        tokens[tokenIdx].used = true;
+        db.set('tmp_reset_tokens', tokens);
+
+        // 2. Update user password (Simulated)
+        const users = db.users.list();
+        const userIdx = users.findIndex(u => u.email === tokens[tokenIdx].email);
+        if (userIdx !== -1) {
+            users[userIdx].password = newPass;
+            db.set('tmp_users', users);
+            return true;
+        }
+        return false;
+    }
+  },
+
+  emails: {
+      list: () => db.get<Email>('tmp_emails').sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+      retry: (ids: (string|number)[]) => {
+          const list = db.get<Email>('tmp_emails').map(e => {
+              if (ids.includes(e.id)) {
+                  return { ...e, sent_at: null, error: null, attempts: 0 };
+              }
+              return e;
+          });
+          db.set('tmp_emails', list);
+      }
   },
 
   users: {
@@ -159,21 +227,108 @@ const db = {
   },
   requests: {
     list: () => db.get<Request>('tmp_requests'),
-    add: (r: Omit<Request, 'id' | 'state' | 'stateChangeLog'>) => {
+    add: (r: Omit<Request, 'id' | 'state' | 'history' | 'createdDate'> & { state?: Request['state'] }) => {
       const list = db.requests.list();
-      list.push({ ...r, id: uid(), state: 'new', stateChangeLog: [{ date: new Date().toISOString(), state: 'new' }] });
+      const newState = r.state || 'new';
+      
+      const cost = Number(r.estimatedCost || 0);
+      const time = r.estimatedTime ? Number(r.estimatedTime) : undefined;
+      // Auto-approve if cost is 0
+      const isApproved = cost === 0 ? true : (r.isApproved ?? false);
+
+      const createdDate = new Date().toISOString();
+      const assignedSupplierId = r.assignedSupplierId || 'internal';
+      
+      const newHistory: RequestHistoryEntry = {
+          date: createdDate,
+          userId: r.authorId,
+          action: 'created',
+          note: 'Požadavek vytvořen'
+      };
+
+      list.push({ 
+          ...r, 
+          id: uid(), 
+          createdDate: createdDate,
+          state: newState, 
+          assignedSupplierId,
+          estimatedCost: cost,
+          estimatedTime: time,
+          isApproved: isApproved,
+          history: [newHistory] 
+      } as Request);
       db.set('tmp_requests', list);
     },
-    updateState: (id: string, state: Request['state'], reason?: string, solverId?: string, updates?: Partial<Request>) => {
+    update: (id: string, diff: Partial<Request>) => {
+        const list = db.requests.list().map(r => {
+            if (r.id === id) {
+                const merged = { ...r, ...diff };
+                
+                // Logic: If price changes
+                // 1. New price is 0 -> Auto-approve
+                // 2. New price > 0 AND price changed -> Revoke approval (isApproved = false)
+                
+                const oldCost = r.estimatedCost || 0;
+                const newCost = diff.estimatedCost !== undefined ? Number(diff.estimatedCost) : oldCost;
+
+                if (diff.estimatedCost !== undefined && newCost !== oldCost) {
+                    if (newCost === 0) {
+                        merged.isApproved = true;
+                    } else {
+                        // Price changed to a non-zero value, revoke approval
+                        merged.isApproved = false;
+                    }
+                }
+                
+                return merged;
+            }
+            return r;
+        });
+        db.set('tmp_requests', list);
+    },
+    updateState: (id: string, state: Request['state'], reason: string | undefined, userId: string | undefined, updates?: Partial<Request>) => {
       const list = db.requests.list().map(r => {
         if (r.id !== id) return r;
-        const log = [...r.stateChangeLog, { date: new Date().toISOString(), state }];
+        
+        const newHistory = [...(r.history || [])];
+        
+        // Log State Change
+        if (r.state !== state) {
+            newHistory.push({
+                date: new Date().toISOString(),
+                userId: userId || 'system',
+                action: 'status_change',
+                oldValue: r.state,
+                newValue: state,
+                note: reason
+            });
+        }
+        
+        // Log Approval Change (if triggered via updates)
+        if (updates && updates.isApproved !== undefined && updates.isApproved !== r.isApproved) {
+            newHistory.push({
+                date: new Date().toISOString(),
+                userId: userId || 'system',
+                action: updates.isApproved ? 'approved' : 'rejected'
+            });
+        }
+
+        // Log generic edit if description or cost changes significantly
+        if (updates && (updates.description || updates.estimatedCost || updates.title)) {
+            // simple check, could be more granular
+             newHistory.push({
+                date: new Date().toISOString(),
+                userId: userId || 'system',
+                action: 'edited'
+            });
+        }
+
         return { 
           ...r, 
           state, 
           cancellationReason: reason, 
-          solverId: solverId || r.solverId, 
-          stateChangeLog: log,
+          solverId: updates?.solverId || r.solverId, // allow updates to override solver
+          history: newHistory,
           ...updates 
         };
       });

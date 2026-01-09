@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useI18n } from '../lib/i18n';
-import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail } from 'lucide-react';
 import { User } from '../lib/types';
 
 interface LayoutProps {
@@ -78,6 +79,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
           {/* Requests visible to all */}
           <MenuLink page="requests" icon={ClipboardList} label={t('menu.requests')} />
 
+          {/* Calendar for Maintenance/Admin */}
+          {(user.role === 'admin' || user.role === 'maintenance') && (
+             <MenuLink page="calendar" icon={CalendarDays} label="Kalendář" />
+          )}
+
           {/* Maintenance separate tab for Admin/Maintenance */}
           {(user.role === 'admin' || user.role === 'maintenance') && (
              <MenuLink page="maintenance" icon={Calendar} label={t('menu.maintenance')} />
@@ -96,6 +102,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
             <>
               <MenuLink page="tech_config" icon={Sliders} label={t('menu.tech_config')} />
               <MenuLink page="users" icon={Users} label={t('menu.users')} />
+              <MenuLink page="emails" icon={Mail} label={t('menu.emails')} />
               <div className="my-2 border-t border-slate-800"></div>
               <MenuLink page="settings" icon={Settings} label="Nastavení" />
             </>

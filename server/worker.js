@@ -1,33 +1,194 @@
+
 import pool from './db.js';
+import nodemailer from 'nodemailer';
+import { getNewRequestEmailBody } from './templates/email.js';
+import { checkDailyOverdue } from './workers/dailyOverdue.js';
+import dotenv from 'dotenv';
 
-console.log('Worker started. Checking for emails every 60 seconds...');
+dotenv.config();
 
-const processQueue = async () => {
+console.log('Worker started. Jobs: Email (60s), Maintenance Generator (60s), Overdue Checker (Daily 00:01)');
+
+// Configure Nodemailer
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false // Often needed for self-signed or internal SMTP servers
+  }
+});
+
+const processEmailQueue = async () => {
   try {
-    // 1. Fetch unsent emails
     const [rows] = await pool.query('SELECT * FROM email_queue WHERE sent_at IS NULL AND attempts < 3 LIMIT 10');
     
     if (rows.length === 0) return;
 
-    console.log(`Found ${rows.length} emails to send.`);
+    console.log(`[MAILER] Found ${rows.length} emails to send.`);
 
     for (const email of rows) {
       try {
-        // Simulate sending email
         console.log(`[MAILER] Sending to ${email.to_address}: ${email.subject}`);
         
-        // 2. Mark as sent
+        const mailOptions = {
+          from: process.env.EMAIL_FROM || '"FHB Maintain" <noreply@fhb.sk>',
+          to: email.to_address,
+          subject: email.subject,
+          html: email.body, // We assume body is HTML
+          attachments: []
+        };
+
+        // Handle Attachments (JSON array of { filename, content, encoding })
+        if (email.attachments) {
+            try {
+                const parsedAttachments = JSON.parse(email.attachments);
+                if (Array.isArray(parsedAttachments)) {
+                    mailOptions.attachments = parsedAttachments;
+                }
+            } catch (e) {
+                console.warn(`[MAILER] Failed to parse attachments for email ${email.id}`, e);
+            }
+        }
+
+        await transporter.sendMail(mailOptions);
+        
         await pool.execute('UPDATE email_queue SET sent_at = NOW() WHERE id = ?', [email.id]);
+        console.log(`[MAILER] Email ${email.id} sent successfully.`);
       } catch (sendErr) {
         console.error(`Failed to send email ${email.id}`, sendErr);
         await pool.execute('UPDATE email_queue SET attempts = attempts + 1, error = ? WHERE id = ?', [sendErr.message, email.id]);
       }
     }
   } catch (err) {
-    console.error('Worker error:', err);
+    console.error('[MAILER] Error:', err);
   }
 };
 
-// Run immediately then interval
-processQueue();
-setInterval(processQueue, 60000);
+const generateMaintenanceRequests = async () => {
+    try {
+        // Fetch active templates
+        const [templates] = await pool.query('SELECT * FROM maintenances WHERE is_active = TRUE');
+        
+        if(templates.length === 0) return;
+
+        const today = new Date();
+        // Zero out time for clean date comparison
+        today.setHours(0,0,0,0);
+
+        for (const template of templates) {
+            // Determine the base date to calculate next due date
+            const lastGenerated = template.last_generated_at ? new Date(template.last_generated_at) : new Date(template.created_at);
+            lastGenerated.setHours(0,0,0,0);
+
+            // Calculate theoretical due date
+            const nextDueDate = new Date(lastGenerated);
+            nextDueDate.setDate(lastGenerated.getDate() + template.interval_days);
+
+            // If not yet due, skip
+            if (nextDueDate > today) continue;
+
+            // Logic: "Save to nearest allowed day"
+            // We start checking from nextDueDate. If allowed, good. If not, increment day and check again.
+            let targetDate = new Date(nextDueDate);
+            let safetyCounter = 0;
+            const allowedDays = template.allowed_days || []; // JSON array [0, 1, 2...]
+
+            while (safetyCounter < 30) {
+                 const currentDayOfWeek = targetDate.getDay(); // 0 = Sun
+                 if (allowedDays.includes(currentDayOfWeek)) {
+                     break; // Found allowed day
+                 }
+                 // Move to next day
+                 targetDate.setDate(targetDate.getDate() + 1);
+                 safetyCounter++;
+            }
+
+            // If targetDate is in future (after adjusting for allowed days), we wait.
+            // But if targetDate <= today, we must generate.
+            if (targetDate > today) continue;
+            
+            // IDEMPOTENCY CHECK:
+            // "Na jeden den nemohou z toto sablony vzniknout 2 pozadavky"
+            // We check if a request already exists for this template with planned_resolution_date == targetDate
+            // Note: Use ISO string YYYY-MM-DD for comparison
+            const targetDateStr = targetDate.toISOString().split('T')[0];
+            
+            const [existing] = await pool.query(
+                'SELECT id FROM requests WHERE maintenance_id = ? AND planned_resolution_date = ?',
+                [template.id, targetDateStr]
+            );
+
+            if (existing.length > 0) {
+                // Already generated for this target date. 
+                // However, we must update last_generated_at to this target date to prevent getting stuck if script runs multiple times
+                // or if we need to advance the interval base.
+                // But only if targetDate > template.last_generated_at
+                if (!template.last_generated_at || new Date(template.last_generated_at) < targetDate) {
+                     await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
+                }
+                continue;
+            }
+
+            // GENERATE REQUEST
+            console.log(`[MAINT] Generating request for template ${template.title} on ${targetDateStr}`);
+            
+            // Auto-Assignment Logic:
+            // If template has responsible persons, assign the first one as 'solver' and state 'assigned'.
+            // Otherwise, keep solver null and state 'new'.
+            const responsibleIds = template.responsible_person_ids || [];
+            const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
+            const state = solverId ? 'assigned' : 'new';
+            const authorId = 'system'; 
+
+            const [res] = await pool.execute(
+                `INSERT INTO requests (tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
+                 VALUES (?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
+                [template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
+            );
+
+            // Update Template
+            await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
+
+            // Optional: Send Email Notification
+            const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
+            await pool.execute(
+                'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+                ['maintenance@tech.com', `Nová údržba: ${template.title}`, emailBody]
+            );
+        }
+
+    } catch (err) {
+        console.error('[MAINT] Error generating requests:', err);
+    }
+}
+
+// Initial Run
+processEmailQueue();
+generateMaintenanceRequests();
+
+// --- Scheduler ---
+let lastOverdueCheck = null;
+
+setInterval(() => {
+    const now = new Date();
+    
+    // Regular jobs (every minute)
+    processEmailQueue();
+    generateMaintenanceRequests();
+
+    // Daily Job at 00:01
+    // We check if hour is 0, minute is 1, and we haven't run it yet today
+    const currentDay = now.getDate();
+    if (now.getHours() === 0 && now.getMinutes() === 1) {
+        if (lastOverdueCheck !== currentDay) {
+            checkDailyOverdue();
+            lastOverdueCheck = currentDay;
+        }
+    }
+
+}, 60000); // 60s Interval

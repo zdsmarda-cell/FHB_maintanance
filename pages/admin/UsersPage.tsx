@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { db } from '../../lib/db';
-import { Edit, Lock, Plus, ShieldAlert, ListChecks } from 'lucide-react';
+import { Edit, Lock, Plus, ShieldAlert, ListChecks, CheckCircle, XCircle } from 'lucide-react';
 import { User } from '../../lib/types';
 import { Modal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
@@ -16,6 +17,10 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     
+    // Filter states
+    const [nameFilter, setNameFilter] = useState('');
+    const [emailFilter, setEmailFilter] = useState('');
+    
     const locations = db.locations.list();
     const workplaces = db.workplaces.list();
     const requests = db.requests.list();
@@ -29,13 +34,22 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
         const newErrors: Record<string, string> = {};
         if (!data.name) newErrors.name = t('validation.required');
         if (!data.email) newErrors.email = t('validation.required');
+        
+        // Strict Phone Validation: Optional +, then only numbers, min 9 digits
+        const phoneRegex = /^\+?[0-9]{9,}$/;
+        if (!data.phone) {
+            newErrors.phone = t('validation.required');
+        } else if (!phoneRegex.test(data.phone.replace(/\s/g, ''))) { // remove spaces for check
+            newErrors.phone = "Telefon musí obsahovat minimálně 9 číslic a může začínat +";
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleAddUser = () => {
         if(!validateForm(newUser)) return;
-        db.users.add({...newUser, assignedLocationIds: [], assignedWorkplaceIds: []});
+        db.users.add({...newUser, assignedLocationIds: [], assignedWorkplaceIds: [], approvalLimits: {}});
         setIsCreateOpen(false);
         setNewUser({ name: '', email: '', role: 'operator', phone: '', isBlocked: false });
         refresh();
@@ -57,13 +71,21 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
 
     const togglePermission = (type: 'loc' | 'wp', id: string) => {
         if(!editingUser) return;
-        // Do not allow toggling if role is admin
-        if(editingUser.role === 'admin') return;
-
+        
         if(type === 'loc') {
             const current = editingUser.assignedLocationIds || [];
             const updated = current.includes(id) ? current.filter(x => x !== id) : [...current, id];
-            setEditingUser({...editingUser, assignedLocationIds: updated});
+            
+            // If removing location, also remove its limit
+            const updatedLimits = { ...editingUser.approvalLimits };
+            if (!updated.includes(id)) {
+                delete updatedLimits[id];
+            } else if (updatedLimits[id] === undefined) {
+                // If adding location, we can leave limit as undefined (no limit set yet)
+                // or set to 0. User asked for blank input, so undefined is safer for UI logic.
+            }
+
+            setEditingUser({...editingUser, assignedLocationIds: updated, approvalLimits: updatedLimits});
         } else {
             const current = editingUser.assignedWorkplaceIds || [];
             const updated = current.includes(id) ? current.filter(x => x !== id) : [...current, id];
@@ -71,9 +93,36 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
         }
     }
 
+    const updateLimit = (locId: string, value: string) => {
+        if (!editingUser) return;
+        
+        // Handle empty string by setting to undefined (which removes it from object effectively or sets to undefined)
+        let numValue: number | undefined = undefined;
+        if (value !== '') {
+            numValue = parseInt(value);
+        }
+
+        const newLimits = { ...editingUser.approvalLimits };
+        if (numValue === undefined) {
+             delete newLimits[locId];
+        } else {
+             newLimits[locId] = numValue;
+        }
+
+        setEditingUser({
+            ...editingUser,
+            approvalLimits: newLimits
+        });
+    }
+
     const getOpenTaskCount = (userId: string) => {
         return requests.filter(r => r.solverId === userId && r.state !== 'solved' && r.state !== 'cancelled').length;
     }
+
+    const filteredUsers = users.filter(u => {
+        return u.name.toLowerCase().includes(nameFilter.toLowerCase()) &&
+               u.email.toLowerCase().includes(emailFilter.toLowerCase());
+    });
 
     return (
         <div className="space-y-6">
@@ -84,35 +133,98 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
                 </button>
              </div>
             
-            <div className="bg-white rounded border border-slate-200 divide-y">
-                {users.map(u => {
-                     const openTasks = getOpenTaskCount(u.id);
-                     return (
-                     <div key={u.id} className="p-4 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${u.isBlocked ? 'bg-red-200 text-red-800' : 'bg-slate-200'}`}>{u.name[0]}</div>
-                            <div>
-                                <div className="font-bold flex items-center gap-2">
-                                    {u.name} {u.isBlocked && <Lock className="w-3 h-3 text-red-500"/>}
-                                </div>
-                                <div className="text-xs text-slate-500">{u.email} | {t(`role.${u.role}`)}</div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            {openTasks > 0 && (
-                                <button 
-                                    onClick={() => onNavigate && onNavigate('operations', { solverId: u.id })}
-                                    className="flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded hover:bg-amber-200 transition-colors"
-                                    title="Zobrazit nedořešené úkoly"
-                                >
-                                    <ListChecks className="w-3 h-3" />
-                                    {openTasks} nedořešených
-                                </button>
+            <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                            <tr>
+                                <th className="px-4 py-3 align-top min-w-[150px]">
+                                    <div className="mb-1">Jméno</div>
+                                    <input 
+                                        className="w-full p-1 border rounded font-normal normal-case"
+                                        placeholder="Hledat..."
+                                        value={nameFilter}
+                                        onChange={e => setNameFilter(e.target.value)}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 align-top min-w-[150px]">
+                                    <div className="mb-1">Email</div>
+                                    <input 
+                                        className="w-full p-1 border rounded font-normal normal-case"
+                                        placeholder="Hledat..."
+                                        value={emailFilter}
+                                        onChange={e => setEmailFilter(e.target.value)}
+                                    />
+                                </th>
+                                <th className="px-4 py-3 align-top">Telefon</th>
+                                <th className="px-4 py-3 align-top">Role</th>
+                                <th className="px-4 py-3 align-top">Limity schvalování</th>
+                                <th className="px-4 py-3 align-top text-center">Stav</th>
+                                <th className="px-4 py-3 align-top text-center">{t('common.actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredUsers.map(u => {
+                                const openTasks = getOpenTaskCount(u.id);
+                                const limitEntries = Object.entries(u.approvalLimits || {});
+                                
+                                return (
+                                    <tr key={u.id} className="border-b hover:bg-slate-50">
+                                        <td className="px-4 py-3 font-medium text-slate-900">{u.name}</td>
+                                        <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                                        <td className="px-4 py-3 text-slate-600">{u.phone}</td>
+                                        <td className="px-4 py-3 text-slate-600">{t(`role.${u.role}`)}</td>
+                                        <td className="px-4 py-3 text-xs">
+                                            {limitEntries.length > 0 ? (
+                                                <div className="flex flex-col gap-1">
+                                                    {limitEntries.map(([locId, limit]) => {
+                                                        const locName = locations.find(l => l.id === locId)?.name || 'Neznámá';
+                                                        return (
+                                                            <span key={locId} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border">
+                                                                {locName}: <strong>{limit} €</strong>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : <span className="text-slate-400">-</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {u.isBlocked ? (
+                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 text-xs font-medium">
+                                                    <Lock className="w-3 h-3 mr-1" /> Blokován
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
+                                                    <CheckCircle className="w-3 h-3 mr-1" /> Aktivní
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {openTasks > 0 && (
+                                                    <button 
+                                                        onClick={() => onNavigate && onNavigate('requests', { solverId: u.id })}
+                                                        className="flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded hover:bg-amber-200 transition-colors"
+                                                        title="Zobrazit nedořešené úkoly"
+                                                    >
+                                                        <ListChecks className="w-3 h-3" />
+                                                        {openTasks}
+                                                    </button>
+                                                )}
+                                                <button onClick={() => { setErrors({}); setEditingUser(u); }} className="text-blue-600 hover:bg-blue-50 p-1 rounded">
+                                                    <Edit className="w-4 h-4"/>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {filteredUsers.length === 0 && (
+                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádní uživatelé nenalezeni.</td></tr>
                             )}
-                            <button onClick={() => { setErrors({}); setEditingUser(u); }} className="text-blue-600 flex items-center gap-1 bg-blue-50 px-3 py-1 rounded text-sm"><Edit className="w-3 h-3"/> {t('common.edit')}</button>
-                        </div>
-                    </div>
-                )})}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {isCreateOpen && (
@@ -127,6 +239,11 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
                              <label className="block text-xs font-bold mb-1">{t('form.email')}</label>
                              <input className={`border p-2 w-full rounded ${errors.email ? 'border-red-500' : ''}`} value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
                              {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
+                        </div>
+                        <div>
+                             <label className="block text-xs font-bold mb-1">{t('form.phone')} (+420...)</label>
+                             <input className={`border p-2 w-full rounded ${errors.phone ? 'border-red-500' : ''}`} value={newUser.phone} onChange={e => setNewUser({...newUser, phone: e.target.value})} placeholder="+420..." />
+                             {errors.phone && <span className="text-xs text-red-500">{errors.phone}</span>}
                         </div>
                         <div>
                              <label className="block text-xs font-bold mb-1">{t('form.role')}</label>
@@ -155,8 +272,11 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
                              <label className="block text-xs font-bold mb-1">{t('form.email')}</label>
                              <input className={`border p-2 w-full rounded mb-2 ${errors.email ? 'border-red-500' : ''}`} value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} />
                              {errors.email && <span className="text-xs text-red-500 mb-2 block">{errors.email}</span>}
+
+                             <label className="block text-xs font-bold mb-1">{t('form.phone')}</label>
+                             <input className={`border p-2 w-full rounded mb-2 ${errors.phone ? 'border-red-500' : ''}`} value={editingUser.phone} onChange={e => setEditingUser({...editingUser, phone: e.target.value})} />
+                             {errors.phone && <span className="text-xs text-red-500 mb-2 block">{errors.phone}</span>}
                              
-                             {/* Role Selector in Edit */}
                              <label className="block text-xs font-bold mb-1">{t('form.role')}</label>
                              <select className="p-2 border rounded w-full mb-2" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as any})}>
                                 <option value="admin">{t('role.admin')}</option>
@@ -164,41 +284,52 @@ export const UsersPage = ({ onNavigate }: UsersPageProps) => {
                                 <option value="operator">{t('role.operator')}</option>
                             </select>
 
-                             <label className="flex items-center gap-2 cursor-pointer mt-2">
+                             <label className="flex items-center gap-2 cursor-pointer mt-2 bg-slate-50 p-2 rounded border">
                                  <input type="checkbox" checked={editingUser.isBlocked} onChange={e => setEditingUser({...editingUser, isBlocked: e.target.checked})} />
-                                 <span className="text-sm font-medium text-red-600">{t('form.blocked')}</span>
+                                 <span className={`text-sm font-medium ${editingUser.isBlocked ? 'text-red-600' : 'text-slate-700'}`}>
+                                     {editingUser.isBlocked ? 'Uživatel je blokován' : 'Uživatel je aktivní'}
+                                 </span>
                              </label>
                         </div>
                         
                         <div className="border-t pt-2">
                             <label className="block text-xs font-bold mb-2">{t('form.permissions')} - {t('headers.locations')} & {t('headers.workplaces')}</label>
                             
-                            {editingUser.role === 'admin' ? (
-                                <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm flex items-start gap-2">
-                                    <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                                    <span>{t('msg.admin_full_access')}</span>
-                                </div>
-                            ) : (
-                                locations.map(loc => (
-                                    <div key={loc.id} className="ml-2 mb-2">
+                            {locations.map(loc => (
+                                <div key={loc.id} className="ml-2 mb-2">
+                                    <div className="flex items-center justify-between mb-1 bg-slate-50 p-2 rounded">
                                         <div className="flex items-center gap-2">
                                             <input type="checkbox" checked={editingUser.assignedLocationIds?.includes(loc.id)} onChange={() => togglePermission('loc', loc.id)} />
                                             <span className="font-medium text-sm">{loc.name}</span>
                                         </div>
-                                        {/* Show workplaces if location is checked */}
                                         {editingUser.assignedLocationIds?.includes(loc.id) && (
-                                            <div className="ml-6 mt-1 border-l-2 border-slate-200 pl-2">
-                                                {workplaces.filter(w => w.locationId === loc.id).map(wp => (
-                                                     <div key={wp.id} className="flex items-center gap-2 py-0.5">
-                                                        <input type="checkbox" checked={editingUser.assignedWorkplaceIds?.includes(wp.id)} onChange={() => togglePermission('wp', wp.id)} />
-                                                        <span className="text-sm text-slate-600">{wp.name}</span>
-                                                    </div>
-                                                ))}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-slate-500 whitespace-nowrap">{t('form.approval_limit')}:</span>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    placeholder="0"
+                                                    className="border p-1 w-20 rounded text-right text-xs" 
+                                                    value={editingUser.approvalLimits?.[loc.id] ?? ''}
+                                                    onChange={(e) => updateLimit(loc.id, e.target.value)}
+                                                />
+                                                <span className="text-xs text-slate-500">€</span>
                                             </div>
                                         )}
                                     </div>
-                                ))
-                            )}
+                                    {/* Show workplaces if location is checked */}
+                                    {editingUser.assignedLocationIds?.includes(loc.id) && (
+                                        <div className="ml-6 mt-1 border-l-2 border-slate-200 pl-2">
+                                            {workplaces.filter(w => w.locationId === loc.id).map(wp => (
+                                                    <div key={wp.id} className="flex items-center gap-2 py-0.5">
+                                                    <input type="checkbox" checked={editingUser.assignedWorkplaceIds?.includes(wp.id)} onChange={() => togglePermission('wp', wp.id)} />
+                                                    <span className="text-sm text-slate-600">{wp.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                         <div className="flex justify-end pt-4 border-t border-slate-100">
                              <button onClick={() => setEditingUser(null)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
