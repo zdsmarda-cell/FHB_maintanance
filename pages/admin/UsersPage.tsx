@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../../lib/db';
-import { Edit, Lock, Plus, ListChecks, CheckCircle, Loader } from 'lucide-react';
+import { Edit, Lock, Plus, ListChecks, CheckCircle, Loader, Clock } from 'lucide-react';
 import { User } from '../../lib/types';
 import { Modal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
@@ -86,8 +86,16 @@ export const UsersPage = ({ onNavigate }: any) => {
         } catch(e) { console.error(e); }
     }
 
-    const getOpenTaskCount = (userId: string) => {
-        return requests.filter(r => r.solverId === userId && r.state !== 'solved' && r.state !== 'cancelled').length;
+    const getUserStats = (userId: string) => {
+        const activeRequests = requests.filter(r => r.solverId === userId && r.state !== 'solved' && r.state !== 'cancelled');
+        const count = activeRequests.length;
+        const totalMinutes = activeRequests.reduce((sum, r) => sum + (r.estimatedTime || 0), 0);
+        
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')} h`;
+
+        return { count, formattedTime, totalMinutes };
     }
 
     const filteredUsers = users.filter(u => {
@@ -137,8 +145,8 @@ export const UsersPage = ({ onNavigate }: any) => {
                             <tr>
                                 <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Jméno</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} /></th>
                                 <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Email</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={emailFilter} onChange={e => setEmailFilter(e.target.value)} /></th>
-                                <th className="px-4 py-3 align-top">Telefon</th>
                                 <th className="px-4 py-3 align-top">Role</th>
+                                <th className="px-4 py-3 align-top">Práce</th>
                                 <th className="px-4 py-3 align-top">Limity schvalování</th>
                                 <th className="px-4 py-3 align-top text-center">Stav</th>
                                 <th className="px-4 py-3 align-top text-center">{t('common.actions')}</th>
@@ -146,14 +154,28 @@ export const UsersPage = ({ onNavigate }: any) => {
                         </thead>
                         <tbody>
                             {filteredUsers.map(u => {
-                                const openTasks = getOpenTaskCount(u.id);
+                                const stats = getUserStats(u.id);
                                 const limitEntries = Object.entries(u.approvalLimits || {});
                                 return (
                                     <tr key={u.id} className="border-b hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{u.name}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-900">
+                                            <div>{u.name}</div>
+                                            <div className="text-xs text-slate-500">{u.phone}</div>
+                                        </td>
                                         <td className="px-4 py-3 text-slate-600">{u.email}</td>
-                                        <td className="px-4 py-3 text-slate-600">{u.phone}</td>
                                         <td className="px-4 py-3 text-slate-600">{t(`role.${u.role}`)}</td>
+                                        <td className="px-4 py-3">
+                                            {stats.count > 0 ? (
+                                                <button onClick={() => onNavigate && onNavigate('requests', { solverId: u.id })} className="flex flex-col gap-1 items-start group">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-bold group-hover:bg-blue-200">
+                                                        <ListChecks className="w-3 h-3 mr-1" /> {stats.count} úkolů
+                                                    </span>
+                                                    <span className="text-xs text-slate-500 flex items-center group-hover:text-slate-700">
+                                                        <Clock className="w-3 h-3 mr-1" /> {stats.formattedTime}
+                                                    </span>
+                                                </button>
+                                            ) : <span className="text-slate-400 text-xs">-</span>}
+                                        </td>
                                         <td className="px-4 py-3 text-xs">
                                             {limitEntries.length > 0 ? (
                                                 <div className="flex flex-col gap-1">{limitEntries.map(([locId, limit]) => <span key={locId} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border">{locations.find(l => l.id === locId)?.name || '?'}: <strong>{limit} €</strong></span>)}</div>
@@ -164,7 +186,6 @@ export const UsersPage = ({ onNavigate }: any) => {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
-                                                {openTasks > 0 && <button onClick={() => onNavigate && onNavigate('requests', { solverId: u.id })} className="flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded hover:bg-amber-200"><ListChecks className="w-3 h-3" />{openTasks}</button>}
                                                 <button onClick={() => { setErrors({}); setEditingUser(u); }} className="text-blue-600 hover:bg-blue-50 p-1 rounded"><Edit className="w-4 h-4"/></button>
                                             </div>
                                         </td>

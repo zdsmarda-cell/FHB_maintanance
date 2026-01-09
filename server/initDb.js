@@ -170,6 +170,25 @@ const migrations = [
         up: [
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS estimated_time INT DEFAULT 0`
         ]
+    },
+    {
+        name: '006_add_photo_urls_requests',
+        up: [
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS photo_urls JSON`
+        ]
+    },
+    {
+        name: '007_multilingual_support',
+        up: [
+            // Change Name columns to TEXT to support JSON strings ({"cs":"...", "en":"..."})
+            // VARCHAR(255) is too short for 3 languages.
+            `ALTER TABLE tech_types MODIFY name TEXT`,
+            `ALTER TABLE tech_states MODIFY name TEXT`,
+            `ALTER TABLE locations MODIFY name TEXT`,
+            `ALTER TABLE workplaces MODIFY name TEXT`,
+            `ALTER TABLE workplaces MODIFY description TEXT`,
+            `ALTER TABLE suppliers MODIFY description TEXT`
+        ]
     }
 ];
 

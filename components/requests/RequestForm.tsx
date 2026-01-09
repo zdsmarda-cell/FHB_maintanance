@@ -110,7 +110,7 @@ export const RequestForm = ({
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')} *</label>
                     <select 
                         className="w-full p-2 rounded border" 
                         value={selWp} 
@@ -173,7 +173,7 @@ export const RequestForm = ({
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.planned_resolution_date')} *</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.planned_resolution_date')}</label>
                     <div className="relative">
                          <input 
                             type="date" 

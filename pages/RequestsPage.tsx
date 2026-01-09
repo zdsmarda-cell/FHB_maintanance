@@ -234,9 +234,8 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         const errs: any = {};
         if (!data.title) errs.title = t('validation.required');
         if (!data.techId) errs.techId = t('validation.required');
-        if (!data.description) errs.description = t('validation.required');
-        // Validation for mandatory plannedResolutionDate
-        if (!data.plannedResolutionDate) errs.plannedResolutionDate = t('validation.required');
+        // description is optional
+        // plannedResolutionDate is optional
         
         setErrors(errs);
         return Object.keys(errs).length === 0;

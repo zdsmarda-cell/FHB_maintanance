@@ -25,6 +25,8 @@ export const getLocalized = (data: string | undefined, lang: string): string => 
 export const prepareMultilingual = async (text: string): Promise<string> => {
     if (!text) return '';
     
+    console.log(`[Translate] Preparing: "${text}"`);
+
     // 1. Check settings
     let settings;
     try {
@@ -32,19 +34,18 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         if (isMock) {
             settings = db.settings.get();
         } else {
-            // We assume settings are loaded in the app or fetch them quickly.
-            // For simplicity in this helper, we'll try to fetch or default to local check if cached.
-            // A robust app would use a Context or Store.
-            // Let's optimistic check localStorage for settings cache from SettingsPage?
-            // Fallback: fetch
-            const s = await api.get('/settings');
-            settings = s;
+            // Fetch settings from API
+            settings = await api.get('/settings');
         }
     } catch (e) {
+        console.warn("[Translate] Failed to load settings, defaulting to false", e);
         settings = { enableOnlineTranslation: false };
     }
 
+    console.log("[Translate] Settings:", settings);
+
     if (!settings?.enableOnlineTranslation) {
+        console.log("[Translate] Skipped: Translation disabled.");
         return text; // Return plain string if translation disabled
     }
 
@@ -53,8 +54,12 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
         let translations;
         
+        console.log("[Translate] Calling API...");
+
         if (isMock) {
             // Mock Translation Logic on Client for Demo
+            // Simulate delay
+            await new Promise(r => setTimeout(r, 500));
             translations = {
                 cs: text,
                 en: `[EN] ${text}`,
@@ -64,9 +69,10 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
             translations = await api.post('/translate', { text });
         }
         
+        console.log("[Translate] Result:", translations);
         return JSON.stringify(translations);
     } catch (e) {
-        console.error("Translation failed, saving raw text:", e);
+        console.error("[Translate] API Failed, saving raw text:", e);
         return text;
     }
 };

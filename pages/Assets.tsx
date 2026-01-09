@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { Technology, User } from '../lib/types';
-import { Plus, Edit, Trash2, Search, Upload, Loader, X, Eye, EyeOff, Wrench, RotateCcw, Link as LinkIcon, Weight } from 'lucide-react';
-import { Modal, ConfirmModal, MultiSelect, Pagination } from '../components/Shared';
+import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon } from 'lucide-react';
+import { Modal, MultiSelect, Pagination } from '../components/Shared';
+import { GalleryModal } from '../components/requests/modals/GalleryModal';
 
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 let API_BASE = PROD_API_URL;
@@ -264,6 +265,11 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const [editingAsset, setEditingAsset] = useState<Technology | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
+    // Gallery Modal State
+    const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
     // Initial Filters
     useEffect(() => {
         if (initialFilters && workplaces.length > 0) {
@@ -353,6 +359,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const paginatedAssets = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const getOpenRequestCount = (techId: string) => requests.filter(r => r.techId === techId && r.state !== 'solved' && r.state !== 'cancelled').length;
 
+    // Gallery Handlers
+    const openGallery = (e: React.MouseEvent, photos: string[]) => {
+        e.stopPropagation();
+        if (photos && photos.length > 0) {
+            setGalleryImages(photos);
+            setGalleryIndex(0);
+            setIsGalleryOpen(true);
+        }
+    }
+
     if (loading) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
     return (
@@ -395,6 +411,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                 <th className="px-4 py-3">{t('form.state')}</th>
                                 <th className="px-4 py-3">{t('form.location')}</th>
                                 <th className="px-4 py-3">{t('form.supplier')}</th>
+                                <th className="px-4 py-3 text-center">{t('form.photos')}</th>
                                 <th className="px-4 py-3 text-center">{t('form.is_visible')}</th>
                                 <th className="px-4 py-3 text-center">{t('col.open_requests')}</th>
                                 <th className="px-4 py-3 text-right">{t('common.actions')}</th>
@@ -423,6 +440,13 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{sup?.name || '-'}</td>
                                         <td className="px-4 py-3 text-center">
+                                            {asset.photoUrls && asset.photoUrls.length > 0 && (
+                                                <button onClick={(e) => openGallery(e, asset.photoUrls)} className="p-1 text-slate-500 hover:text-blue-600 transition-colors" title="Zobrazit fotky">
+                                                    <ImageIcon className="w-4 h-4 mx-auto" />
+                                                </button>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
                                             {asset.isVisible ? <Eye className="w-4 h-4 text-green-500 mx-auto" /> : <EyeOff className="w-4 h-4 text-slate-400 mx-auto" />}
                                         </td>
                                         <td className="px-4 py-3 text-center">
@@ -443,6 +467,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
             </div>
 
             {isModalOpen && <AssetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingAsset} onSave={handleSave} techTypes={techTypes} techStates={techStates} workplaces={workplaces} suppliers={suppliers} locations={locations} />}
+            
+            {isGalleryOpen && (
+                <GalleryModal 
+                    images={galleryImages} 
+                    currentIndex={galleryIndex} 
+                    onClose={() => setIsGalleryOpen(false)} 
+                    onNext={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev + 1) % galleryImages.length); }} 
+                    onPrev={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length); }}
+                />
+            )}
         </div>
     );
 };

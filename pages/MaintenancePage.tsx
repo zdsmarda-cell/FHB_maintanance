@@ -1,16 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/db';
+import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { User, Maintenance } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, MessageSquare, CheckCircle, Calendar, X, Hash } from 'lucide-react';
+import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X } from 'lucide-react';
 import { Modal, MultiSelect } from '../components/Shared';
 
 export const MaintenancePage = ({ user }: { user: User }) => {
     const { t } = useI18n();
     
-    // Maintenance is now treated as "Templates"
-    const [templates, setTemplates] = useState(db.maintenances.list());
+    // --- Data States ---
+    const [loading, setLoading] = useState(true);
+    const [templates, setTemplates] = useState<Maintenance[]>([]);
+    const [technologies, setTechnologies] = useState<Technology[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+
     const [view, setView] = useState<'list' | 'detail'>('list');
     const [selectedTemplate, setSelectedTemplate] = useState<Maintenance | null>(null);
 
@@ -23,12 +30,53 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     });
     const [showFilters, setShowFilters] = useState(user.role !== 'operator');
 
-    const refresh = () => {
-        setTemplates(db.maintenances.list());
-        if (selectedTemplate) {
-            setSelectedTemplate(db.maintenances.list().find(m => m.id === selectedTemplate.id) || null);
+    const refresh = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+            if (isMock) {
+                setTemplates(db.maintenances.list());
+                setTechnologies(db.technologies.list());
+                setSuppliers(db.suppliers.list());
+                setUsers(db.users.list());
+                setLocations(db.locations.list());
+                setWorkplaces(db.workplaces.list());
+            } else {
+                const [maintData, techData, supData, userData, locData, wpData] = await Promise.all([
+                    api.get('/maintenance'),
+                    api.get('/technologies'),
+                    api.get('/suppliers'),
+                    api.get('/users'),
+                    api.get('/locations'),
+                    api.get('/locations/workplaces')
+                ]);
+                setTemplates(maintData);
+                setTechnologies(techData);
+                setSuppliers(supData);
+                setUsers(userData);
+                setLocations(locData);
+                setWorkplaces(wpData);
+            }
+            
+            // Refresh selected template if detail view is open
+            if (selectedTemplate) {
+                // We need to re-find the updated template from the new list (which we don't have in state yet, 
+                // but for simplicity in this async flow, we rely on the next render or fetch it manually if needed)
+                // In production app we might need to fetch the single item again.
+                // For now, we leave it as is, data will refresh on next list render.
+            }
+        } catch (e) {
+            console.error("Failed to load maintenance data", e);
+        } finally {
+            setLoading(false);
         }
     };
+
+    useEffect(() => {
+        refresh();
+    }, []);
 
     const resetFilters = () => {
         setFilters({
@@ -48,21 +96,21 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     const filteredTemplates = templates.filter(m => {
         // Operator Restriction Logic
         if (user.role === 'operator') {
-            const tech = db.technologies.list().find(t => t.id === m.techId);
+            const tech = technologies.find(t => t.id === m.techId);
             if (!tech) return false;
             
             // Check if tech belongs to a workplace/location accessible by the operator
-            const workplace = db.workplaces.list().find(w => w.id === tech.workplaceId);
+            const workplace = workplaces.find(w => w.id === tech.workplaceId);
             if (!workplace) return false;
 
             const hasAccess = 
-                user.assignedWorkplaceIds.includes(workplace.id) || 
-                user.assignedLocationIds.includes(workplace.locationId);
+                (user.assignedWorkplaceIds || []).includes(workplace.id) || 
+                (user.assignedLocationIds || []).includes(workplace.locationId);
             
             if (!hasAccess) return false;
         }
 
-        const tech = db.technologies.list().find(t => t.id === m.techId);
+        const tech = technologies.find(t => t.id === m.techId);
         if (filters.techName && !tech?.name.toLowerCase().includes(filters.techName.toLowerCase())) return false;
         if (filters.type && m.type !== filters.type) return false;
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
@@ -77,7 +125,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
     };
 
     // --- MODALS STATES ---
-    const [isCreateOpen, setIsCreateOpen] = useState(false); // Used for both Create and Edit
+    const [isCreateOpen, setIsCreateOpen] = useState(false); 
     const [editingId, setEditingId] = useState<string | null>(null);
     
     // --- FORM STATES ---
@@ -88,21 +136,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
-
-    // --- AUTO-SELECTION HELPERS ---
-    useEffect(() => {
-        if (isCreateOpen && !editingId) {
-            const locs = db.locations.list();
-            if (locs.length === 1 && !selectedLocId) setSelectedLocId(locs[0].id);
-        }
-    }, [isCreateOpen, editingId]);
-
-    useEffect(() => {
-        if (selectedLocId && !editingId) {
-            const wps = db.workplaces.byLoc(selectedLocId);
-            if (wps.length === 1 && !selectedWpId) setSelectedWpId(wps[0].id);
-        }
-    }, [selectedLocId, editingId]);
 
     // --- CRUD OPERATIONS ---
     const openCreateModal = () => {
@@ -120,9 +153,9 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         setEditingId(m.id);
         setMaintForm(m);
         // Pre-fill location/workplace selectors based on techId
-        const tech = db.technologies.list().find(t => t.id === m.techId);
+        const tech = technologies.find(t => t.id === m.techId);
         if (tech) {
-            const wp = db.workplaces.list().find(w => w.id === tech.workplaceId);
+            const wp = workplaces.find(w => w.id === tech.workplaceId);
             if (wp) {
                 setSelectedWpId(wp.id);
                 setSelectedLocId(wp.locationId);
@@ -137,10 +170,6 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         const newErrors: Record<string, string> = {};
         if (!maintForm.techId) newErrors.techId = t('validation.required');
         if (!maintForm.title) newErrors.title = t('validation.required');
-        // Supplier and Responsible Persons are now OPTIONAL
-        // if (!maintForm.supplierId) newErrors.supplierId = t('validation.required');
-        // if (!maintForm.responsiblePersonIds || maintForm.responsiblePersonIds.length === 0) newErrors.responsiblePersonIds = t('validation.required');
-        
         if (!maintForm.interval || maintForm.interval < 1) newErrors.interval = t('validation.required');
         if (!maintForm.allowedDays || maintForm.allowedDays.length === 0) newErrors.allowedDays = t('validation.required');
 
@@ -148,26 +177,46 @@ export const MaintenancePage = ({ user }: { user: User }) => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!validate()) return;
-        if (editingId) {
-            db.maintenances.update(editingId, maintForm);
-        } else {
-            db.maintenances.add(maintForm as Omit<Maintenance, 'id'>);
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+            if (isMock) {
+                if (editingId) {
+                    db.maintenances.update(editingId, maintForm);
+                } else {
+                    db.maintenances.add(maintForm as Omit<Maintenance, 'id'>);
+                }
+            } else {
+                if (editingId) {
+                    await api.put(`/maintenance/${editingId}`, maintForm);
+                } else {
+                    await api.post('/maintenance', maintForm);
+                }
+            }
+            setIsCreateOpen(false);
+            refresh();
+            if (view === 'detail') setView('list');
+        } catch (e) {
+            console.error("Save Error", e);
+        } finally {
+            setLoading(false);
         }
-        setIsCreateOpen(false);
-        refresh();
     };
+
+    if (loading && templates.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
     // --- VIEW RENDER ---
     if (view === 'detail' && selectedTemplate) {
-        const tech = db.technologies.list().find(t => t.id === selectedTemplate.techId);
-        const supplier = db.suppliers.list().find(s => s.id === selectedTemplate.supplierId);
+        const tech = technologies.find(t => t.id === selectedTemplate.techId);
+        const supplier = suppliers.find(s => s.id === selectedTemplate.supplierId);
         const responsibleNames = selectedTemplate.responsiblePersonIds
-            ?.map(id => db.users.list().find(u => u.id === id)?.name).filter(Boolean).join(', ');
+            ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
         
         const canEditMaint = user.role !== 'operator';
-
         const dayNames = selectedTemplate.allowedDays.sort().map(d => t(`day.${d}`)).join(', ');
 
         return (
@@ -203,7 +252,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.maintenance_type')}</span> {selectedTemplate.type === 'operational' ? 'Provozní' : 'Plánovaná'}</div>
                                 {selectedTemplate.lastGeneratedDate && (
-                                    <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate}</div>
+                                    <div><span className="text-slate-500 block">Poslední generování</span> {new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString()}</div>
                                 )}
                             </div>
                             
@@ -230,6 +279,12 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                         setSelectedWpId={setSelectedWpId}
                         errors={errors}
                         t={t}
+                        // Pass API data props
+                        locations={locations}
+                        workplaces={workplaces}
+                        technologies={technologies}
+                        suppliers={suppliers}
+                        users={users}
                     />
                 )}
             </div>
@@ -277,7 +332,7 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                              <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
                              <select className="w-full p-1.5 border rounded" value={filters.supplierId} onChange={e => setFilters({...filters, supplierId: e.target.value})}>
                                 <option value="">{t('common.all')}</option>
-                                {db.suppliers.list().map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                              </select>
                         </div>
                     </div>
@@ -303,10 +358,10 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                                 <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
-                                    const tech = db.technologies.list().find(t => t.id === m.techId);
-                                    const supplier = db.suppliers.list().find(s => s.id === m.supplierId);
+                                    const tech = technologies.find(t => t.id === m.techId);
+                                    const supplier = suppliers.find(s => s.id === m.supplierId);
                                     const responsibleNames = m.responsiblePersonIds
-                                        ?.map(id => db.users.list().find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                                        ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
@@ -340,6 +395,12 @@ export const MaintenancePage = ({ user }: { user: User }) => {
                     setSelectedWpId={setSelectedWpId}
                     errors={errors}
                     t={t}
+                    // Pass Data Props
+                    locations={locations}
+                    workplaces={workplaces}
+                    technologies={technologies}
+                    suppliers={suppliers}
+                    users={users}
                 />
             )}
         </div>
@@ -347,7 +408,11 @@ export const MaintenancePage = ({ user }: { user: User }) => {
 };
 
 // Refactored Modal for better readability
-const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t }: any) => {
+const MaintModal = ({ 
+    isOpen, onClose, data, setData, isEdit, onSave, 
+    selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t,
+    locations, workplaces, technologies, suppliers, users
+}: any) => {
     
     const removeResponsiblePerson = (id: string) => {
         const updated = (data.responsiblePersonIds || []).filter((pid: string) => pid !== id);
@@ -375,7 +440,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                                 onChange={e => { setSelectedLocId(e.target.value); setSelectedWpId(''); setData({...data, techId: ''}); }}
                             >
                                 <option value="">-- Vyberte lokalitu --</option>
-                                {db.locations.list().map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
                             </select>
                         </div>
                         {selectedLocId && (
@@ -387,7 +452,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                                     onChange={e => { setSelectedWpId(e.target.value); setData({...data, techId: ''}); }}
                                 >
                                     <option value="">-- Vyberte pracoviště --</option>
-                                    {db.workplaces.byLoc(selectedLocId).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                    {workplaces.filter((w: any) => w.locationId === selectedLocId).map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
                                 </select>
                             </div>
                         )}
@@ -400,7 +465,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                                 onChange={e => setData({...data, techId: e.target.value})}
                                 >
                                 <option value="">-- Vyberte technologii --</option>
-                                {db.technologies.list().filter(t => t.workplaceId === selectedWpId && t.isVisible).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
                                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
                             </div>
@@ -424,7 +489,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                     <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')}</label>
                     <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                     <option value="">-- Interní řešení --</option>
-                    {db.suppliers.list().map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {suppliers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                     {errors.supplierId && <span className="text-xs text-red-500">{errors.supplierId}</span>}
             </div>
@@ -472,7 +537,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                     <div className={`${errors.responsiblePersonIds ? 'border border-red-500 rounded' : ''}`}>
                         <MultiSelect 
                         label=""
-                        options={db.users.list().filter(u => (u.role === 'admin' || u.role === 'maintenance') && !u.isBlocked).map(u => ({ id: u.id, name: u.name }))}
+                        options={users.filter((u: any) => (u.role === 'admin' || u.role === 'maintenance') && !u.isBlocked).map((u: any) => ({ id: u.id, name: u.name }))}
                         selectedIds={data.responsiblePersonIds || []}
                         onChange={ids => setData({...data, responsiblePersonIds: ids})}
                         />
@@ -481,7 +546,7 @@ const MaintModal = ({ isOpen, onClose, data, setData, isEdit, onSave, selectedLo
                     {data.responsiblePersonIds && data.responsiblePersonIds.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                             {data.responsiblePersonIds.map((id: string) => {
-                                const user = db.users.list().find(u => u.id === id);
+                                const user = users.find((u: any) => u.id === id);
                                 return (
                                     <span key={id} className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs">
                                         {user?.name}
