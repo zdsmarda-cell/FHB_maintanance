@@ -5,6 +5,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FHB maintain</title>
+    
+    <!-- GLOBAL ERROR REPORTER: Catch errors before React loads -->
+    <script>
+      window.onerror = function (msg, url, lineNo, columnNo, error) {
+        var container = document.getElementById('error-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'error-container';
+          container.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100vh; background:#fff0f0; color:#900; padding:20px; z-index:99999; overflow:auto; font-family:monospace; font-size:14px;';
+          document.body.appendChild(container);
+        }
+        var message = [
+          'Message: ' + msg,
+          'URL: ' + url,
+          'Line: ' + lineNo,
+          'Column: ' + columnNo,
+          'Stack: ' + (error && error.stack ? error.stack : 'N/A')
+        ].join('\n');
+        
+        container.innerText += '\n------------------\n' + message;
+        console.error('Global Error Caught:', error);
+        return false;
+      };
+      
+      window.onunhandledrejection = function(event) {
+         var container = document.getElementById('error-container');
+         if (!container) {
+            // Create container logic duplicated for robustness if error happens early
+            container = document.createElement('div');
+            container.id = 'error-container';
+            container.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100vh; background:#fff0f0; color:#900; padding:20px; z-index:99999; overflow:auto; font-family:monospace; font-size:14px;';
+            document.body.appendChild(container);
+         }
+         container.innerText += '\n------------------\nUnhandled Promise Rejection:\n' + event.reason;
+         console.error('Unhandled Rejection:', event.reason);
+      };
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS via CDN as requested -->
     <script src="https://cdn.tailwindcss.com"></script>

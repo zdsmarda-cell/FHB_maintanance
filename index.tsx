@@ -20,6 +20,45 @@ import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server } from 'lucide-react';
 
+// --- Error Boundary Component ---
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("React Critical Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-10 flex flex-col items-center justify-center min-h-screen bg-slate-50 text-red-900">
+          <AlertTriangle className="w-16 h-16 text-red-600 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Kritická chyba aplikace</h1>
+          <p className="mb-4">Aplikace narazila na neočekávanou chybu.</p>
+          <div className="bg-white p-4 rounded border border-red-200 font-mono text-sm max-w-2xl overflow-auto shadow-sm">
+            {this.state.error?.toString()}
+          </div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Obnovit stránku
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // --- Environment Detection ---
 
 const PROD_DOMAIN = 'fhbmain.impossible.cz';
@@ -366,4 +405,8 @@ const App = () => {
 };
 
 const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+root.render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
