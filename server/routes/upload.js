@@ -15,7 +15,15 @@ const rootDir = path.join(__dirname, '../../');
 // Use IMG_PATH from env or default to 'uploads/images' relative to root
 const uploadDir = path.resolve(rootDir, process.env.IMG_PATH || 'uploads/images');
 
-// Removed mkdirSync to prevent EACCES errors. The directory must exist.
+// Ensure directory exists synchronously before configuring multer
+if (!fs.existsSync(uploadDir)) {
+    try {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        console.log(`Created upload directory: ${uploadDir}`);
+    } catch (err) {
+        console.error(`Failed to create upload directory: ${uploadDir}`, err);
+    }
+}
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {

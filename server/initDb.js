@@ -145,12 +145,14 @@ const migrations = [
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`
         ]
+    },
+    {
+        name: '002_add_weight_column',
+        up: [
+            // Safe add column if it was missing in some deployments
+            `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS weight INT DEFAULT 0`
+        ]
     }
-    // Add future migrations here, e.g.:
-    // {
-    //    name: '002_add_new_column',
-    //    up: ["ALTER TABLE requests ADD COLUMN archived BOOLEAN DEFAULT FALSE"]
-    // }
 ];
 
 export const initDb = async () => {
@@ -178,7 +180,16 @@ export const initDb = async () => {
             
             // Execute all SQL statements in the 'up' array
             for (const sql of migration.up) {
-                await pool.query(sql);
+                try {
+                    await pool.query(sql);
+                } catch (sqlErr) {
+                    // Ignore "Duplicate column name" error if manual patch was applied, but log others
+                    if (sqlErr.code !== 'ER_DUP_FIELDNAME') {
+                        throw sqlErr;
+                    } else {
+                        console.log(`Skipping duplicate field error in migration ${migration.name}`);
+                    }
+                }
             }
 
             // Record migration as done

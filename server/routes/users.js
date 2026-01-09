@@ -7,7 +7,22 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM users');
-    res.json(rows);
+    
+    // Map DB snake_case to Frontend camelCase
+    const mappedUsers = rows.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        phone: u.phone,
+        isBlocked: !!u.isBlocked,
+        assignedLocationIds: typeof u.assignedLocationIds === 'string' ? JSON.parse(u.assignedLocationIds || '[]') : u.assignedLocationIds,
+        assignedWorkplaceIds: typeof u.assignedWorkplaceIds === 'string' ? JSON.parse(u.assignedWorkplaceIds || '[]') : u.assignedWorkplaceIds,
+        // Crucial mapping for approval limits
+        approvalLimits: typeof u.approval_limits === 'string' ? JSON.parse(u.approval_limits || '{}') : u.approval_limits
+    }));
+
+    res.json(mappedUsers);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

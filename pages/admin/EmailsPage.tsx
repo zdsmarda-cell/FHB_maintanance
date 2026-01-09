@@ -4,7 +4,7 @@ import { useI18n } from '../../lib/i18n';
 import { db } from '../../lib/db';
 import { Email } from '../../lib/types';
 import { RefreshCcw, Check, AlertTriangle, Clock, Mail } from 'lucide-react';
-import { Pagination } from '../../components/Shared';
+import { Pagination, ConfirmModal } from '../../components/Shared';
 
 const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
@@ -19,6 +19,7 @@ export const EmailsPage = () => {
     const [emails, setEmails] = useState<Email[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<(string|number)[]>([]);
+    const [showConfirm, setShowConfirm] = useState(false);
     
     // Filtering
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'sent' | 'error'>('all');
@@ -58,34 +59,36 @@ export const EmailsPage = () => {
         fetchEmails();
     }, []);
 
-    const handleRetry = async () => {
-        if (selectedIds.length === 0) return;
-        
-        if (confirm(`Opravdu chcete znovu odeslat ${selectedIds.length} označených emailů?`)) {
-            if (isMockEnv) {
-                db.emails.retry(selectedIds);
-                fetchEmails();
-                setSelectedIds([]);
-            } else {
-                try {
-                    const token = localStorage.getItem('auth_token');
-                    const response = await fetch(`${API_BASE}/api/emails/retry`, {
-                        method: 'POST',
-                        headers: { 
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ ids: selectedIds })
-                    });
-                    if (response.ok) {
-                        fetchEmails();
-                        setSelectedIds([]);
-                    }
-                } catch (e) {
-                    console.error(e);
+    const executeRetry = async () => {
+        if (isMockEnv) {
+            db.emails.retry(selectedIds);
+            fetchEmails();
+            setSelectedIds([]);
+        } else {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/emails/retry`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: selectedIds })
+                });
+                if (response.ok) {
+                    fetchEmails();
+                    setSelectedIds([]);
                 }
+            } catch (e) {
+                console.error(e);
             }
         }
+        setShowConfirm(false);
+    };
+
+    const handleRetryClick = () => {
+        if (selectedIds.length === 0) return;
+        setShowConfirm(true);
     };
 
     const getStatus = (email: Email) => {
@@ -143,7 +146,7 @@ export const EmailsPage = () => {
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-slate-800">{t('headers.emails')}</h2>
                 <button 
-                    onClick={handleRetry} 
+                    onClick={handleRetryClick} 
                     disabled={selectedIds.length === 0}
                     className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
@@ -176,14 +179,13 @@ export const EmailsPage = () => {
                                 <th className="px-4 py-3">{t('common.recipient')}</th>
                                 <th className="px-4 py-3">{t('common.subject')}</th>
                                 <th className="px-4 py-3">{t('common.status')}</th>
-                                <th className="px-4 py-3">Pokusy</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-slate-400">Načítání...</td></tr>
+                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">Načítání...</td></tr>
                             ) : paginatedEmails.length === 0 ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-slate-400">Žádné emaily</td></tr>
+                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">Žádné emaily</td></tr>
                             ) : (
                                 paginatedEmails.map(e => (
                                     <tr key={e.id} className="border-b hover:bg-slate-50">
@@ -196,7 +198,6 @@ export const EmailsPage = () => {
                                         <td className="px-4 py-3 font-medium text-slate-700">{e.to_address}</td>
                                         <td className="px-4 py-3 text-slate-600">{e.subject}</td>
                                         <td className="px-4 py-3">{renderStatusBadge(getStatus(e), e.error)}</td>
-                                        <td className="px-4 py-3 text-slate-500">{e.attempts}</td>
                                     </tr>
                                 ))
                             )}
@@ -214,6 +215,15 @@ export const EmailsPage = () => {
                     />
                 )}
             </div>
+
+            {showConfirm && (
+                <ConfirmModal 
+                    title="Potvrzení odeslání"
+                    message={`Opravdu chcete znovu odeslat ${selectedIds.length} označených emailů?`}
+                    onConfirm={executeRetry}
+                    onCancel={() => setShowConfirm(false)}
+                />
+            )}
         </div>
     );
 };
