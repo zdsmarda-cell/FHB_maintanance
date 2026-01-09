@@ -49,6 +49,18 @@ export const api = {
         });
         if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
         return res.json();
+    },
+
+    delete: async (endpoint: string) => {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+            method: 'DELETE',
+            headers: { 
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        return res.json();
     }
 };
 

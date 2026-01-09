@@ -177,6 +177,14 @@ export const initDb = async () => {
       )
     `);
 
+    // 9. App Settings
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        setting_key VARCHAR(50) PRIMARY KEY,
+        setting_value JSON
+      )
+    `);
+
     // Default Admin
     const adminEmail = 'zdenek.smarda@fhb.sk';
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [adminEmail]);

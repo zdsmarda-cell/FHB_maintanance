@@ -1,15 +1,40 @@
-import React, { useState } from 'react';
-import { db } from '../../lib/db';
+
+import React, { useState, useEffect } from 'react';
+import { db, api, isProductionDomain } from '../../lib/db';
+import { Loader } from 'lucide-react';
 
 export const SettingsPage = () => {
-    const [settings, setSettings] = useState(db.settings.get());
+    const [loading, setLoading] = useState(false);
+    const [settings, setSettings] = useState<any>({});
     
-    const toggleTranslation = () => {
+    const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+
+    const refresh = async () => {
+        setLoading(true);
+        try {
+            if(isMock) {
+                setSettings(db.settings.get());
+            } else {
+                const data = await api.get('/settings');
+                setSettings(data);
+            }
+        } catch(e) { console.error(e); } 
+        finally { setLoading(false); }
+    };
+
+    useEffect(() => { refresh(); }, []);
+    
+    const toggleTranslation = async () => {
         const newVal = !settings.enableOnlineTranslation;
         const newSettings = { ...settings, enableOnlineTranslation: newVal };
-        setSettings(newSettings);
-        db.settings.save(newSettings);
+        setSettings(newSettings); // Optimistic update
+        try {
+            if(isMock) db.settings.save(newSettings);
+            else await api.post('/settings', newSettings);
+        } catch(e) { console.error(e); refresh(); }
     };
+
+    if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
     return (
         <div className="bg-white p-6 rounded shadow-sm border border-slate-200">

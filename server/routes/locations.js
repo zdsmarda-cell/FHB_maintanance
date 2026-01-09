@@ -13,12 +13,15 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET all workplaces
-router.get('/workplaces', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM workplaces');
-    res.json(rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+// UPDATE Location
+router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, address, isVisible } = req.body;
+    try {
+        await pool.query('UPDATE locations SET name=?, address=?, is_visible=? WHERE id=?', 
+            [name, JSON.stringify(address), isVisible, id]);
+        res.json({ id, ...req.body });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // CREATE Location
@@ -32,6 +35,16 @@ router.post('/', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- WORKPLACES ---
+
+// GET all workplaces
+router.get('/workplaces', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM workplaces');
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // CREATE Workplace
 router.post('/workplaces', async (req, res) => {
     const { locationId, name, description, isVisible } = req.body;
@@ -40,6 +53,31 @@ router.post('/workplaces', async (req, res) => {
         await pool.query('INSERT INTO workplaces (id, location_id, name, description, is_visible) VALUES (?, ?, ?, ?, ?)', 
             [id, locationId, name, description, isVisible]);
         res.json({ id, locationId, name, description, isVisible });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// UPDATE Workplace
+router.put('/workplaces/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description, isVisible } = req.body;
+    try {
+        await pool.query('UPDATE workplaces SET name=?, description=?, is_visible=? WHERE id=?', 
+            [name, description, isVisible, id]);
+        res.json({ id, ...req.body });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE Workplace
+router.delete('/workplaces/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Check for dependencies (Technology)
+        const [techs] = await pool.query('SELECT id FROM technologies WHERE workplace_id = ?', [id]);
+        if (techs.length > 0) {
+            return res.status(400).json({ error: 'Cannot delete workplace used by technologies.' });
+        }
+        await pool.query('DELETE FROM workplaces WHERE id = ?', [id]);
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

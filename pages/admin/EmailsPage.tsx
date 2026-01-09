@@ -1,5 +1,4 @@
 
-/// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { db } from '../../lib/db';

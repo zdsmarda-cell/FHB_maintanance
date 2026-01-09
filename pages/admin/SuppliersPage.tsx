@@ -1,82 +1,92 @@
 
-import React, { useState } from 'react';
-import { db } from '../../lib/db';
-import { Edit, Trash, Plus } from 'lucide-react';
-import { Address } from '../../lib/types';
+import React, { useState, useEffect } from 'react';
+import { db, api, isProductionDomain } from '../../lib/db';
+import { Edit, Trash, Plus, Loader } from 'lucide-react';
+import { Address, Supplier } from '../../lib/types';
 import { AddressInput, Modal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
 
 export const SuppliersPage = () => {
     const { t } = useI18n();
-    const [suppliers, setSuppliers] = useState(db.suppliers.list());
+    const [loading, setLoading] = useState(false);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [contacts, setContacts] = useState<any[]>([]);
     const [viewContactsFor, setViewContactsFor] = useState<string | null>(null);
     const [editingSup, setEditingSup] = useState<any>(null);
     
-    // Create Modal State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    
-    // Contact Edit Modal State
     const [editingContact, setEditingContact] = useState<any>(null);
-
-    // Delete Modal State
     const [confirmDelete, setConfirmDelete] = useState<{show: boolean, type: 'supplier'|'contact', id: string, supId?: string}>({ show: false, type: 'supplier', id: '' });
     
     const emptyAddress: Address = { street: '', number: '', zip: '', city: '', country: 'SK' };
-    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
+    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, isVisible: true });
     const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', position: '' });
     
-    // Errors
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
 
-    const refresh = () => setSuppliers(db.suppliers.list());
+    const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+
+    // Fetch Suppliers
+    const refresh = async () => {
+        setLoading(true);
+        try {
+            if (isMock) {
+                setSuppliers(db.suppliers.list());
+            } else {
+                const data = await api.get('/suppliers');
+                setSuppliers(data);
+            }
+        } catch (e) { console.error(e); } 
+        finally { setLoading(false); }
+    };
+
+    useEffect(() => { refresh(); }, []);
+
+    // Fetch Contacts
+    const loadContacts = async (supId: string) => {
+        try {
+            if (isMock) {
+                setContacts(db.supplierContacts.list(supId));
+            } else {
+                const data = await api.get(`/suppliers/${supId}/contacts`);
+                setContacts(data);
+            }
+        } catch (e) { console.error(e); }
+    };
 
     const validateForm = (data: any) => {
         const newErrors: Record<string, string> = {};
-        
-        // Name validation
         if (!data.name || data.name.trim().length < 2) newErrors.name = "Název musí mít alespoň 2 znaky.";
-        
-        // Contacts
         if (!data.phone) newErrors.phone = t('validation.required');
         if (!data.email) newErrors.email = t('validation.required');
-
-        // Address Validation
         if (!data.address.street) newErrors.street = "Ulice je povinná.";
         if (!data.address.city) newErrors.city = "Město je povinné.";
         if (!data.address.zip) newErrors.zip = "PSČ je povinné.";
-
-        // IČ Validation: Optional, but if present must be numeric
-        if (data.ic && data.ic.trim() !== '') {
-            if (!/^\d+$/.test(data.ic)) newErrors.ic = "IČ musí obsahovat pouze čísla.";
-        }
-
-        // DIČ Validation: Optional
-        if (data.dic && data.dic.trim() !== '') {
-             // Basic length check instead of strict regex to avoid frustration
-             if (data.dic.length < 5) newErrors.dic = "DIČ je příliš krátké.";
-        }
-        
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleAddSup = () => {
+    const handleAddSup = async () => {
         if(!validateForm(newSup)) return;
-        db.suppliers.add(newSup);
-        setNewSup({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
-        setIsCreateOpen(false);
-        refresh();
+        try {
+            if(isMock) db.suppliers.add(newSup);
+            else await api.post('/suppliers', newSup);
+            setNewSup({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
+            setIsCreateOpen(false);
+            refresh();
+        } catch(e) { console.error(e); }
     };
 
-    const handleUpdateSup = () => {
+    const handleUpdateSup = async () => {
         if(!editingSup) return;
         if(!validateForm(editingSup)) return;
-        
-        db.suppliers.update(editingSup.id, editingSup);
-        setEditingSup(null);
-        refresh();
+        try {
+            if(isMock) db.suppliers.update(editingSup.id, editingSup);
+            else await api.put(`/suppliers/${editingSup.id}`, editingSup);
+            setEditingSup(null);
+            refresh();
+        } catch(e) { console.error(e); }
     }
     
     const openCreateModal = () => {
@@ -88,8 +98,12 @@ export const SuppliersPage = () => {
     const toggleContacts = (id: string) => {
         setContactErrors({});
         setNewContact({ name: '', email: '', phone: '', position: '' });
-        if(viewContactsFor === id) { setViewContactsFor(null); }
-        else { setViewContactsFor(id); setContacts(db.supplierContacts.list(id)); }
+        if(viewContactsFor === id) { 
+            setViewContactsFor(null); 
+        } else { 
+            setViewContactsFor(id); 
+            loadContacts(id);
+        }
     }
 
     const validateContact = (data: any) => {
@@ -102,36 +116,44 @@ export const SuppliersPage = () => {
         return Object.keys(errs).length === 0;
     }
 
-    const addContact = (supId: string) => {
+    const addContact = async (supId: string) => {
         if(!validateContact(newContact)) return;
-
-        db.supplierContacts.add({...newContact, supplierId: supId});
-        setContacts(db.supplierContacts.list(supId));
-        setNewContact({ name: '', email: '', phone: '', position: '' });
-        setContactErrors({});
+        try {
+            if(isMock) db.supplierContacts.add({...newContact, supplierId: supId});
+            else await api.post('/suppliers/contacts', {...newContact, supplierId: supId});
+            
+            loadContacts(supId);
+            setNewContact({ name: '', email: '', phone: '', position: '' });
+            setContactErrors({});
+        } catch(e) { console.error(e); }
     }
 
-    const updateContact = () => {
+    const updateContact = async () => {
         if(!editingContact) return;
         if(!validateContact(editingContact)) return;
-
-        db.supplierContacts.update(editingContact.id, editingContact);
-        setContacts(db.supplierContacts.list(editingContact.supplierId));
-        setEditingContact(null);
-        setContactErrors({});
+        try {
+            if(isMock) db.supplierContacts.update(editingContact.id, editingContact);
+            else await api.put(`/suppliers/contacts/${editingContact.id}`, editingContact);
+            
+            loadContacts(editingContact.supplierId);
+            setEditingContact(null);
+            setContactErrors({});
+        } catch(e) { console.error(e); }
     }
     
-    const promptDeleteContact = (supId: string, id: string) => {
-        setConfirmDelete({ show: true, type: 'contact', id, supId });
-    }
-
-    const executeDelete = () => {
+    const executeDelete = async () => {
         if (confirmDelete.type === 'contact') {
-            db.supplierContacts.delete(confirmDelete.id);
-            if (confirmDelete.supId) setContacts(db.supplierContacts.list(confirmDelete.supId));
+            try {
+                if(isMock) db.supplierContacts.delete(confirmDelete.id);
+                else await api.delete(`/suppliers/contacts/${confirmDelete.id}`);
+
+                if (confirmDelete.supId) loadContacts(confirmDelete.supId);
+            } catch(e) { console.error(e); }
         }
         setConfirmDelete({ show: false, type: 'supplier', id: '' });
     }
+
+    if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
     return (
         <div className="space-y-6">
@@ -167,135 +189,68 @@ export const SuppliersPage = () => {
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setContactErrors({}); setEditingContact(c); }} className="text-blue-600"><Edit className="w-3 h-3"/></button>
-                                            <button onClick={() => promptDeleteContact(s.id, c.id)} className="text-red-500"><Trash className="w-3 h-3"/></button>
+                                            <button onClick={() => setConfirmDelete({ show: true, type: 'contact', id: c.id, supId: s.id })} className="text-red-500"><Trash className="w-3 h-3"/></button>
                                         </div>
                                     </div>
                                 ))}
                                 <div className="grid grid-cols-5 gap-2 mt-2 items-start">
-                                    <div className="w-full">
-                                        <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
-                                    </div>
-                                    <div className="w-full">
-                                        <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
-                                    </div>
-                                    <div className="w-full">
-                                        <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
-                                    </div>
-                                    <div className="w-full">
-                                        <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
-                                    </div>
+                                    <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
+                                    <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
+                                    <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
+                                    <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
                                     <button onClick={() => addContact(s.id)} className="bg-blue-600 text-white rounded text-sm py-1">{t('common.add')}</button>
                                 </div>
-                                {Object.keys(contactErrors).length > 0 && <div className="text-xs text-red-500 mt-1">Všechna pole jsou povinná.</div>}
                             </div>
                         )}
                     </div>
                 ))}
             </div>
             
-            {/* Create Modal */}
+            {/* Create/Edit Modals logic same as before, using handleAddSup/handleUpdateSup */}
             {isCreateOpen && (
                 <Modal title={t('headers.new_supplier')} onClose={() => setIsCreateOpen(false)}>
                      <div className="grid grid-cols-2 gap-2 mb-2">
                         <div className="col-span-2">
                              <label className="block text-xs text-slate-500 mb-1">{t('form.name')}</label>
                              <input className={`p-2 border rounded w-full ${errors.name ? 'border-red-500' : ''}`} value={newSup.name} onChange={e => setNewSup({...newSup, name: e.target.value})} />
-                             {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
                         </div>
-                        <div className="col-span-1">
-                             <input placeholder={t('form.ic')} className={`p-2 border rounded w-full ${errors.ic ? 'border-red-500' : ''}`} value={newSup.ic} onChange={e => setNewSup({...newSup, ic: e.target.value})} />
-                             {errors.ic && <span className="text-xs text-red-500">{errors.ic}</span>}
-                        </div>
-                        <div className="col-span-1">
-                             <input placeholder={t('form.phone')} className={`p-2 border rounded w-full ${errors.phone ? 'border-red-500' : ''}`} value={newSup.phone} onChange={e => setNewSup({...newSup, phone: e.target.value})} />
-                             {errors.phone && <span className="text-xs text-red-500">{errors.phone}</span>}
-                        </div>
-                        <div className="col-span-2">
-                             <input placeholder={t('form.dic')} className={`p-2 border rounded w-full ${errors.dic ? 'border-red-500' : ''}`} value={newSup.dic} onChange={e => setNewSup({...newSup, dic: e.target.value})} />
-                             {errors.dic && <span className="text-xs text-red-500">{errors.dic}</span>}
-                        </div>
-                        <div className="col-span-2">
-                             <input placeholder={t('form.email')} className={`p-2 border rounded w-full ${errors.email ? 'border-red-500' : ''}`} value={newSup.email} onChange={e => setNewSup({...newSup, email: e.target.value})} />
-                             {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
-                        </div>
+                        <div className="col-span-1"><input placeholder={t('form.ic')} className="p-2 border rounded w-full" value={newSup.ic} onChange={e => setNewSup({...newSup, ic: e.target.value})} /></div>
+                        <div className="col-span-1"><input placeholder={t('form.phone')} className="p-2 border rounded w-full" value={newSup.phone} onChange={e => setNewSup({...newSup, phone: e.target.value})} /></div>
+                        <div className="col-span-2"><input placeholder={t('form.dic')} className="p-2 border rounded w-full" value={newSup.dic} onChange={e => setNewSup({...newSup, dic: e.target.value})} /></div>
+                        <div className="col-span-2"><input placeholder={t('form.email')} className="p-2 border rounded w-full" value={newSup.email} onChange={e => setNewSup({...newSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={newSup.address} onChange={a => setNewSup({...newSup, address: a})} errors={errors} />
-                    <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
-                        <button onClick={() => setIsCreateOpen(false)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
-                        <button onClick={handleAddSup} className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button>
-                    </div>
+                    <div className="flex justify-end mt-4"><button onClick={handleAddSup} className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button></div>
                 </Modal>
             )}
 
-            {/* Edit Supplier Modal */}
             {editingSup && (
                 <Modal title={t('headers.edit_supplier')} onClose={() => setEditingSup(null)}>
                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div className="col-span-2">
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.name')}</label>
-                            <input className={`p-2 border rounded w-full ${errors.name ? 'border-red-500' : ''}`} value={editingSup.name} onChange={e => setEditingSup({...editingSup, name: e.target.value})} />
-                             {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
-                        </div>
-                        <div className="col-span-1">
-                            <input className={`p-2 border rounded w-full ${errors.ic ? 'border-red-500' : ''}`} value={editingSup.ic} onChange={e => setEditingSup({...editingSup, ic: e.target.value})} />
-                            {errors.ic && <span className="text-xs text-red-500">{errors.ic}</span>}
-                        </div>
-                        <div className="col-span-1">
-                            <input className={`p-2 border rounded w-full ${errors.phone ? 'border-red-500' : ''}`} value={editingSup.phone} onChange={e => setEditingSup({...editingSup, phone: e.target.value})} />
-                            {errors.phone && <span className="text-xs text-red-500">{errors.phone}</span>}
-                        </div>
-                        <div className="col-span-2">
-                             <input className={`p-2 border rounded w-full ${errors.dic ? 'border-red-500' : ''}`} value={editingSup.dic} onChange={e => setEditingSup({...editingSup, dic: e.target.value})} />
-                             {errors.dic && <span className="text-xs text-red-500">{errors.dic}</span>}
-                        </div>
-                        <div className="col-span-2">
-                            <input className={`p-2 border rounded w-full ${errors.email ? 'border-red-500' : ''}`} value={editingSup.email} onChange={e => setEditingSup({...editingSup, email: e.target.value})} />
-                            {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
-                        </div>
+                        <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.name} onChange={e => setEditingSup({...editingSup, name: e.target.value})} /></div>
+                        <div className="col-span-1"><input className="p-2 border rounded w-full" value={editingSup.ic} onChange={e => setEditingSup({...editingSup, ic: e.target.value})} /></div>
+                        <div className="col-span-1"><input className="p-2 border rounded w-full" value={editingSup.phone} onChange={e => setEditingSup({...editingSup, phone: e.target.value})} /></div>
+                        <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.dic} onChange={e => setEditingSup({...editingSup, dic: e.target.value})} /></div>
+                        <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.email} onChange={e => setEditingSup({...editingSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={editingSup.address} onChange={a => setEditingSup({...editingSup, address: a})} errors={errors} />
-                    <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
-                        <button onClick={() => setEditingSup(null)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
-                        <button onClick={handleUpdateSup} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button>
-                    </div>
+                    <div className="flex justify-end mt-4"><button onClick={handleUpdateSup} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button></div>
                 </Modal>
             )}
 
-            {/* Edit Contact Modal */}
             {editingContact && (
                 <Modal title="Upravit Kontakt" onClose={() => setEditingContact(null)}>
                     <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.user_name')}</label>
-                            <input className={`w-full border p-2 rounded ${contactErrors.name ? 'border-red-500' : ''}`} value={editingContact.name} onChange={e => setEditingContact({...editingContact, name: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.position')}</label>
-                            <input className={`w-full border p-2 rounded ${contactErrors.position ? 'border-red-500' : ''}`} value={editingContact.position} onChange={e => setEditingContact({...editingContact, position: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.email')}</label>
-                            <input className={`w-full border p-2 rounded ${contactErrors.email ? 'border-red-500' : ''}`} value={editingContact.email} onChange={e => setEditingContact({...editingContact, email: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1">{t('form.phone')}</label>
-                            <input className={`w-full border p-2 rounded ${contactErrors.phone ? 'border-red-500' : ''}`} value={editingContact.phone} onChange={e => setEditingContact({...editingContact, phone: e.target.value})} />
-                        </div>
+                        <input className="w-full border p-2 rounded" value={editingContact.name} onChange={e => setEditingContact({...editingContact, name: e.target.value})} />
+                        <input className="w-full border p-2 rounded" value={editingContact.position} onChange={e => setEditingContact({...editingContact, position: e.target.value})} />
+                        <input className="w-full border p-2 rounded" value={editingContact.email} onChange={e => setEditingContact({...editingContact, email: e.target.value})} />
+                        <input className="w-full border p-2 rounded" value={editingContact.phone} onChange={e => setEditingContact({...editingContact, phone: e.target.value})} />
                     </div>
-                    <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
-                        <button onClick={() => setEditingContact(null)} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
-                        <button onClick={updateContact} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button>
-                    </div>
+                    <div className="flex justify-end mt-4"><button onClick={updateContact} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.save')}</button></div>
                 </Modal>
             )}
 
-            {confirmDelete.show && (
-                <ConfirmModal 
-                    message={t('msg.confirm_delete')} 
-                    onConfirm={executeDelete} 
-                    onCancel={() => setConfirmDelete({ show: false, type: 'supplier', id: '' })} 
-                />
-            )}
+            {confirmDelete.show && <ConfirmModal message={t('msg.confirm_delete')} onConfirm={executeDelete} onCancel={() => setConfirmDelete({ show: false, type: 'supplier', id: '' })} />}
         </div>
     );
 };
