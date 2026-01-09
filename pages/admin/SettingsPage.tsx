@@ -7,14 +7,18 @@ export const SettingsPage = () => {
     const [loading, setLoading] = useState(false);
     const [settings, setSettings] = useState<any>({});
     
-    const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+    // Check localStorage manually to debug
+    const hasMockToken = localStorage.getItem('auth_token')?.startsWith('mock-token-');
+    const isMock = !isProductionDomain || hasMockToken;
 
     const refresh = async () => {
         setLoading(true);
         try {
             if(isMock) {
+                console.log("Settings: Using MOCK data.");
                 setSettings(db.settings.get());
             } else {
+                console.log("Settings: Fetching from API...");
                 const data = await api.get('/settings');
                 setSettings(data);
             }
@@ -29,8 +33,14 @@ export const SettingsPage = () => {
         const newSettings = { ...settings, enableOnlineTranslation: newVal };
         setSettings(newSettings); // Optimistic update
         try {
-            if(isMock) db.settings.save(newSettings);
-            else await api.post('/settings', newSettings);
+            if(isMock) {
+                console.log("Settings: Saving to MOCK.");
+                db.settings.save(newSettings);
+            }
+            else {
+                console.log("Settings: Saving to API...");
+                await api.post('/settings', newSettings);
+            }
         } catch(e) { console.error(e); refresh(); }
     };
 
@@ -39,6 +49,11 @@ export const SettingsPage = () => {
     return (
         <div className="bg-white p-6 rounded shadow-sm border border-slate-200">
             <h3 className="font-bold text-lg mb-4">Administrátorské nastavení</h3>
+            {isMock && (
+                <div className="mb-4 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">
+                    Běžíte v Mock/Demo režimu. Změny se neukládají na server. Přihlašte se reálným účtem pro produkční použití.
+                </div>
+            )}
             <div className="flex items-center justify-between py-3 border-b">
                 <div>
                     <div className="font-medium">Online překlady</div>

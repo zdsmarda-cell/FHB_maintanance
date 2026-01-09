@@ -12,16 +12,28 @@ interface AddressInputProps {
 
 export const AddressInput = ({ address, onChange, errors = {} }: AddressInputProps) => {
     const { t } = useI18n();
+    const countries = ['SK', 'CZ', 'DE', 'AT', 'PL', 'HU', 'UA', 'GB', 'US'];
+
     return (
         <div className="grid grid-cols-6 gap-2 text-sm mt-2 bg-slate-50 p-3 rounded border border-slate-100">
-            <div className="col-span-6">
-                <label className="block text-xs text-slate-500">{t('form.street_and_number')}</label>
+            <div className="col-span-4">
+                <label className="block text-xs text-slate-500">{t('form.street')}</label>
                 <input 
                     className={`w-full border p-1 rounded ${errors.street ? 'border-red-500' : ''}`}
                     value={address.street} 
                     onChange={e => onChange({...address, street: e.target.value})} 
                 />
                 {errors.street && <span className="text-xs text-red-500">{errors.street}</span>}
+            </div>
+            
+            <div className="col-span-2">
+                <label className="block text-xs text-slate-500">{t('form.number')}</label>
+                <input 
+                    className={`w-full border p-1 rounded ${errors.number ? 'border-red-500' : ''}`}
+                    value={address.number} 
+                    onChange={e => onChange({...address, number: e.target.value})} 
+                />
+                {errors.number && <span className="text-xs text-red-500">{errors.number}</span>}
             </div>
             
             <div className="col-span-2">
@@ -44,7 +56,15 @@ export const AddressInput = ({ address, onChange, errors = {} }: AddressInputPro
             </div>
             <div className="col-span-1">
                 <label className="block text-xs text-slate-500">{t('form.country')}</label>
-                <select className="w-full border p-1 rounded bg-slate-100" disabled value={address.country}><option value="SK">SK</option></select>
+                <select 
+                    className="w-full border p-1 rounded bg-white" 
+                    value={address.country}
+                    onChange={e => onChange({...address, country: e.target.value})}
+                >
+                    {countries.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
             </div>
         </div>
     );

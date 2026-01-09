@@ -7,21 +7,27 @@ const router = express.Router();
 
 // --- TYPES ---
 router.get('/types', async (req, res) => {
-    const [rows] = await pool.query('SELECT * FROM tech_types');
-    res.json(rows);
+    try {
+        const [rows] = await pool.query('SELECT * FROM tech_types');
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/types', async (req, res) => {
-    const { name, description } = req.body;
+    const { name } = req.body;
     const id = crypto.randomUUID();
-    await pool.query('INSERT INTO tech_types (id, name, description) VALUES (?, ?, ?)', [id, name, description]);
-    res.json({ id, name, description });
+    try {
+        await pool.query('INSERT INTO tech_types (id, name) VALUES (?, ?)', [id, name]);
+        res.json({ id, name });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/types/:id', async (req, res) => {
-    const { name, description } = req.body;
-    await pool.query('UPDATE tech_types SET name=?, description=? WHERE id=?', [name, description, req.params.id]);
-    res.json({ id: req.params.id, name, description });
+    const { name } = req.body;
+    try {
+        await pool.query('UPDATE tech_types SET name=? WHERE id=?', [name, req.params.id]);
+        res.json({ id: req.params.id, name });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/types/:id', async (req, res) => {
@@ -35,21 +41,27 @@ router.delete('/types/:id', async (req, res) => {
 
 // --- STATES ---
 router.get('/states', async (req, res) => {
-    const [rows] = await pool.query('SELECT * FROM tech_states');
-    res.json(rows);
+    try {
+        const [rows] = await pool.query('SELECT * FROM tech_states');
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/states', async (req, res) => {
-    const { name, description } = req.body;
+    const { name } = req.body;
     const id = crypto.randomUUID();
-    await pool.query('INSERT INTO tech_states (id, name, description) VALUES (?, ?, ?)', [id, name, description]);
-    res.json({ id, name, description });
+    try {
+        await pool.query('INSERT INTO tech_states (id, name) VALUES (?, ?)', [id, name]);
+        res.json({ id, name });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/states/:id', async (req, res) => {
-    const { name, description } = req.body;
-    await pool.query('UPDATE tech_states SET name=?, description=? WHERE id=?', [name, description, req.params.id]);
-    res.json({ id: req.params.id, name, description });
+    const { name } = req.body;
+    try {
+        await pool.query('UPDATE tech_states SET name=? WHERE id=?', [name, req.params.id]);
+        res.json({ id: req.params.id, name });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/states/:id', async (req, res) => {

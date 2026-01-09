@@ -74,19 +74,18 @@ export const initDb = async () => {
     `);
 
     // 4. Tech Config (Types & States)
+    // REMOVED DESCRIPTION COLUMN
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tech_types (
         id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT
+        name VARCHAR(255) NOT NULL
       )
     `);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tech_states (
         id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT
+        name VARCHAR(255) NOT NULL
       )
     `);
 

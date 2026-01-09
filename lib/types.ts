@@ -7,7 +7,7 @@ export interface Address {
   number: string;
   zip: string;
   city: string;
-  country: 'SK'; // Enum, currently only Slovakia
+  country: string; // Changed from 'SK' literal to string to allow other countries
 }
 
 export interface User {

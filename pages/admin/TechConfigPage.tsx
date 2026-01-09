@@ -16,8 +16,8 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
     const [states, setStates] = useState<any[]>([]);
     const [assets, setAssets] = useState<any[]>([]); // For counting usage
     
-    const [newType, setNewType] = useState({ name: '', description: '' });
-    const [newState, setNewState] = useState({ name: '', description: '' });
+    const [newType, setNewType] = useState({ name: '' });
+    const [newState, setNewState] = useState({ name: '' });
     const [isCreateTypeOpen, setIsCreateTypeOpen] = useState(false);
     const [isCreateStateOpen, setIsCreateStateOpen] = useState(false);
 
@@ -112,7 +112,7 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
         try {
             if(isMock) db.techTypes.add(newType);
             else await api.post('/config/types', newType);
-            setNewType({ name: '', description: '' });
+            setNewType({ name: '' });
             setIsCreateTypeOpen(false);
             refresh();
         } catch(e) { console.error(e); }
@@ -124,7 +124,7 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
         try {
             if(isMock) db.techStates.add(newState);
             else await api.post('/config/states', newState);
-            setNewState({ name: '', description: '' });
+            setNewState({ name: '' });
             setIsCreateStateOpen(false);
             refresh();
         } catch(e) { console.error(e); }
@@ -179,7 +179,6 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
             {isCreateTypeOpen && (
                 <Modal title={t('headers.new_tech_type')} onClose={() => setIsCreateTypeOpen(false)}>
                     <input value={newType.name} placeholder={t('form.name')} onChange={e => setNewType({...newType, name: e.target.value})} className={`border p-2 w-full rounded mb-1 ${errors.name ? 'border-red-500' : ''}`} />
-                    <input value={newType.description} placeholder={t('form.description')} onChange={e => setNewType({...newType, description: e.target.value})} className="border p-2 w-full rounded mb-2" />
                     <div className="flex justify-end pt-4 border-t border-slate-100"><button onClick={handleAddType} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.create')}</button></div>
                 </Modal>
             )}
@@ -187,7 +186,6 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
             {isCreateStateOpen && (
                 <Modal title={t('headers.new_tech_state')} onClose={() => setIsCreateStateOpen(false)}>
                     <input value={newState.name} placeholder={t('form.name')} onChange={e => setNewState({...newState, name: e.target.value})} className={`border p-2 w-full rounded mb-1 ${errors.name ? 'border-red-500' : ''}`} />
-                    <input value={newState.description} placeholder={t('form.description')} onChange={e => setNewState({...newState, description: e.target.value})} className="border p-2 w-full rounded mb-2" />
                     <div className="flex justify-end pt-4 border-t border-slate-100"><button onClick={handleAddState} className="bg-blue-600 text-white px-3 py-2 rounded">{t('common.create')}</button></div>
                 </Modal>
             )}
