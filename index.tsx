@@ -1,6 +1,6 @@
 
 /// <reference types="vite/client" />
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, Component, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; 
 import { Layout } from './components/Layout';
@@ -21,7 +21,7 @@ import { useI18n } from './lib/i18n';
 import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server } from 'lucide-react';
 
 // --- Error Boundary Component ---
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
   constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };
