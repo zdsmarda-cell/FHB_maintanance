@@ -34,10 +34,8 @@ const rootDir = path.join(__dirname, '../');
 // Serve uploaded files statically based on IMG_PATH
 const imgPath = path.resolve(rootDir, process.env.IMG_PATH || 'uploads/images');
 
-// Ensure the directory exists (safe check)
-if (!fs.existsSync(imgPath)) {
-    fs.mkdirSync(imgPath, { recursive: true });
-}
+// Removed mkdirSync to prevent permissions issues in production environment where creating folders at root might fail.
+// Ensure the directory exists via deployment scripts or manual creation.
 
 // Mount specific image path
 app.use('/uploads/images', express.static(imgPath));

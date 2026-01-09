@@ -225,18 +225,20 @@ const App = () => {
                     </button>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col items-center">
-                    <label className="flex items-center text-sm text-slate-500 cursor-pointer hover:text-slate-700">
-                        <input 
-                            type="checkbox" 
-                            className="mr-2 rounded" 
-                            checked={useMockData} 
-                            onChange={(e) => setUseMockData(e.target.checked)} 
-                        />
-                        <Database className="w-4 h-4 mr-1" />
-                        Demo režim (lokální data)
-                    </label>
-                </div>
+                {isDevEnv && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col items-center">
+                        <label className="flex items-center text-sm text-slate-500 cursor-pointer hover:text-slate-700">
+                            <input 
+                                type="checkbox" 
+                                className="mr-2 rounded" 
+                                checked={useMockData} 
+                                onChange={(e) => setUseMockData(e.target.checked)} 
+                            />
+                            <Database className="w-4 h-4 mr-1" />
+                            Demo režim (lokální data)
+                        </label>
+                    </div>
+                )}
 
                 <div className="mt-4 pt-4 border-t border-slate-100">
                     <button 
