@@ -45,6 +45,9 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const id = crypto.randomUUID();
+    
+    // Fix for incorrect date values (strip time if present)
+    const cleanDate = installDate ? installDate.slice(0, 10) : null;
 
     try {
         await pool.query(
@@ -54,7 +57,7 @@ router.post('/', async (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id, name, serialNumber, description, typeId, stateId, workplaceId,
-                supplierId, installDate || null, weight || 0, sharepointLink, 
+                supplierId, cleanDate, weight || 0, sharepointLink, 
                 JSON.stringify(photoUrls || []), isVisible
             ]
         );
@@ -69,6 +72,9 @@ router.put('/:id', async (req, res) => {
         supplierId, installDate, weight, sharepointLink, photoUrls, isVisible 
     } = req.body;
 
+    // Fix for incorrect date values (strip time if present)
+    const cleanDate = installDate ? installDate.slice(0, 10) : null;
+
     try {
         await pool.query(
             `UPDATE technologies SET 
@@ -77,7 +83,7 @@ router.put('/:id', async (req, res) => {
             WHERE id=?`,
             [
                 name, serialNumber, description, typeId, stateId, workplaceId,
-                supplierId, installDate || null, weight || 0, sharepointLink, 
+                supplierId, cleanDate, weight || 0, sharepointLink, 
                 JSON.stringify(photoUrls || []), isVisible, id
             ]
         );

@@ -17,9 +17,19 @@ interface AssetsPageProps {
 
 const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers, locations }: any) => {
     const { t } = useI18n();
-    const [data, setData] = useState<Partial<Technology>>(initialData || {
-        name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
-        installDate: '', weight: 0, description: '', sharepointLink: '', photoUrls: [], isVisible: true
+    
+    // Initialize state with careful date handling and defaults
+    const [data, setData] = useState<Partial<Technology>>(() => {
+        const base = initialData || {
+            name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
+            installDate: '', weight: 0, description: '', sharepointLink: '', photoUrls: [], isVisible: true
+        };
+        
+        // Fix: If date comes in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ), strip time for input type="date"
+        if (base.installDate && typeof base.installDate === 'string' && base.installDate.includes('T')) {
+            base.installDate = base.installDate.split('T')[0];
+        }
+        return base;
     });
     
     // State for Location Filter
@@ -62,8 +72,11 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
     const handleSave = () => {
         if(validate()) {
             if (data.name && data.workplaceId) {
-                // Ensure weight is number
-                const finalData = { ...data, weight: data.weight ? Number(data.weight) : 0 };
+                // Ensure weight is number (allow 0)
+                const finalData = { 
+                    ...data, 
+                    weight: (data.weight !== undefined && data.weight !== '') ? Number(data.weight) : 0 
+                };
                 onSave(finalData as any);
             }
         }
@@ -160,14 +173,14 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
 
                 <div className="grid grid-cols-2 gap-4">
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')} *</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')}</label>
                         <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                             <option value="">-</option>
                             {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                      </div>
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.install_date')} *</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.install_date')}</label>
                         <input type="date" className={`w-full border p-2 rounded ${errors.installDate ? 'border-red-500' : ''}`} value={data.installDate || ''} onChange={e => setData({...data, installDate: e.target.value})} />
                      </div>
                 </div>
@@ -176,7 +189,15 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                 <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><Weight className="w-3 h-3 mr-1"/> {t('form.weight')}</label>
-                        <input type="number" min="0" className={`w-full border p-2 rounded ${errors.weight ? 'border-red-500' : ''}`} value={data.weight || ''} onChange={e => setData({...data, weight: Number(e.target.value)})} placeholder="kg" />
+                        <input 
+                            type="number" 
+                            min="0" 
+                            className={`w-full border p-2 rounded ${errors.weight ? 'border-red-500' : ''}`} 
+                            /* Fix: Check for undefined specifically to allow 0 */
+                            value={data.weight !== undefined ? data.weight : ''} 
+                            onChange={e => setData({...data, weight: e.target.value === '' ? undefined : Number(e.target.value)})} 
+                            placeholder="kg" 
+                        />
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><LinkIcon className="w-3 h-3 mr-1"/> {t('form.documentation')}</label>
@@ -245,11 +266,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     // Initial Filters
     useEffect(() => {
-        if (initialFilters) {
+        if (initialFilters && workplaces.length > 0) {
             if (initialFilters.typeId) setFilterTypeIds([initialFilters.typeId]);
             if (initialFilters.stateId) setFilterStateIds([initialFilters.stateId]);
+            if (initialFilters.workplaceId) setFilterWpIds([initialFilters.workplaceId]);
+            if (initialFilters.locationId) {
+                const wps = workplaces.filter(w => w.locationId === initialFilters.locationId).map(w => w.id);
+                setFilterWpIds(wps);
+            }
         }
-    }, [initialFilters]);
+    }, [initialFilters, workplaces]);
 
     // FETCH DATA
     const fetchData = async () => {

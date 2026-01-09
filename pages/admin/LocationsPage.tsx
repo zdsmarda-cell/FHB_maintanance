@@ -1,18 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../../lib/db';
-import { Edit, Trash, Plus, Eye, EyeOff, Loader } from 'lucide-react';
+import { Edit, Trash, Plus, Eye, EyeOff, Loader, Box } from 'lucide-react';
 import { Address } from '../../lib/types';
 import { AddressInput, Modal, AlertModal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
 import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
-export const LocationsPage = () => {
+interface LocationsPageProps {
+    onNavigate?: (page: string, params?: any) => void;
+}
+
+export const LocationsPage = ({ onNavigate }: LocationsPageProps) => {
   const { t, lang } = useI18n();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false); // New state for save loading
   const [locations, setLocations] = useState<any[]>([]);
   const [workplaces, setWorkplaces] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]); // Need assets to count
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateWpOpen, setIsCreateWpOpen] = useState(false);
@@ -38,10 +43,16 @@ export const LocationsPage = () => {
           if (isMock) {
               setLocations(db.locations.list());
               setWorkplaces(db.workplaces.list());
+              setAssets(db.technologies.list());
           } else {
-              const [locs, wps] = await Promise.all([api.get('/locations'), api.get('/locations/workplaces')]);
+              const [locs, wps, tech] = await Promise.all([
+                  api.get('/locations'), 
+                  api.get('/locations/workplaces'),
+                  api.get('/technologies')
+              ]);
               setLocations(locs);
               setWorkplaces(wps);
+              setAssets(tech);
           }
       } catch (e) { console.error(e); } 
       finally { setLoading(false); }
@@ -84,10 +95,6 @@ export const LocationsPage = () => {
       if(!validateForm(editingLoc, 'location')) return;
       setSaving(true);
       try {
-          // Note: If user edited the name, we re-translate. 
-          // If editingLoc.name is already JSON string (because user didn't touch it in modal, but modal decoded it?), 
-          // we should handle that. But the modal inputs usually show the *localized* string.
-          // So we always re-save as new translation bundle.
           const translatedName = await prepareMultilingual(editingLoc.name);
           const payload = { ...editingLoc, name: translatedName };
 
@@ -167,6 +174,15 @@ export const LocationsPage = () => {
       });
   };
 
+  const getAssetCount = (type: 'loc'|'wp', id: string) => {
+      if (type === 'wp') {
+          return assets.filter(a => a.workplaceId === id).length;
+      }
+      // For location, sum assets of all workplaces in this location
+      const locWps = workplaces.filter(w => w.locationId === id).map(w => w.id);
+      return assets.filter(a => locWps.includes(a.workplaceId)).length;
+  }
+
   if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;
 
   return (
@@ -181,13 +197,23 @@ export const LocationsPage = () => {
        <div className="space-y-4">
           {locations.map(loc => {
               const wps = workplaces.filter(w => w.locationId === loc.id);
+              const locAssetCount = getAssetCount('loc', loc.id);
               return (
                   <div key={loc.id} className={`bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm ${!loc.isVisible ? 'opacity-75' : ''}`}>
                       <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start">
                            <div className="flex items-start gap-2">
                                {!loc.isVisible && <div title="Skryto"><EyeOff className="w-5 h-5 text-slate-400 mt-1" /></div>}
                                <div>
-                                   <div className="font-bold text-lg">{getLocalized(loc.name, lang)}</div>
+                                   <div className="font-bold text-lg flex items-center gap-2">
+                                       {getLocalized(loc.name, lang)}
+                                       <button 
+                                            onClick={() => onNavigate && onNavigate('assets', { locationId: loc.id })}
+                                            className="text-xs bg-white border border-slate-300 text-slate-600 px-2 py-0.5 rounded-full hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 flex items-center transition-colors font-normal shadow-sm"
+                                            title="Zobrazit technologie v lokalitě"
+                                        >
+                                            <Box className="w-3 h-3 mr-1" /> {locAssetCount}
+                                        </button>
+                                   </div>
                                    <div className="text-sm text-slate-500">
                                        {loc.address.street} {loc.address.number}, {loc.address.zip} {loc.address.city}, {loc.address.country}
                                    </div>
@@ -198,18 +224,31 @@ export const LocationsPage = () => {
                       <div className="p-4">
                           <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t('headers.workplaces')}</h5>
                           {wps.length === 0 && <div className="text-sm text-slate-400 italic mb-2">Žádná pracoviště</div>}
-                          {wps.map(wp => (
-                              <div key={wp.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm border-slate-100">
-                                  <div className="flex items-center gap-2">
-                                      {!wp.isVisible && <div title="Skryto"><EyeOff className="w-4 h-4 text-slate-400" /></div>}
-                                      <span className="font-medium text-slate-700">{getLocalized(wp.name, lang)} <span className="font-normal text-slate-400 ml-2">{getLocalized(wp.description, lang)}</span></span>
+                          {wps.map(wp => {
+                              const wpAssetCount = getAssetCount('wp', wp.id);
+                              return (
+                                  <div key={wp.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm border-slate-100">
+                                      <div className="flex items-center gap-2">
+                                          {!wp.isVisible && <div title="Skryto"><EyeOff className="w-4 h-4 text-slate-400" /></div>}
+                                          <span className="font-medium text-slate-700 flex items-center">
+                                              {getLocalized(wp.name, lang)} 
+                                              <button 
+                                                onClick={() => onNavigate && onNavigate('assets', { workplaceId: wp.id })}
+                                                className="ml-2 text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full hover:bg-blue-100 hover:text-blue-700 flex items-center transition-colors font-normal"
+                                                title="Zobrazit technologie"
+                                              >
+                                                <Box className="w-3 h-3 mr-1" /> {wpAssetCount}
+                                              </button>
+                                          </span>
+                                          <span className="font-normal text-slate-400 ml-2">{getLocalized(wp.description, lang)}</span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                          <button onClick={() => { setErrors({}); startEditWp(wp); }} className="text-blue-600 hover:text-blue-800"><Edit className="w-3 h-3"/></button>
+                                          <button onClick={() => setDeleteWpId(wp.id)} className="text-red-400 hover:text-red-600"><Trash className="w-3 h-3"/></button>
+                                      </div>
                                   </div>
-                                  <div className="flex gap-2">
-                                      <button onClick={() => { setErrors({}); startEditWp(wp); }} className="text-blue-600 hover:text-blue-800"><Edit className="w-3 h-3"/></button>
-                                      <button onClick={() => setDeleteWpId(wp.id)} className="text-red-400 hover:text-red-600"><Trash className="w-3 h-3"/></button>
-                                  </div>
-                              </div>
-                          ))}
+                              );
+                          })}
                           <div className="mt-4 border-t pt-2">
                               <button onClick={() => { setErrors({}); setCreateWpLocationId(loc.id); setNewWp({ name: '', description: '', locationId: loc.id, isVisible: true }); setIsCreateWpOpen(true); }} className="w-full py-2 bg-slate-50 text-slate-600 border border-dashed border-slate-300 rounded hover:bg-slate-100 text-sm flex items-center justify-center">
                                   <Plus className="w-4 h-4 mr-2"/> Přidat pracoviště

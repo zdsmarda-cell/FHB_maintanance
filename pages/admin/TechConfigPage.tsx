@@ -55,13 +55,13 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
 
     useEffect(() => { refresh(); }, []);
 
-    const isUsed = (type: 'type'|'state', id: string) => {
-        if (type === 'type') return assets.some(a => a.typeId === id);
-        return assets.some(a => a.stateId === id);
+    const getCount = (type: 'type'|'state', id: string) => {
+        if (type === 'type') return assets.filter(a => a.typeId === id).length;
+        return assets.filter(a => a.stateId === id).length;
     }
 
     const initiateDelete = (type: 'type'|'state', id: string) => {
-        if(isUsed(type, id)) {
+        if(getCount(type, id) > 0) {
             setAlertMsg(t('msg.cannot_delete_used'));
             return;
         }
@@ -165,18 +165,27 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
                     <button onClick={() => { setErrors({}); setIsCreateTypeOpen(true); }} className="bg-blue-600 text-white p-1.5 rounded shadow-sm hover:bg-blue-700"><Plus className="w-4 h-4" /></button>
                 </div>
                 <div className="bg-white rounded border border-slate-200 divide-y">
-                    {types.map(t => (
-                        <div key={t.id} className="p-2 flex justify-between items-center group">
-                            <div className="flex items-center gap-2">
-                                <span>{getLocalized(t.name, lang)}</span>
-                                {isUsed('type', t.id) && <button onClick={() => onNavigate && onNavigate('assets', { typeId: t.id })} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"><Box className="w-3 h-3 mr-1" /></button>}
+                    {types.map(t => {
+                        const count = getCount('type', t.id);
+                        return (
+                            <div key={t.id} className="p-2 flex justify-between items-center group">
+                                <div className="flex items-center gap-2">
+                                    <span>{getLocalized(t.name, lang)}</span>
+                                    <button 
+                                        onClick={() => onNavigate && onNavigate('assets', { typeId: t.id })} 
+                                        className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full hover:bg-blue-100 hover:text-blue-700 flex items-center transition-colors"
+                                        title="Zobrazit technologie"
+                                    >
+                                        <Box className="w-3 h-3 mr-1" /> {count}
+                                    </button>
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => startEditType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                    <button onClick={() => initiateDelete('type', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                                </div>
                             </div>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditType(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
-                                <button onClick={() => initiateDelete('type', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
              <div>
@@ -185,18 +194,27 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
                     <button onClick={() => { setErrors({}); setIsCreateStateOpen(true); }} className="bg-blue-600 text-white p-1.5 rounded shadow-sm hover:bg-blue-700"><Plus className="w-4 h-4" /></button>
                 </div>
                 <div className="bg-white rounded border border-slate-200 divide-y">
-                    {states.map(t => (
-                        <div key={t.id} className="p-2 flex justify-between items-center group">
-                            <div className="flex items-center gap-2">
-                                <span>{getLocalized(t.name, lang)}</span>
-                                {isUsed('state', t.id) && <button onClick={() => onNavigate && onNavigate('assets', { stateId: t.id })} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 flex items-center"><Box className="w-3 h-3 mr-1" /></button>}
+                    {states.map(t => {
+                        const count = getCount('state', t.id);
+                        return (
+                            <div key={t.id} className="p-2 flex justify-between items-center group">
+                                <div className="flex items-center gap-2">
+                                    <span>{getLocalized(t.name, lang)}</span>
+                                    <button 
+                                        onClick={() => onNavigate && onNavigate('assets', { stateId: t.id })} 
+                                        className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full hover:bg-blue-100 hover:text-blue-700 flex items-center transition-colors"
+                                        title="Zobrazit technologie"
+                                    >
+                                        <Box className="w-3 h-3 mr-1" /> {count}
+                                    </button>
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => startEditState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
+                                    <button onClick={() => initiateDelete('state', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
+                                </div>
                             </div>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditState(t)}><Edit className="w-3 h-3 text-blue-600"/></button>
-                                <button onClick={() => initiateDelete('state', t.id)}><Trash className="w-3 h-3 text-red-600"/></button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
             

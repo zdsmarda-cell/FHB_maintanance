@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../lib/db';
+import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { User, Request, RequestPriority } from '../lib/types';
+import { User, Request, RequestPriority, Workplace, Technology, Supplier } from '../lib/types';
 import { RequestsTable } from '../components/requests/RequestsTable';
 import { RequestDetail } from '../components/requests/RequestDetail';
 import { RequestForm } from '../components/requests/RequestForm';
@@ -10,7 +10,7 @@ import { Modal, Pagination, ConfirmModal, AlertModal } from '../components/Share
 import { ApprovalModal } from '../components/requests/modals/ApprovalModal';
 import { AssignModal } from '../components/requests/modals/AssignModal';
 import { UnassignModal } from '../components/requests/modals/UnassignModal';
-import { Plus, Printer } from 'lucide-react';
+import { Plus, Printer, Loader } from 'lucide-react';
 import { generateWorkListPDF } from '../lib/pdf';
 
 interface RequestsPageProps {
@@ -22,10 +22,18 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const { t, lang } = useI18n(); // Destructure lang
     const [view, setView] = useState<'list' | 'detail' | 'create' | 'edit'>('list');
     const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
-    const [requests, setRequests] = useState(db.requests.list());
     
-    // CRITICAL: Always get the fresh user from DB to ensure Limits are up-to-date
-    const currentUser = db.users.list().find(u => u.id === initialUser.id) || initialUser;
+    // --- Data States ---
+    const [loading, setLoading] = useState(true);
+    const [requests, setRequests] = useState<Request[]>([]);
+    const [technologies, setTechnologies] = useState<Technology[]>([]);
+    const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+    // CRITICAL: Always get the fresh user from DB/State to ensure Limits are up-to-date
+    // In production we look in loaded users, fallback to initial
+    const currentUser = users.find(u => u.id === initialUser.id) || initialUser;
     
     // --- Filter States (Lifted from Table) ---
     const [fTitle, setFTitle] = useState('');
@@ -36,6 +44,50 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
     const [fApproved, setFApproved] = useState('all');
+
+    // --- Data Fetching ---
+    const refresh = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+            if (isMock) {
+                setRequests(db.requests.list());
+                setTechnologies(db.technologies.list());
+                setWorkplaces(db.workplaces.list());
+                setUsers(db.users.list());
+                setSuppliers(db.suppliers.list());
+            } else {
+                const [reqData, techData, wpData, userData, supData] = await Promise.all([
+                    api.get('/requests'),
+                    api.get('/technologies'),
+                    api.get('/locations/workplaces'),
+                    api.get('/users'),
+                    api.get('/suppliers')
+                ]);
+                setRequests(reqData);
+                setTechnologies(techData);
+                setWorkplaces(wpData);
+                setUsers(userData);
+                setSuppliers(supData);
+            }
+
+            // Refresh selected request reference
+            if (selectedRequest) {
+                // In mock, we read from db directly again. In prod, we look at the fresh `requests` (but since state update is async, we do this in effect or just rely on next render if we find it in new data)
+                // For simplicity here, we assume selectedRequest is updated via UI flow or re-found from list
+            }
+        } catch (e) {
+            console.error("Failed to load requests data", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        refresh();
+    }, []);
 
     // Load initial filters
     useEffect(() => {
@@ -57,7 +109,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     }, [initialFilters]);
 
     // --- Filtering Logic ---
-    const technologies = db.technologies.list();
     const filteredRequests = useMemo(() => {
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
@@ -142,25 +193,18 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         title: string; techId: string; description: string; priority: RequestPriority;
         estimatedCost: number | undefined; photoUrls: string[]; assignedSupplierId: string;
         plannedResolutionDate?: string;
+        estimatedTime?: number;
     }>({ title: '', techId: '', description: '', priority: 'basic', estimatedCost: undefined, photoUrls: [], assignedSupplierId: 'internal' });
     const [errors, setErrors] = useState({});
     const [isUploading, setIsUploading] = useState(false);
 
-    const refresh = () => {
-        setRequests(db.requests.list());
-        if (selectedRequest) {
-            const updated = db.requests.list().find(r => r.id === selectedRequest.id);
-            if (updated) setSelectedRequest(updated);
-        }
-    };
-
     // --- Helpers & Actions ---
     const getEligibleSolvers = (req: Request): User[] => {
-        const tech = db.technologies.list().find(t => t.id === req.techId);
+        const tech = technologies.find(t => t.id === req.techId);
         if (!tech) return [];
-        const wp = db.workplaces.list().find(w => w.id === tech.workplaceId);
+        const wp = workplaces.find(w => w.id === tech.workplaceId);
         if (!wp) return [];
-        return db.users.list().filter(u => {
+        return users.filter(u => {
             if (u.isBlocked) return false;
             if (u.role === 'operator') return false;
             if (u.role === 'admin') return true;
@@ -174,11 +218,12 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         setRequestForm({
             title: req.title, techId: req.techId, description: req.description, priority: req.priority,
             estimatedCost: req.estimatedCost || 0, photoUrls: req.photoUrls || [], assignedSupplierId: req.assignedSupplierId || 'internal',
-            plannedResolutionDate: req.plannedResolutionDate || ''
+            plannedResolutionDate: req.plannedResolutionDate || '',
+            estimatedTime: req.estimatedTime
         });
         setView('edit');
     };
-    const handleBack = () => { setSelectedRequest(null); setView('list'); };
+    const handleBack = () => { setSelectedRequest(null); setView('list'); refresh(); };
     const handleCreate = () => { setRequestForm({ title: '', techId: '', description: '', priority: 'basic', estimatedCost: undefined, photoUrls: [], assignedSupplierId: 'internal' }); setView('create'); };
 
     const validateForm = (data: any) => {
@@ -190,10 +235,22 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         return Object.keys(errs).length === 0;
     };
 
-    const handleSaveNew = () => {
+    const handleSaveNew = async () => {
         if (!validateForm(requestForm)) return;
-        db.requests.add({ ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0, authorId: currentUser.id, state: 'new' } as any);
-        refresh(); setView('list');
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            const payload = { ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0, authorId: currentUser.id };
+
+            if (isMock) {
+                db.requests.add({ ...payload, state: 'new' } as any);
+            } else {
+                await api.post('/requests', payload);
+            }
+            setView('list');
+            refresh();
+        } catch(e) { console.error(e); setLoading(false); }
     };
 
     const handleUpdate = () => {
@@ -205,10 +262,23 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         executeUpdate();
     };
 
-    const executeUpdate = () => {
+    const executeUpdate = async () => {
         if (!selectedRequest) return;
-        db.requests.update(selectedRequest.id, { ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0 });
-        setShowPriceWarning(false); refresh(); setView('list');
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            const payload = { ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0 };
+
+            if (isMock) {
+                db.requests.update(selectedRequest.id, payload);
+            } else {
+                await api.put(`/requests/${selectedRequest.id}`, payload);
+            }
+            setShowPriceWarning(false); 
+            setView('list');
+            refresh();
+        } catch(e) { console.error(e); setLoading(false); }
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,27 +286,94 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             const file = e.target.files[0];
             setIsUploading(true);
             try {
-                const reader = new FileReader();
-                reader.onloadend = () => { setRequestForm(prev => ({ ...prev, photoUrls: [...prev.photoUrls, reader.result as string] })); setIsUploading(false); };
-                reader.readAsDataURL(file);
+                const token = localStorage.getItem('auth_token');
+                const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+                if (isMock) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setRequestForm(prev => ({ ...prev, photoUrls: [...prev.photoUrls, reader.result as string] })); setIsUploading(false); };
+                    reader.readAsDataURL(file);
+                } else {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const response = await fetch(`${api.baseUrl}/api/upload`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData
+                    });
+                    if(response.ok) {
+                        const resData = await response.json();
+                        const fullUrl = resData.url.startsWith('http') ? resData.url : `${api.baseUrl}${resData.url}`;
+                        setRequestForm(prev => ({ ...prev, photoUrls: [...prev.photoUrls, fullUrl] }));
+                    }
+                    setIsUploading(false);
+                }
             } catch (err) { setIsUploading(false); }
         }
     };
     const removePhoto = (idx: number) => { setRequestForm(prev => ({ ...prev, photoUrls: prev.photoUrls.filter((_, i) => i !== idx) })); };
 
-    const updateRequestState = (newState: any, reason?: string, userId?: string, updates?: any) => {
-        if (selectedRequest) { db.requests.updateState(selectedRequest.id, newState, reason, userId || currentUser.id, updates); refresh(); }
+    // --- STATE CHANGES ---
+    const updateRequestState = async (newState: any, reason?: string, userId?: string, updates?: any) => {
+        if (!selectedRequest) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            
+            if (isMock) {
+                db.requests.updateState(selectedRequest.id, newState, reason || '', userId || currentUser.id, updates);
+            } else {
+                await api.put(`/requests/${selectedRequest.id}`, {
+                    state: newState,
+                    cancellationReason: reason,
+                    ...updates
+                });
+            }
+            refresh();
+            if (view === 'detail') setView('list'); // Optionally close detail on major state change
+        } catch(e) { console.error(e); setLoading(false); }
     };
-    const handleApproveChange = (isApproved: boolean) => {
-        if (selectedRequest) { db.requests.updateState(selectedRequest.id, selectedRequest.state, undefined, currentUser.id, { isApproved }); refresh(); }
+
+    const handleApproveChange = async (isApproved: boolean) => {
+        if (!selectedRequest) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            
+            if (isMock) {
+                db.requests.updateState(selectedRequest.id, selectedRequest.state, '', currentUser.id, { isApproved });
+            } else {
+                await api.put(`/requests/${selectedRequest.id}`, { isApproved });
+            }
+            // Update local selected request state to reflect change immediately in detail view
+            setSelectedRequest({...selectedRequest, isApproved});
+            refresh();
+        } catch(e) { console.error(e); setLoading(false); }
     };
-    const handleApprovalModalAction = (isApproved: boolean) => {
-        if (approvalReq) { db.requests.updateState(approvalReq.id, approvalReq.state, undefined, currentUser.id, { isApproved }); setApprovalReq(null); refresh(); }
+
+    const handleApprovalModalAction = async (isApproved: boolean) => {
+        if (!approvalReq) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            
+            if (isMock) {
+                db.requests.updateState(approvalReq.id, approvalReq.state, '', currentUser.id, { isApproved });
+            } else {
+                await api.put(`/requests/${approvalReq.id}`, { isApproved });
+            }
+            setApprovalReq(null); 
+            refresh();
+        } catch(e) { console.error(e); setLoading(false); }
     };
+
     const openApprovalModal = (req: Request) => {
         if (currentUser.role !== 'admin' && currentUser.role !== 'maintenance') { setAlertMsg("Nemáte oprávnění ke schvalování."); return; }
-        const tech = db.technologies.list().find(t => t.id === req.techId);
-        const wp = db.workplaces.list().find(w => w.id === tech?.workplaceId);
+        const tech = technologies.find(t => t.id === req.techId);
+        const wp = workplaces.find(w => w.id === tech?.workplaceId);
         const limit = currentUser.approvalLimits?.[wp?.locationId || ''];
         const cost = req.estimatedCost || 0;
         if (limit !== undefined && limit >= cost) { setApprovalReq(req); } else { setAlertMsg(`Zamítnuto: Cena (${cost} €) překračuje váš schvalovací limit (${limit || 0} €).`); }
@@ -245,23 +382,29 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const openStatusModal = (req: Request) => { setStatusModal({ isOpen: true, req }); setNewStatus(req.state); }
     
     // Status Change Logic - Handle "New" resets
-    const saveStatusChange = () => { 
+    const saveStatusChange = async () => { 
         if (statusModal.req && newStatus) { 
             const updates: any = {};
-            // If switching to 'new', remove solver
             if (newStatus === 'new') {
                 updates.solverId = '';
             }
             
-            db.requests.updateState(
-                statusModal.req.id, 
-                newStatus as any, 
-                'Změna z přehledu', 
-                currentUser.id, 
-                updates
-            ); 
-            setStatusModal({ isOpen: false, req: null }); 
-            refresh(); 
+            setLoading(true);
+            try {
+                const token = localStorage.getItem('auth_token');
+                const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+                
+                if (isMock) {
+                    db.requests.updateState(statusModal.req.id, newStatus as any, 'Změna z přehledu', currentUser.id, updates); 
+                } else {
+                    await api.put(`/requests/${statusModal.req.id}`, {
+                        state: newStatus,
+                        ...updates
+                    });
+                }
+                setStatusModal({ isOpen: false, req: null }); 
+                refresh(); 
+            } catch(e) { console.error(e); setLoading(false); }
         } 
     }
 
@@ -282,33 +425,60 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         setUnassignModalOpen(true);
     };
 
-    const handleAssignConfirm = () => {
+    const handleAssignConfirm = async () => {
         if (assignTargetReq && assignSolverId && assignDate) {
             const updates: any = { solverId: assignSolverId, plannedResolutionDate: assignDate };
             // If it was new, switch to assigned. If it was assigned (change solver), keep assigned.
             const newState = assignTargetReq.state === 'new' ? 'assigned' : assignTargetReq.state;
             
-            db.requests.updateState(assignTargetReq.id, newState, 'Přiřazeno/Změněno z přehledu', currentUser.id, updates);
-            setAssignModalOpen(false); setAssignTargetReq(null); refresh();
+            setLoading(true);
+            try {
+                const token = localStorage.getItem('auth_token');
+                const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+                
+                if (isMock) {
+                    db.requests.updateState(assignTargetReq.id, newState, 'Přiřazeno/Změněno z přehledu', currentUser.id, updates);
+                } else {
+                    await api.put(`/requests/${assignTargetReq.id}`, {
+                        state: newState,
+                        ...updates
+                    });
+                }
+                setAssignModalOpen(false); setAssignTargetReq(null); refresh();
+            } catch(e) { console.error(e); setLoading(false); }
         }
     };
 
     // Unassign Logic (Called from UnassignModal or AssignModal Remove button)
-    const handleUnassignConfirm = () => {
+    const handleUnassignConfirm = async () => {
         const target = unassignTargetReq || assignTargetReq || selectedRequest;
         if (target) {
-            db.requests.updateState(
-                target.id, 
-                'new', 
-                `Udržbář se uvolnil z požadavku / Řešitel odebrán`, 
-                currentUser.id,
-                { solverId: '' } 
-            );
-            setUnassignModalOpen(false);
-            setAssignModalOpen(false);
-            setUnassignTargetReq(null);
-            setAssignTargetReq(null);
-            refresh();
+            setLoading(true);
+            try {
+                const token = localStorage.getItem('auth_token');
+                const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+                const updates = { solverId: '' };
+
+                if (isMock) {
+                    db.requests.updateState(
+                        target.id, 
+                        'new', 
+                        `Udržbář se uvolnil z požadavku / Řešitel odebrán`, 
+                        currentUser.id,
+                        updates
+                    );
+                } else {
+                    await api.put(`/requests/${target.id}`, {
+                        state: 'new',
+                        ...updates
+                    });
+                }
+                setUnassignModalOpen(false);
+                setAssignModalOpen(false);
+                setUnassignTargetReq(null);
+                setAssignTargetReq(null);
+                refresh();
+            } catch(e) { console.error(e); setLoading(false); }
         }
     }
 
@@ -318,6 +488,8 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
     // --- Main Content Render ---
     const renderContent = () => {
+        if (loading && requests.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
+
         if (view === 'create' || view === 'edit') {
             const isEdit = view === 'edit';
             return (
@@ -325,7 +497,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                     <h2 className="text-xl font-bold mb-4">{isEdit ? t('common.edit') : t('headers.new_request')}</h2>
                     <RequestForm 
                         formData={requestForm} setFormData={setRequestForm} errors={errors} user={currentUser}
-                        locations={db.locations.list()} workplaces={db.workplaces.list()} technologies={db.technologies.list()}
+                        locations={db.locations.list()} workplaces={workplaces} technologies={technologies}
                         handleImageUpload={handleImageUpload} removePhoto={removePhoto} isEditMode={isEdit} isUploading={isUploading}
                     />
                     <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
@@ -340,7 +512,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         if (view === 'detail' && selectedRequest) {
             return (
                 <RequestDetail 
-                    request={selectedRequest} currentUser={currentUser} technologies={db.technologies.list()}
+                    request={selectedRequest} currentUser={currentUser} technologies={technologies}
                     onBack={handleBack} onEdit={() => handleEditClick(selectedRequest)} onSolve={() => updateRequestState('solved')}
                     onAssign={() => openAssignModal(selectedRequest)} 
                     onUnassign={() => setUnassignModalOpen(true)}
@@ -381,10 +553,10 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                         onApprovalClick={openApprovalModal}
                         onUnassign={openUnassignModal}
                         currentUser={currentUser} 
-                        workplaces={db.workplaces.list()}
-                        technologies={db.technologies.list()}
-                        users={db.users.list()}
-                        suppliers={db.suppliers.list()}
+                        workplaces={workplaces}
+                        technologies={technologies}
+                        users={users}
+                        suppliers={suppliers}
                         currentPage={currentPage}
                         itemsPerPage={itemsPerPage}
                         onPageChange={setCurrentPage}
@@ -456,7 +628,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 />
             )}
 
-            {approvalReq && <ApprovalModal request={approvalReq} technologies={db.technologies.list()} onClose={() => setApprovalReq(null)} onApprove={handleApprovalModalAction} />}
+            {approvalReq && <ApprovalModal request={approvalReq} technologies={technologies} onClose={() => setApprovalReq(null)} onApprove={handleApprovalModalAction} />}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
         </>
     );
