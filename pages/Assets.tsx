@@ -369,7 +369,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     });
 
     const paginatedAssets = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const getOpenRequestCount = (techId: string) => requests.filter(r => r.techId === techId && r.state !== 'solved' && r.state !== 'cancelled').length;
+    
+    // Count logic: if operator, only count their requests
+    const getOpenRequestCount = (techId: string) => {
+        return requests.filter(r => {
+            if (r.techId !== techId) return false;
+            if (r.state === 'solved' || r.state === 'cancelled') return false;
+            if (user.role === 'operator' && r.authorId !== user.id) return false;
+            return true;
+        }).length;
+    };
 
     // Gallery Handlers - FIXED SIGNATURE
     const openGallery = (photos: string[], e: React.MouseEvent) => {

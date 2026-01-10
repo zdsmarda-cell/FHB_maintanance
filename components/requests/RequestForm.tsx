@@ -72,6 +72,13 @@ export const RequestForm = ({
         }
     }, [isEditMode, formData.techId, technologies, workplaces]);
 
+    // Force 'internal' supplier for operators if not already set
+    useEffect(() => {
+        if (user.role === 'operator' && formData.assignedSupplierId !== 'internal') {
+            setFormData({...formData, assignedSupplierId: 'internal'});
+        }
+    }, [user.role, formData, setFormData]);
+
     // --- Dynamic Supplier Logic ---
     const { defaultSupplier, otherSuppliers } = useMemo(() => {
         const allSuppliers = db.suppliers.list();
@@ -103,9 +110,9 @@ export const RequestForm = ({
                         className="w-full p-2 rounded border" 
                         value={selLoc} 
                         onChange={e => { setSelLoc(e.target.value); setSelWp(''); }}
-                        disabled={isEditMode}
+                        disabled={isEditMode || availLocs.length <= 1} // Disable if only 1 option
                     >
-                        <option value="">-- {t('form.location')} --</option>
+                        {availLocs.length > 1 && <option value="">-- {t('form.location')} --</option>}
                         {availLocs.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                 </div>
@@ -115,9 +122,9 @@ export const RequestForm = ({
                         className="w-full p-2 rounded border" 
                         value={selWp} 
                         onChange={e => { setSelWp(e.target.value); }}
-                        disabled={!selLoc || isEditMode}
+                        disabled={!selLoc || isEditMode || availWps.length <= 1} // Disable if only 1 option
                     >
-                        <option value="">-- {t('form.workplace')} --</option>
+                        {availWps.length > 1 && <option value="">-- {t('form.workplace')} --</option>}
                         {availWps.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
                     </select>
                 </div>
@@ -137,31 +144,34 @@ export const RequestForm = ({
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
              </div>
 
-             <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Řešení (Dodavatel)</label>
-                <select 
-                    className="w-full p-2 rounded border"
-                    value={formData.assignedSupplierId || 'internal'} 
-                    onChange={e => setFormData({...formData, assignedSupplierId: e.target.value})}
-                >
-                    <option value="internal">🔧 Interní (Vlastní síly)</option>
-                    
-                    {defaultSupplier && (
-                        <>
-                            <option disabled>──────────</option>
-                            <option value={defaultSupplier.id} className="font-bold bg-blue-50">
-                                {defaultSupplier.name} (Výchozí pro technologii)
-                            </option>
-                        </>
-                    )}
-                    
-                    <option disabled>──────────</option>
-                    {otherSuppliers.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                </select>
-                <p className="text-xs text-slate-400 mt-1">Zvolte, zda bude problém řešen interně nebo externím dodavatelem.</p>
-             </div>
+             {/* Supplier Selection - Hidden for Operators */}
+             {user.role !== 'operator' && (
+                 <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Řešení (Dodavatel)</label>
+                    <select 
+                        className="w-full p-2 rounded border"
+                        value={formData.assignedSupplierId || 'internal'} 
+                        onChange={e => setFormData({...formData, assignedSupplierId: e.target.value})}
+                    >
+                        <option value="internal">🔧 Interní (Vlastní síly)</option>
+                        
+                        {defaultSupplier && (
+                            <>
+                                <option disabled>──────────</option>
+                                <option value={defaultSupplier.id} className="font-bold bg-blue-50">
+                                    {defaultSupplier.name} (Výchozí pro technologii)
+                                </option>
+                            </>
+                        )}
+                        
+                        <option disabled>──────────</option>
+                        {otherSuppliers.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Zvolte, zda bude problém řešen interně nebo externím dodavatelem.</p>
+                 </div>
+             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

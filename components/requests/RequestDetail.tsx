@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
-import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, FileCheck, History as HistoryIcon, UserMinus } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, FileCheck, History as HistoryIcon, UserPlus } from 'lucide-react';
 import { CancelModal } from './modals/CancelModal';
 
 interface RequestDetailProps {
@@ -57,6 +57,7 @@ export const RequestDetail = ({
     
     // Admin behaves like Maintenance regarding limits now
     const canApproveRole = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
+    const canAssignRole = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
 
     const canSolve = request.isApproved;
 
@@ -91,6 +92,16 @@ export const RequestDetail = ({
                     {/* Action Buttons */}
                     {(request.state === 'new' || request.state === 'assigned') && (
                         <>
+                             {/* Take Over Button for Maintenance if not already assigned to self */}
+                             {canAssignRole && request.solverId !== currentUser.id && (
+                                <button 
+                                    onClick={onAssign}
+                                    className="flex items-center text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                                >
+                                    <UserPlus className="w-4 h-4 mr-1" /> {request.solverId ? 'Přebrat' : 'Převzít'}
+                                </button>
+                             )}
+
                              <button onClick={() => setCancelModalOpen(true)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded hover:bg-red-100 text-sm">
                                  Storno
                              </button>

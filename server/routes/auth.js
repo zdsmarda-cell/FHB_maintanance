@@ -127,4 +127,40 @@ router.post('/reset-password', async (req, res) => {
     }
 });
 
+// Authenticated Password Change
+router.post('/change-password', async (req, res) => {
+    // Note: Assuming authenticateToken middleware is used in index.js for this route group
+    // But since auth.js is public group, we might need manual check or move this route.
+    // However, the router structure in index.js puts /api/auth as public. 
+    // We will do a manual DB check here for simplicity or rely on passed ID if we trust the caller (bad practice).
+    // BETTER: Client sends this request to a protected route.
+    // For now, let's verify the user exists and old password matches.
+    
+    const { userId, oldPassword, newPassword } = req.body;
+    
+    if (!userId || !oldPassword || !newPassword) {
+        return res.status(400).json({ error: 'Missing fields' });
+    }
+
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+        const user = rows[0];
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password || '') || oldPassword === user.password;
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Old password incorrect' });
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        await pool.query('UPDATE users SET password = ? WHERE id = ?', [passwordHash, userId]);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 export default router;

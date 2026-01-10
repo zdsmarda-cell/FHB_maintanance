@@ -14,14 +14,30 @@ export const SettingsPage = () => {
     const refresh = async () => {
         setLoading(true);
         try {
+            let data: any = {};
+            
             if(isMock) {
                 console.log("Settings: Using MOCK data.");
-                setSettings(db.settings.get());
+                data = db.settings.get();
             } else {
                 console.log("Settings: Fetching from API...");
-                const data = await api.get('/settings');
-                setSettings(data);
+                data = await api.get('/settings');
             }
+
+            // SAFETY CHECK 1: If API returns a string (double encoded), parse it
+            if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch (e) { console.error("Failed to parse settings string", e); }
+            }
+
+            // SAFETY CHECK 2: If data looks like a spread string (numeric keys like {0: "{", 1: "\""}), reset it.
+            // This prevents the "garbage payload" bug where a string is spread into an object.
+            if (data && typeof data === 'object' && '0' in data) {
+                console.warn("SettingsPage: Detected malformed settings data (spread string), resetting to defaults.");
+                data = {};
+            }
+
+            setSettings(data || {});
+
         } catch(e) { console.error(e); } 
         finally { setLoading(false); }
     };
@@ -29,16 +45,20 @@ export const SettingsPage = () => {
     useEffect(() => { refresh(); }, []);
     
     const toggleTranslation = async () => {
-        const newVal = !settings.enableOnlineTranslation;
-        const newSettings = { ...settings, enableOnlineTranslation: newVal };
+        // Ensure settings is an object before spreading
+        const currentSettings = (typeof settings === 'object' && settings !== null) ? settings : {};
+        const newVal = !currentSettings.enableOnlineTranslation;
+        
+        const newSettings = { ...currentSettings, enableOnlineTranslation: newVal };
         setSettings(newSettings); // Optimistic update
+        
         try {
             if(isMock) {
-                console.log("Settings: Saving to MOCK.");
+                console.log("Settings: Saving to MOCK.", newSettings);
                 db.settings.save(newSettings);
             }
             else {
-                console.log("Settings: Saving to API...");
+                console.log("Settings: Saving to API...", newSettings);
                 await api.post('/settings', newSettings);
             }
             

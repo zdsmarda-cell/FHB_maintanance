@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { useI18n } from '../lib/i18n';
-import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail } from 'lucide-react';
+import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole } from 'lucide-react';
 import { User } from '../lib/types';
+import { ChangePasswordModal } from './modals/ChangePasswordModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPage, onNavigate }) => {
   const { t, setLang, lang } = useI18n();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleNavigate = (page: string) => {
       onNavigate(page);
@@ -126,9 +128,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
               <div className="text-sm font-medium truncate">{user.name}</div>
               <div className="text-xs text-slate-400 truncate">{user.email}</div>
             </div>
-            <button onClick={onLogout} className="text-slate-400 hover:text-white ml-2">
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex gap-1 ml-2">
+                <button onClick={() => setIsPasswordModalOpen(true)} className="text-slate-400 hover:text-white" title="Změnit heslo">
+                    <LockKeyhole className="w-4 h-4" />
+                </button>
+                <button onClick={onLogout} className="text-slate-400 hover:text-white">
+                    <LogOut className="w-4 h-4" />
+                </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -139,6 +146,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
            {children}
         </div>
       </main>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+        userId={user.id} 
+      />
     </div>
   );
 };
