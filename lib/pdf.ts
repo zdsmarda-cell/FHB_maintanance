@@ -2,7 +2,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Request, User, Technology, Supplier } from './types';
-import { db } from './db';
 
 // Helper to load fonts for diacritics support
 const loadFonts = async (doc: jsPDF) => {
@@ -64,17 +63,17 @@ export const generateWorkListPDF = async (
     user: User, 
     title: string, 
     t: (key: string) => string, 
-    lang: string
+    lang: string,
+    // Data sources passed from component state to ensure sync with API data
+    technologies: Technology[],
+    suppliers: Supplier[],
+    users: User[]
 ) => {
     const doc = new jsPDF({ orientation: 'landscape' }); // Landscape for better column fit
     
     // Load fonts
     await loadFonts(doc);
     doc.setFont("Roboto"); // Activate the font
-
-    const techs = db.technologies.list();
-    const suppliers = db.suppliers.list();
-    const users = db.users.list();
 
     // --- Header ---
     doc.setFontSize(18);
@@ -100,19 +99,21 @@ export const generateWorkListPDF = async (
         if (weightA !== weightB) return weightB - weightA; // Descending weight
 
         // Tech Name Sort
-        const techA = techs.find(t => t.id === a.techId)?.name || '';
-        const techB = techs.find(t => t.id === b.techId)?.name || '';
+        const techA = technologies.find(t => t.id === a.techId)?.name || '';
+        const techB = technologies.find(t => t.id === b.techId)?.name || '';
         return techA.localeCompare(techB);
     });
 
     // --- Sort & Group (Internal vs External) ---
-    // Note: We maintain the sort order determined above within the groups
     const internalRequests: Request[] = [];
     const externalRequests: Request[] = [];
 
     sortedRequests.forEach(r => {
-        const isInternal = r.assignedSupplierId === 'internal' || !r.assignedSupplierId;
-        if (isInternal) {
+        const tech = technologies.find(t => t.id === r.techId);
+        // Determine effective supplier: Assigned > Tech Default > Internal
+        const effectiveSupplierId = r.assignedSupplierId || tech?.supplierId || 'internal';
+        
+        if (effectiveSupplierId === 'internal') {
             internalRequests.push(r);
         } else {
             externalRequests.push(r);
@@ -121,10 +122,16 @@ export const generateWorkListPDF = async (
 
     // Helper to generate Row Data
     const generateRow = (r: Request) => {
-        const tech = techs.find(t => t.id === r.techId);
-        const supplier = r.assignedSupplierId && r.assignedSupplierId !== 'internal' 
-            ? suppliers.find(s => s.id === r.assignedSupplierId)?.name 
-            : 'Interní';
+        const tech = technologies.find(t => t.id === r.techId);
+        
+        let supplierName = 'Interní';
+        if (r.assignedSupplierId === 'internal') {
+            supplierName = 'Interní';
+        } else if (r.assignedSupplierId) {
+            supplierName = suppliers.find(s => s.id === r.assignedSupplierId)?.name || 'Neznámý';
+        } else if (tech?.supplierId) {
+            supplierName = suppliers.find(s => s.id === tech.supplierId)?.name || 'Neznámý';
+        }
         
         const solverName = r.solverId ? users.find(u => u.id === r.solverId)?.name || '-' : '-';
         const localizedPrio = t(`prio.${r.priority}`);
@@ -134,14 +141,14 @@ export const generateWorkListPDF = async (
 
         return [
             { content: r.title, styles: { fontStyle: 'bold' } },
-            tech?.name + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
-            { content: r.description, styles: { cellWidth: 60 } }, 
+            (tech?.name || 'Neznámá') + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
+            { content: r.description || '', styles: { cellWidth: 60 } }, 
             solverName,
             plannedDate,
             localizedPrio,
             estTime,
             cost,
-            supplier
+            supplierName
         ];
     };
 
@@ -164,7 +171,6 @@ export const generateWorkListPDF = async (
     }
 
     // --- Main Table ---
-    // Columns: Title, Tech, Desc, Solver, Date, Priority, Time, Cost, Solution
     const columns = [
         t('form.title'), 
         'Technologie', 
@@ -193,7 +199,7 @@ export const generateWorkListPDF = async (
             fontStyle: 'bold'
         },
         columnStyles: {
-            2: { cellWidth: 70 }, // Description wider
+            2: { cellWidth: 60 }, // Description wider
             4: { cellWidth: 20 }, // Date
             6: { cellWidth: 15 }, // Time
             7: { cellWidth: 20 }, // Cost

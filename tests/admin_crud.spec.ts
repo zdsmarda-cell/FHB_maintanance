@@ -178,4 +178,19 @@ test.describe('Admin Full CRUD & Logic Tests', () => {
     await expect(page.getByText(new Date(dateStr).toLocaleDateString())).toBeVisible();
   });
 
+  // 6. PDF Generation Test
+  test('PDF Export should start download', async ({ page }) => {
+    await page.getByRole('button', { name: 'Požadavky' }).click();
+    
+    // Ensure there is at least one request by creating one if empty, or just rely on existing
+    // We already created a request in the previous step, so table shouldn't be empty.
+    
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTitle('Exportovat seznam do PDF').click();
+    const download = await downloadPromise;
+    
+    // Check filename pattern
+    expect(download.suggestedFilename()).toMatch(/worklist_.*\.pdf/);
+  });
+
 });

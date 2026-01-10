@@ -499,7 +499,17 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     }
 
     const handleExportPDF = async () => {
-        await generateWorkListPDF(filteredRequests, currentUser, "Seznam úkolů", t, lang);
+        // Pass all loaded data to the PDF generator to ensure it works in Production/API mode
+        await generateWorkListPDF(
+            filteredRequests, 
+            currentUser, 
+            "Seznam úkolů", 
+            t, 
+            lang,
+            technologies,
+            suppliers,
+            users
+        );
     }
 
     // --- Main Content Render ---
