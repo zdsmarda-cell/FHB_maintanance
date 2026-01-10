@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/db';
+import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { User, Request } from '../lib/types';
-import { ChevronLeft, ChevronRight, Clock, CheckCircle, User as UserIcon, Truck, Wrench, Printer } from 'lucide-react';
+import { User, Request, Technology } from '../lib/types';
+import { ChevronLeft, ChevronRight, Clock, CheckCircle, User as UserIcon, Truck, Wrench, Printer, Loader } from 'lucide-react';
 import { generateWorkListPDF } from '../lib/pdf';
 
 interface CalendarPageProps {
@@ -19,28 +19,48 @@ interface DayData {
 }
 
 export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
-    const { t, lang } = useI18n(); // Destructure lang
+    const { t, lang } = useI18n();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [loading, setLoading] = useState(false);
     
     // Admin selector state
     const [selectedSolverId, setSelectedSolverId] = useState(user.id);
-    const [solverRequests, setSolverRequests] = useState<Request[]>([]);
+    
+    // Data state
+    const [allRequests, setAllRequests] = useState<Request[]>([]);
+    const [technologies, setTechnologies] = useState<Technology[]>([]);
+    const [adminUsers, setAdminUsers] = useState<User[]>([]);
 
-    // Load requests whenever user changes or component mounts (ensures fresh data)
+    const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+
+    // --- Load Data ---
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            if (isMock) {
+                setAllRequests(db.requests.list());
+                setTechnologies(db.technologies.list());
+                setAdminUsers(db.users.list().filter(u => !u.isBlocked && (u.role === 'maintenance' || u.role === 'admin')));
+            } else {
+                const [reqs, techs, users] = await Promise.all([
+                    api.get('/requests'),
+                    api.get('/technologies'),
+                    api.get('/users')
+                ]);
+                setAllRequests(reqs);
+                setTechnologies(techs);
+                setAdminUsers(users.filter((u: User) => !u.isBlocked && (u.role === 'maintenance' || u.role === 'admin')));
+            }
+        } catch (e) {
+            console.error("Failed to load calendar data", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadData = () => {
-            const allRequests = db.requests.list();
-            const filtered = allRequests.filter(r => {
-                if (r.solverId !== selectedSolverId) return false;
-                if (r.state === 'solved' || r.state === 'cancelled') return false;
-                // REMOVED 'internal' only filter to show both
-                if (!r.plannedResolutionDate) return false;
-                return true;
-            });
-            setSolverRequests(filtered);
-        };
-        loadData();
-    }, [selectedSolverId]);
+        fetchData();
+    }, []);
 
     const nextMonth = () => {
         const next = new Date(currentDate);
@@ -57,18 +77,27 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    // Group by Date & Type
+    // --- Filter Requests for Selected Solver ---
+    const solverRequests = allRequests.filter(r => {
+        if (r.solverId !== selectedSolverId) return false;
+        if (r.state === 'solved' || r.state === 'cancelled') return false;
+        if (!r.plannedResolutionDate) return false;
+        return true;
+    });
+
+    // --- Group by Date & Type ---
     const requestsByDate: Record<string, DayData> = {};
-    const techs = db.technologies.list();
 
     solverRequests.forEach(r => {
-        const d = r.plannedResolutionDate!;
+        // Ensure date format is YYYY-MM-DD
+        const d = r.plannedResolutionDate!.split('T')[0];
+        
         if (!requestsByDate[d]) {
             requestsByDate[d] = { internalCount: 0, internalEffort: 0, externalCount: 0, externalEffort: 0 };
         }
 
         // Logic to determine if Internal or External
-        const tech = techs.find(t => t.id === r.techId);
+        const tech = technologies.find(t => t.id === r.techId);
         const isInternal = r.assignedSupplierId === 'internal' || (!r.assignedSupplierId && !tech?.supplierId);
 
         if (isInternal) {
@@ -80,7 +109,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
         }
     });
 
-    // Calendar Generation
+    // --- Calendar Generation ---
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
     const getFirstDayOfMonth = (year: number, month: number) => {
         const day = new Date(year, month, 1).getDay();
@@ -114,15 +143,14 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
     // PDF Export
     const handleExportDay = async (e: React.MouseEvent, dateStr: string) => {
         e.stopPropagation();
-        const dailyRequests = solverRequests.filter(r => r.plannedResolutionDate === dateStr);
+        const dailyRequests = solverRequests.filter(r => r.plannedResolutionDate?.split('T')[0] === dateStr);
         // Construct a User object to pass to PDF generator
-        const userObj = db.users.list().find(u => u.id === selectedSolverId) || user;
+        const userObj = adminUsers.find(u => u.id === selectedSolverId) || user;
         
         await generateWorkListPDF(dailyRequests, userObj, `Denní plán: ${dateStr}`, t, lang);
     };
 
-    // Prepare User Options for Admin
-    const maintenanceUsers = db.users.list().filter(u => !u.isBlocked && (u.role === 'maintenance' || u.role === 'admin'));
+    if (loading) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
     return (
         <div className="space-y-6">
@@ -142,7 +170,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
                                 value={selectedSolverId}
                                 onChange={(e) => setSelectedSolverId(e.target.value)}
                             >
-                                {maintenanceUsers.map(u => (
+                                {adminUsers.map(u => (
                                     <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                             </select>
@@ -232,7 +260,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
                         );
                     })}
                     
-                    {/* Fill remaining cells if needed to make it look square, logic omitted for brevity */}
+                    {/* Fill remaining cells if needed */}
                 </div>
             </div>
             

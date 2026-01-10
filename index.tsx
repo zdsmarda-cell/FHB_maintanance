@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode, Component } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; 
 import { Layout } from './components/Layout';
