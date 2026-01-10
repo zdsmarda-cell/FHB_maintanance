@@ -94,7 +94,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
 
   const handleAssignConfirm = async () => {
       if (assignTargetReq && assignSolverId && assignDate) {
-          const updates: any = { solverId: assignSolverId, plannedResolutionDate: assignDate };
+          // Ensure assignDate is captured correctly in closure
+          const finalDate = assignDate; 
+          const updates: any = { solverId: assignSolverId, plannedResolutionDate: finalDate };
           const newState = assignTargetReq.state === 'new' ? 'assigned' : assignTargetReq.state;
           
           setLoading(true);

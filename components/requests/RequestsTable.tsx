@@ -5,7 +5,6 @@ import { useI18n } from '../../lib/i18n';
 import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw, Clock, Euro, Image as ImageIcon } from 'lucide-react';
 import { Pagination, MultiSelect } from '../Shared';
 
-// Interface now includes filterState for controlled mode
 interface RequestsTableProps {
     requests: Request[];
     onRowClick: (req: Request) => void;
@@ -14,7 +13,7 @@ interface RequestsTableProps {
     onAssignSelf?: (req: Request) => void;
     onApprovalClick?: (req: Request) => void;
     onUnassign?: (req: Request) => void;
-    onGallery?: (photos: string[], e: React.MouseEvent) => void; // Updated Signature
+    onGallery?: (photos: string[], e: React.MouseEvent) => void;
     currentUser: User;
     workplaces: Workplace[];
     technologies: Technology[];
@@ -24,7 +23,7 @@ interface RequestsTableProps {
     itemsPerPage: number;
     onPageChange: (page: number) => void;
     onItemsPerPageChange: (limit: number) => void;
-    filterState: any; // Passed from parent
+    filterState: any; 
 }
 
 export const RequestsTable = ({ 
@@ -57,6 +56,7 @@ export const RequestsTable = ({
         fSolverIds, setFSolverIds,
         fSupplierIds, setFSupplierIds,
         fStatusIds, setFStatusIds,
+        fPriorities, setFPriorities,
         fApproved, setFApproved
     } = filterState;
 
@@ -68,6 +68,7 @@ export const RequestsTable = ({
         fSolverIds.length > 0 || 
         fSupplierIds.length > 0 || 
         fStatusIds.length > 0 || 
+        fPriorities.length > 0 || 
         fApproved !== 'all';
 
     const handleClearAllFilters = () => {
@@ -78,10 +79,11 @@ export const RequestsTable = ({
         setFSolverIds([]);
         setFSupplierIds([]);
         setFStatusIds([]);
+        setFPriorities([]);
         setFApproved('all');
     };
 
-    // -- Filtering Logic (Duplicate logic from Parent just to display correct items in Table) --
+    // -- Filtering Logic --
     const filteredRequests = useMemo(() => {
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
@@ -121,12 +123,15 @@ export const RequestsTable = ({
             }
 
             if (fStatusIds.length > 0 && !fStatusIds.includes(req.state)) return false;
+            
+            if (fPriorities && fPriorities.length > 0 && !fPriorities.includes(req.priority)) return false;
+
             if (fApproved === 'yes' && !req.isApproved) return false;
             if (fApproved === 'no' && req.isApproved) return false;
 
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved]);
 
     // -- Pagination Logic --
     const totalItems = filteredRequests.length;
@@ -180,6 +185,14 @@ export const RequestsTable = ({
         );
     }
 
+    const renderPriorityBadge = (prio: string) => {
+        let colors = 'bg-slate-100 text-slate-700';
+        if (prio === 'urgent') colors = 'bg-red-100 text-red-800 border-red-200 font-bold';
+        if (prio === 'priority') colors = 'bg-amber-100 text-amber-800 border-amber-200';
+        
+        return <span className={`px-2 py-0.5 rounded text-xs border ${colors} uppercase`}>{t(`prio.${prio}`)}</span>;
+    }
+
     const formatTime = (minutes: number | undefined) => {
         if (!minutes) return '-';
         const h = Math.floor(minutes / 60);
@@ -196,6 +209,7 @@ export const RequestsTable = ({
         ...suppliers.map(s => ({ id: s.id, name: s.name }))
     ];
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
+    const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
 
     return (
         <>
@@ -208,6 +222,7 @@ export const RequestsTable = ({
                             <th className="px-4 py-2 font-semibold min-w-[150px]">Technologie</th>
                             <th className="px-4 py-2 font-semibold whitespace-nowrap">Vytvořeno</th>
                             <th className="px-4 py-2 font-semibold whitespace-nowrap">Termín vyřízení</th>
+                            <th className="px-4 py-2 font-semibold min-w-[100px]">Priorita</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">Řešitel</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">{t('form.supplier')}</th>
                             <th className="px-4 py-2 font-semibold text-center w-24">Cena</th>
@@ -244,6 +259,7 @@ export const RequestsTable = ({
                                     <input type="date" className="w-full border rounded p-0.5 text-xs font-normal" value={fDateResTo} onChange={e => setFDateResTo(e.target.value)} />
                                 </div>
                             </th>
+                            <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={priorityOptions} selectedIds={fPriorities} onChange={setFPriorities} /></div></th>
                             <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={userOptions} selectedIds={fSolverIds} onChange={setFSolverIds} /></div></th>
                             <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={supplierOptions} selectedIds={fSupplierIds} onChange={setFSupplierIds} /></div></th>
                             {/* No filters for Price and Time */}
@@ -272,7 +288,7 @@ export const RequestsTable = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {paginatedRequests.length === 0 ? (
-                            <tr><td colSpan={12} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
+                            <tr><td colSpan={13} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
                         ) : (
                             paginatedRequests.map(r => {
                                 const tech = technologies.find(t => t.id === r.techId);
@@ -301,6 +317,7 @@ export const RequestsTable = ({
                                             <div className="text-[10px] text-slate-400">{new Date(r.createdDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{r.plannedResolutionDate ? new Date(r.plannedResolutionDate).toLocaleDateString() : '-'}</td>
+                                        <td className="px-4 py-3">{renderPriorityBadge(r.priority)}</td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">
                                             {solver ? (
                                                 <div className="flex items-center justify-between gap-1">

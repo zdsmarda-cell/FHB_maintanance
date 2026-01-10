@@ -50,6 +50,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [fSolverIds, setFSolverIds] = useState<string[]>([]);
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
+    const [fPriorities, setFPriorities] = useState<string[]>([]); // Added Priority Filter
     const [fApproved, setFApproved] = useState('all');
     const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null); // New Maintenance Filter
 
@@ -83,12 +84,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 setSuppliers(supData);
                 setLocations(locData);
             }
-
-            // Refresh selected request reference
-            if (selectedRequest) {
-                // In mock, we read from db directly again. In prod, we look at the fresh `requests` (but since state update is async, we do this in effect or just rely on next render if we find it in new data)
-                // For simplicity here, we assume selectedRequest is updated via UI flow or re-found from list
-            }
         } catch (e) {
             console.error("Failed to load requests data", e);
         } finally {
@@ -102,12 +97,15 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
     // Load initial filters
     useEffect(() => {
-        if (initialFilters) {
+        if (initialFilters && Object.keys(initialFilters).length > 0) {
             if (initialFilters.status) setFStatusIds([initialFilters.status]);
             if (initialFilters.solverId) setFSolverIds([initialFilters.solverId]);
             if (initialFilters.mode === 'approval') {
                 setFApproved('no');
-                setFStatusIds(['new', 'assigned']);
+                // Ensure we see requests that need approval (usually new or assigned)
+                // If status isn't specified, we might default to active ones, 
+                // but 'no' on approval + Admin role usually implies the Dashboard link.
+                if (!initialFilters.status) setFStatusIds(['new', 'assigned']);
             }
             if (initialFilters.date) {
                 setFDateResFrom(initialFilters.date);
@@ -125,7 +123,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         }
     }, [initialFilters]);
 
-    // --- Filtering Logic ---
+    // --- Filtering Logic (Used for PDF Export consistency) ---
     const filteredRequests = useMemo(() => {
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
@@ -182,9 +180,12 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             // 9. Maintenance ID Filter
             if (fMaintenanceId && req.maintenanceId !== fMaintenanceId) return false;
 
+            // 10. Priority Filter
+            if (fPriorities.length > 0 && !fPriorities.includes(req.priority)) return false;
+
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId, fPriorities]);
 
 
     // Modals
@@ -250,8 +251,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         const errs: any = {};
         if (!data.title) errs.title = t('validation.required');
         if (!data.techId) errs.techId = t('validation.required');
-        // description is optional
-        // plannedResolutionDate is optional
         
         setErrors(errs);
         return Object.keys(errs).length === 0;
@@ -353,7 +352,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 });
             }
             refresh();
-            if (view === 'detail') setView('list'); // Optionally close detail on major state change
+            if (view === 'detail') setView('list');
         } catch(e) { console.error(e); setLoading(false); }
     };
 
@@ -369,7 +368,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             } else {
                 await api.put(`/requests/${selectedRequest.id}`, { isApproved });
             }
-            // Update local selected request state to reflect change immediately in detail view
             setSelectedRequest({...selectedRequest, isApproved});
             refresh();
         } catch(e) { console.error(e); setLoading(false); }
@@ -403,7 +401,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
     const openStatusModal = (req: Request) => { setStatusModal({ isOpen: true, req }); setNewStatus(req.state); }
     
-    // Status Change Logic - Handle "New" resets
     const saveStatusChange = async () => { 
         if (statusModal.req && newStatus) { 
             const updates: any = {};
@@ -432,7 +429,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
     const openAssignModal = (req: Request) => { 
         setAssignTargetReq(req); 
-        // If already assigned, prefill solver and date
         if (req.solverId) {
              setAssignSolverId(req.solverId);
         } else {
@@ -450,7 +446,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const handleAssignConfirm = async () => {
         if (assignTargetReq && assignSolverId && assignDate) {
             const updates: any = { solverId: assignSolverId, plannedResolutionDate: assignDate };
-            // If it was new, switch to assigned. If it was assigned (change solver), keep assigned.
             const newState = assignTargetReq.state === 'new' ? 'assigned' : assignTargetReq.state;
             
             setLoading(true);
@@ -471,7 +466,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         }
     };
 
-    // Unassign Logic (Called from UnassignModal or AssignModal Remove button)
     const handleUnassignConfirm = async () => {
         const target = unassignTargetReq || assignTargetReq || selectedRequest;
         if (target) {
@@ -505,7 +499,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     }
 
     const handleExportPDF = async () => {
-        // Pass all loaded data to the PDF generator to ensure it works in Production/API mode
         await generateWorkListPDF(
             filteredRequests, 
             currentUser, 
@@ -518,7 +511,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         );
     }
 
-    // Gallery Handlers - FIXED SIGNATURE
     const openGallery = (photos: string[], e: React.MouseEvent) => {
         e.stopPropagation();
         if (photos && photos.length > 0) {
@@ -528,7 +520,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         }
     };
 
-    // --- Main Content Render ---
     const renderContent = () => {
         if (loading && requests.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
@@ -566,7 +557,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             );
         }
 
-        // List View
         return (
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -624,6 +614,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                             fSolverIds, setFSolverIds,
                             fSupplierIds, setFSupplierIds,
                             fStatusIds, setFStatusIds,
+                            fPriorities, setFPriorities,
                             fApproved, setFApproved
                         }}
                     />
@@ -632,7 +623,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         );
     };
 
-    // Return structure including Modals at root level
     return (
         <>
             {renderContent()}
@@ -648,7 +638,6 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                             <option value="cancelled">{t('status.cancelled')}</option>
                         </select>
                         
-                        {/* Warning when switching to NEW if solver assigned */}
                         {newStatus === 'new' && statusModal.req?.solverId && (
                             <div className="bg-amber-50 text-amber-800 p-2 rounded text-xs border border-amber-200">
                                 <strong>Pozor:</strong> Změna stavu na "Nový" odebere současného řešitele z požadavku.
