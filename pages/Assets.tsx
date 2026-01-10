@@ -6,7 +6,7 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon, Calendar } from 'lucide-react';
 import { Modal, MultiSelect, Pagination } from '../components/Shared';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
-import { prepareMultilingual } from '../lib/helpers'; // Import translation helper
+import { prepareMultilingual, getLocalized } from '../lib/helpers'; // Import getLocalized
 
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 let API_BASE = PROD_API_URL;
@@ -18,12 +18,12 @@ interface AssetsPageProps {
 }
 
 const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers, locations }: any) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n(); // Destructure lang
     const [saving, setSaving] = useState(false); // Add saving state
     
     // Initialize state with careful date handling and defaults
     const [data, setData] = useState<Partial<Technology>>(() => {
-        const base = initialData || {
+        const base = initialData ? { ...initialData } : {
             name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
             installDate: '', weight: 0, description: '', sharepointLink: '', photoUrls: [], isVisible: true
         };
@@ -32,6 +32,12 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         if (base.installDate && typeof base.installDate === 'string' && base.installDate.includes('T')) {
             base.installDate = base.installDate.split('T')[0];
         }
+
+        // Fix: Localize description if it exists (don't show JSON)
+        if (base.description) {
+            base.description = getLocalized(base.description, lang);
+        }
+
         return base;
     });
     
