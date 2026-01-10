@@ -47,6 +47,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { techId, authorId, description, priority, title, estimatedCost, estimatedTime, photoUrls, assignedSupplierId, plannedResolutionDate } = req.body;
+  
+  // Logic for assigning solver: Frontend might send solverId if user selected it, or we rely on 'assigned' logic
+  // Typically frontend sends solverId if selecting 'Assign to me' or specific user.
+  // For safety, let's look at the body for solverId, if not present it remains null (state 'new')
+  const solverId = req.body.solverId || null;
+  const state = solverId ? 'assigned' : 'new';
+
   try {
     // Initialize history
     const history = [{
@@ -63,25 +70,51 @@ router.post('/', async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO requests (
         id, tech_id, author_id, description, priority, title, is_approved, history,
-        estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+        estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         techId, authorId, description, priority, title || 'Nový požadavek', false, JSON.stringify(history),
-        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate
+        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId
       ]
     );
     
-    // Fetch the newly created ID (using UUID() in insert means we can't rely on insertId directly for uuid, but we can query by created_at or similar, 
-    // OR better practice: generate UUID in JS. For now, let's select the latest for this author/tech)
+    // Fetch the newly created ID
     const [newRequest] = await pool.query('SELECT * FROM requests WHERE tech_id = ? AND author_id = ? ORDER BY created_date DESC LIMIT 1', [techId, authorId]);
     
-    // 2. Queue Email to Maintenance using Template
+    // 2. Email Logic (Real DB Users)
+    const currentUserId = req.user ? req.user.id : authorId; // Logic relies on authenticated user via middleware
     const emailBody = getNewRequestEmailBody(priority, description);
-    
-    await pool.execute(
-      'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-      ['maintenance@tech.com', `Nový požadavek: ${title || priority}`, emailBody]
-    );
+    const emailSubject = `Nový požadavek: ${title || priority}`;
+
+    const recipients = new Set();
+
+    if (solverId) {
+        // A) Request is assigned immediately
+        // Only send email if I am NOT assigning it to myself
+        if (solverId !== currentUserId) {
+            const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [solverId]);
+            if (users.length > 0 && users[0].email) {
+                recipients.add(users[0].email);
+            }
+        }
+    } else {
+        // B) Request is unassigned (New) -> Notify all Maintenance staff
+        // Exclude the author if they are maintenance to prevent spamming themselves
+        const [maintUsers] = await pool.query("SELECT email, id FROM users WHERE role = 'maintenance' AND isBlocked = 0");
+        maintUsers.forEach(u => {
+            if (u.id !== currentUserId && u.email) {
+                recipients.add(u.email);
+            }
+        });
+    }
+
+    // Insert emails into queue
+    for (const email of recipients) {
+        await pool.execute(
+            'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+            [email, emailSubject, emailBody]
+        );
+    }
 
     res.json(mapToModel(newRequest[0]));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -90,6 +123,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const body = req.body;
+    const currentUserId = req.user ? req.user.id : null;
 
     try {
         // Construct dynamic query based on what's provided
@@ -116,8 +150,8 @@ router.put('/:id', async (req, res) => {
         if (body.isApproved !== undefined) { updates.push('is_approved = ?'); values.push(body.isApproved ? 1 : 0); }
         if (body.photoUrls !== undefined) { updates.push('photo_urls = ?'); values.push(JSON.stringify(body.photoUrls)); }
         
-        // Append history logic could be here, but for simplicity we rely on frontend sending just the fields to update 
-        // or we fetch-modify-save history. For this implementation, we assume basic field updates.
+        // Critical: Allow updating history
+        if (body.history !== undefined) { updates.push('history = ?'); values.push(JSON.stringify(body.history)); }
         
         if (updates.length === 0) return res.json({ message: 'No changes' });
 
@@ -126,6 +160,19 @@ router.put('/:id', async (req, res) => {
 
         await pool.execute(sql, values);
         
+        // --- Email Logic on Assignment (PUT) ---
+        // If solverId was changed AND it wasn't a self-assignment
+        if (body.solverId && body.solverId !== currentUserId) {
+             const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [body.solverId]);
+             if (users.length > 0 && users[0].email) {
+                 const emailBody = `Byl vám přiřazen požadavek.\n\nZkontrolujte systém FHB Maintein.`;
+                 await pool.execute(
+                    'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+                    [users[0].email, `Přiřazení úkolu`, emailBody]
+                 );
+             }
+        }
+
         const [updated] = await pool.query('SELECT * FROM requests WHERE id = ?', [id]);
         res.json(mapToModel(updated[0]));
 

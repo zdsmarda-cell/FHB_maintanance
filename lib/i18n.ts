@@ -11,7 +11,7 @@ interface I18nStore {
 
 const translations: Record<Lang, Record<string, string>> = {
   cs: {
-    'app.name': 'FHB maintain',
+    'app.name': 'FHB maintein',
     'menu.dashboard': 'Přehled',
     'menu.locations': 'Lokality',
     'menu.suppliers': 'Dodavatelé',
@@ -195,7 +195,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'action.comment': 'Komentář'
   },
   en: {
-    'app.name': 'FHB maintain',
+    'app.name': 'FHB maintein',
     'menu.dashboard': 'Dashboard',
     'menu.locations': 'Locations',
     'menu.suppliers': 'Suppliers',
@@ -379,7 +379,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'action.comment': 'Comment'
   },
   uk: {
-    'app.name': 'FHB maintain',
+    'app.name': 'FHB maintein',
     'menu.dashboard': 'Огляд',
     'menu.locations': 'Локації',
     'menu.suppliers': 'Постачальники',

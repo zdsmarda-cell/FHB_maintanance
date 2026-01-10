@@ -62,9 +62,8 @@ export const SettingsPage = () => {
                 await api.post('/settings', newSettings);
             }
             
-            // Reload page to ensure the helper functions pick up the new setting (if they cache it)
-            // and to show visual feedback that something "major" changed
-            setTimeout(() => window.location.reload(), 500);
+            // Removed reload to keep user on Settings page
+            // setTimeout(() => window.location.reload(), 500);
 
         } catch(e) { console.error(e); refresh(); }
     };

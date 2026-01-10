@@ -342,13 +342,35 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             const token = localStorage.getItem('auth_token');
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
             
+            // Prepare History Entry including reason/note
+            const historyEntry = {
+                date: new Date().toISOString(),
+                userId: userId || currentUser.id,
+                action: 'status_change',
+                oldValue: selectedRequest.state,
+                newValue: newState,
+                note: reason || '' 
+            };
+
+            // Calculate new history array
+            const currentHistory = selectedRequest.history || [];
+            const newHistory = [...currentHistory, historyEntry];
+
+            // Merge history into updates
+            const finalUpdates = { 
+                ...updates, 
+                history: newHistory,
+                // Ensure cancellationReason is explicitly set if cancelled
+                ...(newState === 'cancelled' ? { cancellationReason: reason } : {})
+            };
+
             if (isMock) {
-                db.requests.updateState(selectedRequest.id, newState, reason || '', userId || currentUser.id, updates);
+                db.requests.updateState(selectedRequest.id, newState, reason || '', userId || currentUser.id, finalUpdates);
             } else {
                 await api.put(`/requests/${selectedRequest.id}`, {
                     state: newState,
                     cancellationReason: reason,
-                    ...updates
+                    ...finalUpdates
                 });
             }
             refresh();
@@ -363,12 +385,21 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             const token = localStorage.getItem('auth_token');
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
             
+            // Prepare History
+            const historyEntry = {
+                date: new Date().toISOString(),
+                userId: currentUser.id,
+                action: isApproved ? 'approved' : 'rejected',
+                note: isApproved ? 'Schváleno' : 'Zamítnuto'
+            };
+            const newHistory = [...(selectedRequest.history || []), historyEntry];
+
             if (isMock) {
-                db.requests.updateState(selectedRequest.id, selectedRequest.state, '', currentUser.id, { isApproved });
+                db.requests.updateState(selectedRequest.id, selectedRequest.state, '', currentUser.id, { isApproved, history: newHistory });
             } else {
-                await api.put(`/requests/${selectedRequest.id}`, { isApproved });
+                await api.put(`/requests/${selectedRequest.id}`, { isApproved, history: newHistory });
             }
-            setSelectedRequest({...selectedRequest, isApproved});
+            setSelectedRequest({...selectedRequest, isApproved, history: newHistory});
             refresh();
         } catch(e) { console.error(e); setLoading(false); }
     };
@@ -403,22 +434,40 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     
     const saveStatusChange = async () => { 
         if (statusModal.req && newStatus) { 
+            // Reuse updateRequestState logic but adapted for this context or call it directly if possible
+            // For simplicity calling logic similar to updateRequestState but with closure access
+            
             const updates: any = {};
             if (newStatus === 'new') {
                 updates.solverId = '';
             }
+            
+            // We can call updateRequestState but we need to trick selectedRequest logic or pass ID
+            // Since updateRequestState depends on selectedRequest which might be null here (list view),
+            // we'll implement direct update here.
             
             setLoading(true);
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 
+                const historyEntry = {
+                    date: new Date().toISOString(),
+                    userId: currentUser.id,
+                    action: 'status_change',
+                    oldValue: statusModal.req.state,
+                    newValue: newStatus,
+                    note: 'Změna z přehledu'
+                };
+                const newHistory = [...(statusModal.req.history || []), historyEntry];
+                const finalUpdates = { ...updates, history: newHistory };
+
                 if (isMock) {
-                    db.requests.updateState(statusModal.req.id, newStatus as any, 'Změna z přehledu', currentUser.id, updates); 
+                    db.requests.updateState(statusModal.req.id, newStatus as any, 'Změna z přehledu', currentUser.id, finalUpdates); 
                 } else {
                     await api.put(`/requests/${statusModal.req.id}`, {
                         state: newStatus,
-                        ...updates
+                        ...finalUpdates
                     });
                 }
                 setStatusModal({ isOpen: false, req: null }); 
@@ -453,12 +502,21 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 const token = localStorage.getItem('auth_token');
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 
+                const historyEntry = {
+                    date: new Date().toISOString(),
+                    userId: currentUser.id,
+                    action: 'edited',
+                    note: 'Přiřazeno/Změněno z přehledu'
+                };
+                const newHistory = [...(assignTargetReq.history || []), historyEntry];
+                const finalUpdates = { ...updates, history: newHistory };
+
                 if (isMock) {
-                    db.requests.updateState(assignTargetReq.id, newState, 'Přiřazeno/Změněno z přehledu', currentUser.id, updates);
+                    db.requests.updateState(assignTargetReq.id, newState, 'Přiřazeno/Změněno z přehledu', currentUser.id, finalUpdates);
                 } else {
                     await api.put(`/requests/${assignTargetReq.id}`, {
                         state: newState,
-                        ...updates
+                        ...finalUpdates
                     });
                 }
                 setAssignModalOpen(false); setAssignTargetReq(null); refresh();
@@ -474,6 +532,15 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 const token = localStorage.getItem('auth_token');
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 const updates = { solverId: '' };
+                
+                const historyEntry = {
+                    date: new Date().toISOString(),
+                    userId: currentUser.id,
+                    action: 'edited',
+                    note: 'Uvolněno z řešení'
+                };
+                const newHistory = [...(target.history || []), historyEntry];
+                const finalUpdates = { ...updates, history: newHistory };
 
                 if (isMock) {
                     db.requests.updateState(
@@ -481,12 +548,12 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                         'new', 
                         `Udržbář se uvolnil z požadavku / Řešitel odebrán`, 
                         currentUser.id,
-                        updates
+                        finalUpdates
                     );
                 } else {
                     await api.put(`/requests/${target.id}`, {
                         state: 'new',
-                        ...updates
+                        ...finalUpdates
                     });
                 }
                 setUnassignModalOpen(false);
@@ -518,6 +585,28 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             setGalleryIndex(0);
             setIsGalleryOpen(true);
         }
+    };
+
+    // --- Badge Renderers for Detail View (Correctly Localized) ---
+    const renderDetailStatusBadge = (status: string) => {
+        const styles: any = {
+            'new': 'bg-blue-100 text-blue-800 border-blue-200',
+            'assigned': 'bg-amber-100 text-amber-800 border-amber-200',
+            'solved': 'bg-green-100 text-green-800 border-green-200',
+            'cancelled': 'bg-red-100 text-red-800 border-red-200'
+        };
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-bold border uppercase ${styles[status] || 'bg-slate-100'}`}>
+                {t(`status.${status}`) || status}
+            </span>
+        );
+    };
+
+    const renderDetailPrioBadge = (prio: string) => {
+        let colors = 'bg-slate-100 text-slate-700';
+        if (prio === 'urgent') colors = 'bg-red-100 text-red-800 border-red-200 font-bold';
+        if (prio === 'priority') colors = 'bg-amber-100 text-amber-800 border-amber-200';
+        return <span className={`px-2 py-0.5 rounded text-xs border uppercase ${colors}`}>{t(`prio.${prio}`)}</span>;
     };
 
     const renderContent = () => {
@@ -552,7 +641,9 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                     onCancel={(reason) => updateRequestState('cancelled', reason)}
                     onApproveChange={handleApproveChange} 
                     onGallery={openGallery} 
-                    renderStatusBadge={(s) => <span className="badge">{s}</span>} renderPrioBadge={(p) => <span className="badge">{p}</span>} refresh={refresh}
+                    renderStatusBadge={renderDetailStatusBadge} 
+                    renderPrioBadge={renderDetailPrioBadge} 
+                    refresh={refresh}
                 />
             );
         }

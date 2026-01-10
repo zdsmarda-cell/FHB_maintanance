@@ -67,7 +67,7 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
     
     console.log(`[Translate] Preparing: "${text}"`);
 
-    // 1. Check settings
+    // 1. Check settings with Robust Parsing
     let settings;
     try {
         const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
@@ -76,6 +76,16 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         } else {
             // Fetch settings from API
             settings = await api.get('/settings');
+        }
+
+        // Recursively parse stringified JSON until it is an object (same logic as SettingsPage)
+        while (typeof settings === 'string') {
+            try {
+                const parsed = JSON.parse(settings);
+                settings = parsed;
+            } catch (e) {
+                break;
+            }
         }
     } catch (e) {
         console.warn("[Translate] Failed to load settings, defaulting to false", e);
@@ -96,6 +106,11 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         
         console.log("[Translate] Calling API...");
 
+        // Even in Mock mode, if the user enabled translation in settings, try to call the real API if reachable,
+        // otherwise fallback to mock simulation.
+        // Since we cannot call protected API from mock-token easily without failure, we simulate or skip.
+        // BUT user complained "generally nowhere called". If they are running full backend locally, it should work.
+        
         if (isMock) {
             // Mock Translation Logic on Client for Demo
             // Simulate delay

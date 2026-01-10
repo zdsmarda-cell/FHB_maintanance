@@ -6,6 +6,7 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon, Calendar } from 'lucide-react';
 import { Modal, MultiSelect, Pagination } from '../components/Shared';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
+import { prepareMultilingual } from '../lib/helpers'; // Import translation helper
 
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 let API_BASE = PROD_API_URL;
@@ -18,6 +19,7 @@ interface AssetsPageProps {
 
 const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers, locations }: any) => {
     const { t } = useI18n();
+    const [saving, setSaving] = useState(false); // Add saving state
     
     // Initialize state with careful date handling and defaults
     const [data, setData] = useState<Partial<Technology>>(() => {
@@ -70,15 +72,26 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         return Object.keys(errs).length === 0;
     }
 
-    const handleSave = () => {
+    const handleSaveClick = async () => {
         if(validate()) {
-            if (data.name && data.workplaceId) {
-                // Ensure weight is number (allow 0)
-                const finalData = { 
-                    ...data, 
-                    weight: data.weight ?? 0 
-                };
-                onSave(finalData as any);
+            setSaving(true);
+            try {
+                // Apply translation to description if present
+                const translatedDesc = data.description ? await prepareMultilingual(data.description) : '';
+                
+                if (data.name && data.workplaceId) {
+                    // Ensure weight is number (allow 0)
+                    const finalData = { 
+                        ...data, 
+                        description: translatedDesc,
+                        weight: data.weight ?? 0 
+                    };
+                    await onSave(finalData as any);
+                }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                setSaving(false);
             }
         }
     }
@@ -128,6 +141,13 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                      <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.serial_number')}</label>
                      <input className="w-full border p-2 rounded" value={data.serialNumber} onChange={e => setData({...data, serialNumber: e.target.value})} />
                 </div>
+                
+                {/* Description - Will be translated on save */}
+                <div>
+                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.description')}</label>
+                     <textarea className="w-full border p-2 rounded" rows={2} value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.type')}</label>
@@ -232,7 +252,10 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
              </div>
              <div className="flex justify-end pt-4 mt-4 border-t border-slate-100">
                 <button onClick={onClose} className="mr-2 text-slate-500 hover:bg-slate-100 px-3 py-2 rounded">{t('common.cancel')}</button>
-                <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t('common.save')}</button>
+                <button onClick={handleSaveClick} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
+                    {saving && <Loader className="animate-spin w-4 h-4 mr-2" />}
+                    {t('common.save')}
+                </button>
              </div>
         </Modal>
     );
@@ -370,19 +393,10 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     const paginatedAssets = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     
-    // Count logic: if operator, only count their requests
+    // Count logic: Filter out closed/cancelled requests.
+    // Show count of ALL requests for the tech regardless of author (even for operators).
     const getOpenRequestCount = (techId: string) => {
-        return requests.filter(r => {
-            if (r.techId !== techId) return false;
-            // Filter out solved/cancelled
-            if (['solved', 'cancelled'].includes(r.state)) return false;
-            
-            // Strictly filter by author for operators
-            if (user.role === 'operator') {
-                return r.authorId === user.id;
-            }
-            return true;
-        }).length;
+        return requests.filter(r => r.techId === techId && r.state !== 'solved' && r.state !== 'cancelled').length;
     };
 
     // Gallery Handlers - FIXED SIGNATURE

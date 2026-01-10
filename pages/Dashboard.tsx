@@ -263,7 +263,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                 </div>
             </div>
         )}
-        <Card title={t('dashboard.active_maintenance')} value={activeMaintenance} icon={Clock} color="bg-blue-500" onClick={() => onNavigate('maintenance')} />
+        
+        {/* Only show Active Maintenance to non-operators */}
+        {user.role !== 'operator' && (
+            <Card title={t('dashboard.active_maintenance')} value={activeMaintenance} icon={Clock} color="bg-blue-500" onClick={() => onNavigate('maintenance')} />
+        )}
+        
         <Card title={t('dashboard.total_assets')} value={totalAssets} icon={CheckCircle} color="bg-emerald-500" onClick={() => onNavigate('assets')} />
       </div>
 

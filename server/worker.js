@@ -154,20 +154,33 @@ const generateMaintenanceRequests = async () => {
                 );
                 await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
 
-                // 4. Send Email (Correct Recipient)
-                let emailRecipient = 'maintenance@tech.com'; // Fallback
+                // 4. Send Email (Real Recipients)
+                const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
+                const emailSubject = `Nová údržba: ${template.title}`;
+                
+                const recipients = new Set();
+
                 if (solverId) {
+                    // Send to assigned responsible person
                     const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [solverId]);
                     if (users.length > 0 && users[0].email) {
-                        emailRecipient = users[0].email;
+                        recipients.add(users[0].email);
                     }
+                } else {
+                    // No responsible person set -> Send to ALL maintenance staff
+                    const [maintUsers] = await pool.query("SELECT email FROM users WHERE role = 'maintenance' AND isBlocked = 0");
+                    maintUsers.forEach(u => {
+                        if (u.email) recipients.add(u.email);
+                    });
                 }
 
-                const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
-                await pool.execute(
-                    'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                    [emailRecipient, `Nová údržba: ${template.title}`, emailBody]
-                );
+                // Insert into queue
+                for (const email of recipients) {
+                    await pool.execute(
+                        'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+                        [email, emailSubject, emailBody]
+                    );
+                }
 
             } catch (createErr) {
                 // 5. Error: Update Log
