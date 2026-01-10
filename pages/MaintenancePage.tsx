@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List } from 'lucide-react';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap } from 'lucide-react';
 import { Modal, ConfirmModal } from '../components/Shared';
 
 interface MaintenancePageProps {
@@ -36,6 +36,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
 
     // Delete State
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    
+    // Run Now State
+    const [runNowTemplate, setRunNowTemplate] = useState<Maintenance | null>(null);
 
     const refresh = async () => {
         setLoading(true);
@@ -109,6 +112,40 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             refresh();
         } catch (e) {
             console.error("Delete Error", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRunNow = async () => {
+        if (!runNowTemplate) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+
+            if (isMock) {
+                // Mock implementation: just create request and update maintenance
+                const req = {
+                    techId: runNowTemplate.techId,
+                    maintenanceId: runNowTemplate.id,
+                    title: runNowTemplate.title,
+                    authorId: user.id,
+                    solverId: runNowTemplate.responsiblePersonIds?.[0] || '',
+                    state: runNowTemplate.responsiblePersonIds?.length > 0 ? 'assigned' : 'new',
+                    priority: 'priority',
+                    description: runNowTemplate.description,
+                    plannedResolutionDate: new Date().toISOString().split('T')[0]
+                };
+                db.requests.add(req);
+                db.maintenances.update(runNowTemplate.id, { lastGeneratedDate: new Date().toISOString() });
+            } else {
+                await api.post(`/maintenance/${runNowTemplate.id}/run`, {});
+            }
+            setRunNowTemplate(null);
+            refresh();
+        } catch (e) {
+            console.error("Run Now Error", e);
         } finally {
             setLoading(false);
         }
@@ -286,6 +323,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                      <div className="flex gap-2">
                         {canEditMaint && (
                             <>
+                                <button onClick={() => setRunNowTemplate(selectedTemplate)} className="bg-amber-100 text-amber-700 px-3 py-2 rounded flex items-center hover:bg-amber-200 border border-amber-200">
+                                    <Zap className="w-4 h-4 mr-2" /> Vytvořit ihned
+                                </button>
                                 <button onClick={() => openEditModal(selectedTemplate)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
                                     <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
                                 </button>
@@ -341,7 +381,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     </div>
                 </div>
 
-                {/* --- EDIT / CREATE MODAL --- */}
+                {/* Modals are handled at bottom of component */}
                 {isCreateOpen && (
                     <MaintModal 
                         isOpen={isCreateOpen} 
@@ -356,7 +396,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         setSelectedWpId={setSelectedWpId}
                         errors={errors}
                         t={t}
-                        // Pass API data props
                         locations={locations}
                         workplaces={workplaces}
                         technologies={technologies}
@@ -370,6 +409,15 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         message={t('msg.confirm_delete')} 
                         onConfirm={handleDelete} 
                         onCancel={() => setShowDeleteConfirm(false)} 
+                    />
+                )}
+
+                {runNowTemplate && (
+                    <RunNowModal 
+                        template={runNowTemplate} 
+                        onConfirm={handleRunNow} 
+                        onCancel={() => setRunNowTemplate(null)}
+                        nextRunDate={calculateNextRun(runNowTemplate)}
                     />
                 )}
             </div>
@@ -429,11 +477,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
+                                <th className="px-4 py-3 text-right">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={8} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                                <tr><td colSpan={9} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
@@ -465,6 +514,17 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{supplier?.name || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                {user.role !== 'operator' && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setRunNowTemplate(m); }}
+                                                        className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-full transition-colors"
+                                                        title="Vytvořit požadavek ihned"
+                                                    >
+                                                        <Zap className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })
@@ -488,7 +548,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     setSelectedWpId={setSelectedWpId}
                     errors={errors}
                     t={t}
-                    // Pass Data Props
                     locations={locations}
                     workplaces={workplaces}
                     technologies={technologies}
@@ -496,11 +555,45 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     users={users}
                 />
             )}
+
+            {runNowTemplate && (
+                <RunNowModal 
+                    template={runNowTemplate} 
+                    onConfirm={handleRunNow} 
+                    onCancel={() => setRunNowTemplate(null)}
+                    nextRunDate={calculateNextRun(runNowTemplate)}
+                />
+            )}
         </div>
     );
 };
 
-// Refactored Modal for better readability
+const RunNowModal = ({ template, onConfirm, onCancel, nextRunDate }: any) => {
+    return (
+        <Modal title="Okamžité vytvoření požadavku" onClose={onCancel}>
+            <div className="space-y-4">
+                <div className="bg-amber-50 p-3 rounded border border-amber-100 text-sm text-amber-800">
+                    <p className="font-bold mb-1 flex items-center"><Zap className="w-4 h-4 mr-1"/> Mimořádné spuštění</p>
+                    <p>Chystáte se manuálně vytvořit požadavek pro šablonu: <strong>{template.title}</strong>.</p>
+                </div>
+                
+                <div className="text-sm text-slate-600">
+                    <p className="mb-2">Standardní termín dalšího generování by byl: <strong>{nextRunDate ? nextRunDate.toLocaleDateString() : 'Není naplánováno'}</strong>.</p>
+                    <p>Pokud vytvoříte požadavek nyní, interval pro další automatické generování se přepočítá od dnešního data.</p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                    <button onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Zrušit</button>
+                    <button onClick={onConfirm} className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center">
+                        <Zap className="w-4 h-4 mr-1" /> Vytvořit ihned
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+// Refactored Modal for better readability (Same as before)
 const MaintModal = ({ 
     isOpen, onClose, data, setData, isEdit, onSave, 
     selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t,

@@ -51,6 +51,41 @@ router.post('/', async (req, res) => {
     }
 });
 
+// Force Run Maintenance NOW
+router.post('/:id/run', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // 1. Get Template
+        const [templates] = await pool.query('SELECT * FROM maintenances WHERE id = ?', [id]);
+        if (templates.length === 0) return res.status(404).json({ error: 'Template not found' });
+        
+        const template = templates[0];
+        
+        // 2. Prepare Data
+        const todayStr = new Date().toISOString().split('T')[0];
+        const responsibleIds = template.responsible_person_ids ? (typeof template.responsible_person_ids === 'string' ? JSON.parse(template.responsible_person_ids) : template.responsible_person_ids) : [];
+        const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
+        const state = solverId ? 'assigned' : 'new';
+        const authorId = req.user?.id || 'system';
+        const requestId = crypto.randomUUID();
+
+        // 3. Create Request
+        await pool.execute(
+            `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
+            [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr]
+        );
+
+        // 4. Update Maintenance last_generated_at to NOW (Resetting interval)
+        await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [todayStr, id]);
+
+        res.json({ success: true, message: 'Maintenance request created successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const data = req.body;

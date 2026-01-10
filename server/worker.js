@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import { getNewRequestEmailBody } from './templates/email.js';
 import { checkDailyOverdue } from './workers/dailyOverdue.js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -142,11 +143,15 @@ const generateMaintenanceRequests = async () => {
             const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
             const state = solverId ? 'assigned' : 'new';
             const authorId = 'system'; 
+            
+            // Generate UUID for the new request
+            const requestId = crypto.randomUUID();
 
-            const [res] = await pool.execute(
-                `INSERT INTO requests (tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
-                 VALUES (?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
-                [template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
+            // Insert Request (Fixed: Added 'id' column and value)
+            await pool.execute(
+                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
+                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
             );
 
             // Update Template
