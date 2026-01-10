@@ -201,6 +201,13 @@ const migrations = [
                 template_snapshot JSON
             )`
         ]
+    },
+    {
+        name: '009_fix_request_columns',
+        up: [
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS assigned_supplier_id VARCHAR(255)`,
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS planned_resolution_date DATE`
+        ]
     }
 ];
 
