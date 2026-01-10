@@ -371,8 +371,8 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const paginatedAssets = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     const getOpenRequestCount = (techId: string) => requests.filter(r => r.techId === techId && r.state !== 'solved' && r.state !== 'cancelled').length;
 
-    // Gallery Handlers
-    const openGallery = (e: React.MouseEvent, photos: string[]) => {
+    // Gallery Handlers - FIXED SIGNATURE
+    const openGallery = (photos: string[], e: React.MouseEvent) => {
         e.stopPropagation();
         if (photos && photos.length > 0) {
             setGalleryImages(photos);
@@ -465,7 +465,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                         <td className="px-4 py-3 font-medium text-slate-900">
                                             <div className="flex items-center gap-2">
                                                 {hasPhotos && (
-                                                    <button onClick={(e) => openGallery(e, asset.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                                    <button onClick={(e) => openGallery(asset.photoUrls, e)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
                                                         <ImageIcon className="w-4 h-4" />
                                                     </button>
                                                 )}

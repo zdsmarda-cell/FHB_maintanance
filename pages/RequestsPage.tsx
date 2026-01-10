@@ -518,8 +518,8 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         );
     }
 
-    // Gallery Handlers
-    const openGallery = (e: React.MouseEvent, photos: string[]) => {
+    // Gallery Handlers - FIXED SIGNATURE
+    const openGallery = (photos: string[], e: React.MouseEvent) => {
         e.stopPropagation();
         if (photos && photos.length > 0) {
             setGalleryImages(photos);

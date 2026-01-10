@@ -14,7 +14,7 @@ interface RequestsTableProps {
     onAssignSelf?: (req: Request) => void;
     onApprovalClick?: (req: Request) => void;
     onUnassign?: (req: Request) => void;
-    onGallery?: (e: React.MouseEvent, photos: string[]) => void; // New Prop
+    onGallery?: (photos: string[], e: React.MouseEvent) => void; // Updated Signature
     currentUser: User;
     workplaces: Workplace[];
     technologies: Technology[];
@@ -289,7 +289,7 @@ export const RequestsTable = ({
                                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-3 text-center">
                                             {hasPhotos && onGallery && (
-                                                <button onClick={(e) => onGallery(e, r.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                                <button onClick={(e) => onGallery(r.photoUrls, e)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
                                                     <ImageIcon className="w-4 h-4" />
                                                 </button>
                                             )}

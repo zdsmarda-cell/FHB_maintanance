@@ -7,7 +7,20 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'global'");
-    res.json(rows[0]?.setting_value || {});
+    
+    let settings = rows[0]?.setting_value || {};
+    
+    // Ensure it is parsed if the DB driver returns a string for JSON column
+    if (typeof settings === 'string') {
+        try {
+            settings = JSON.parse(settings);
+        } catch (e) {
+            console.error('Failed to parse settings JSON:', e);
+            settings = {};
+        }
+    }
+
+    res.json(settings);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

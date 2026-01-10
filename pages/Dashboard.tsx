@@ -152,7 +152,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         } catch(e) { console.error(e); setLoading(false); }
   };
 
-  const openGallery = (e: React.MouseEvent, photos: string[]) => {
+  // FIXED SIGNATURE
+  const openGallery = (photos: string[], e: React.MouseEvent) => {
       e.stopPropagation();
       if (photos && photos.length > 0) {
           setGalleryImages(photos);
@@ -305,7 +306,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                   <tr key={r.id} onClick={() => setSelectedRequest(r)} className="hover:bg-red-100 cursor-pointer transition-colors bg-white">
                                       <td className="px-4 py-3 text-center">
                                           {hasPhotos && (
-                                              <button onClick={(e) => openGallery(e, r.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                              <button onClick={(e) => openGallery(r.photoUrls, e)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
                                                   <ImageIcon className="w-4 h-4" />
                                               </button>
                                           )}
@@ -438,7 +439,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       onUnassign={() => {}}
                       onCancel={(reason) => handleDetailAction('cancel', reason)}
                       onApproveChange={(isApproved) => handleDetailAction('approve', isApproved)} 
-                      onGallery={() => {}}
+                      onGallery={openGallery}
                       renderStatusBadge={renderStatusBadge}
                       renderPrioBadge={(p) => <span className="text-xs font-bold uppercase">{p}</span>}
                       refresh={loadData}
