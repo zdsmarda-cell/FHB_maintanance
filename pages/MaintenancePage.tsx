@@ -255,7 +255,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     // --- VALIDATION LOGIC ---
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        if (!maintForm.techId) newErrors.techId = t('validation.required');
+        if (!maintForm.techId) newErrors.techId = "Technologie je povinná (vyberte pracoviště)";
         if (!maintForm.title) newErrors.title = t('validation.required');
         if (!maintForm.interval || maintForm.interval < 1) newErrors.interval = t('validation.required');
         if (!maintForm.allowedDays || maintForm.allowedDays.length === 0) newErrors.allowedDays = t('validation.required');
@@ -663,20 +663,21 @@ const MaintModal = ({
                                 </select>
                             </div>
                         )}
-                        {selectedWpId && (
-                            <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Technologie *</label>
-                                <select 
-                                className={`w-full border p-2 rounded ${errors.techId ? 'border-red-500' : ''}`}
+                        
+                        {/* Always show technology dropdown, but disabled or empty if no workplace */}
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">Technologie *</label>
+                            <select 
+                                className={`w-full border p-2 rounded ${errors.techId ? 'border-red-500' : ''} ${!selectedWpId ? 'bg-slate-100' : ''}`}
                                 value={data.techId} 
                                 onChange={e => setData({...data, techId: e.target.value})}
-                                >
-                                <option value="">-- Vyberte technologii --</option>
-                                {technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                                {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
-                            </div>
-                        )}
+                                disabled={!selectedWpId}
+                            >
+                                <option value="">{selectedWpId ? "-- Vyberte technologii --" : "-- Nejdříve vyberte pracoviště --"}</option>
+                                {selectedWpId && technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                            {errors.techId && <span className="text-xs text-red-500 font-bold">{errors.techId}</span>}
+                        </div>
                 </div>
             )}
 

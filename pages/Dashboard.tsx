@@ -3,11 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { calculateNextMaintenanceDate } from '../lib/helpers';
-import { AlertCircle, CheckCircle, Clock, List, Calendar, Wrench, Inbox, FileCheck, Loader, ArrowRight, AlertTriangle, Euro, UserPlus, Eye } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, List, Calendar, Wrench, Inbox, FileCheck, Loader, ArrowRight, AlertTriangle, Euro, UserPlus, Eye, Image as ImageIcon } from 'lucide-react';
 import { User, Maintenance, Request, Technology, Supplier } from '../lib/types';
 import { Modal } from '../components/Shared';
 import { RequestDetail } from '../components/requests/RequestDetail';
 import { AssignModal } from '../components/requests/modals/AssignModal';
+import { GalleryModal } from '../components/requests/modals/GalleryModal';
 
 interface DashboardProps {
     user: User;
@@ -28,6 +29,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   // Modal States
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
+
+  // Gallery Modal State
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   // Assign Modal State
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -108,6 +114,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
               setAssignTargetReq(null); 
               loadData();
           } catch(e) { console.error(e); setLoading(false); }
+      }
+  };
+
+  // Handler for actions inside Request Detail Modal (Cancel, Solve, Approve)
+  const handleDetailAction = async (action: 'cancel' | 'solve' | 'approve', data?: any) => {
+        if (!selectedRequest) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            
+            let newState = selectedRequest.state;
+            let reason = '';
+            let updates = {};
+
+            if (action === 'cancel') {
+                newState = 'cancelled';
+                reason = data; // data is reason string
+            } else if (action === 'solve') {
+                newState = 'solved';
+            } else if (action === 'approve') {
+                updates = { isApproved: data }; // data is boolean
+            }
+
+            if (isMock) {
+                db.requests.updateState(selectedRequest.id, newState, reason, user.id, updates);
+            } else {
+                await api.put(`/requests/${selectedRequest.id}`, {
+                    state: newState,
+                    cancellationReason: reason,
+                    ...updates
+                });
+            }
+            setSelectedRequest(null);
+            loadData();
+        } catch(e) { console.error(e); setLoading(false); }
+  };
+
+  const openGallery = (e: React.MouseEvent, photos: string[]) => {
+      e.stopPropagation();
+      if (photos && photos.length > 0) {
+          setGalleryImages(photos);
+          setGalleryIndex(0);
+          setIsGalleryOpen(true);
       }
   };
 
@@ -227,6 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                   <table className="w-full text-sm text-left">
                       <thead className="text-xs text-red-700 uppercase bg-red-50 border-b border-red-200">
                           <tr>
+                              <th className="px-4 py-3 w-8"></th>
                               <th className="px-4 py-3">{t('form.title')}</th>
                               <th className="px-4 py-3">Technologie</th>
                               <th className="px-4 py-3 whitespace-nowrap">Vytvořeno</th>
@@ -247,11 +298,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                               const supplier = r.assignedSupplierId && r.assignedSupplierId !== 'internal' 
                                   ? suppliers.find(s => s.id === r.assignedSupplierId) 
                                   : null;
-                              
                               const canAssign = user.role === 'admin' || user.role === 'maintenance';
+                              const hasPhotos = r.photoUrls && r.photoUrls.length > 0;
 
                               return (
                                   <tr key={r.id} onClick={() => setSelectedRequest(r)} className="hover:bg-red-100 cursor-pointer transition-colors bg-white">
+                                      <td className="px-4 py-3 text-center">
+                                          {hasPhotos && (
+                                              <button onClick={(e) => openGallery(e, r.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                                  <ImageIcon className="w-4 h-4" />
+                                              </button>
+                                          )}
+                                      </td>
                                       <td className="px-4 py-3 font-bold text-slate-800">{r.title}</td>
                                       <td className="px-4 py-3 text-slate-600 text-xs">{tech?.name || '-'}</td>
                                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
@@ -375,11 +433,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       technologies={techs}
                       onBack={() => setSelectedRequest(null)}
                       onEdit={() => {}} // Not allowed from dashboard quick view
-                      onSolve={() => {}} 
+                      onSolve={() => handleDetailAction('solve')} 
                       onAssign={() => {}} 
                       onUnassign={() => {}}
-                      onCancel={() => {}}
-                      onApproveChange={() => {}} 
+                      onCancel={(reason) => handleDetailAction('cancel', reason)}
+                      onApproveChange={(isApproved) => handleDetailAction('approve', isApproved)} 
                       onGallery={() => {}}
                       renderStatusBadge={renderStatusBadge}
                       renderPrioBadge={(p) => <span className="text-xs font-bold uppercase">{p}</span>}
@@ -462,6 +520,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
               candidates={users.filter(u => u.role !== 'operator' && !u.isBlocked)} 
               currentUser={user}
               isAlreadyAssigned={false}
+          />
+      )}
+
+      {isGalleryOpen && (
+          <GalleryModal 
+              images={galleryImages} 
+              currentIndex={galleryIndex} 
+              onClose={() => setIsGalleryOpen(false)} 
+              onNext={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev + 1) % galleryImages.length); }} 
+              onPrev={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length); }}
           />
       )}
     </div>

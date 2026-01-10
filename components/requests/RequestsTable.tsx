@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Request, User, Workplace, Technology, Supplier } from '../../lib/types';
 import { useI18n } from '../../lib/i18n';
-import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw, Clock, Euro } from 'lucide-react';
+import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw, Clock, Euro, Image as ImageIcon } from 'lucide-react';
 import { Pagination, MultiSelect } from '../Shared';
 
 // Interface now includes filterState for controlled mode
@@ -14,6 +14,7 @@ interface RequestsTableProps {
     onAssignSelf?: (req: Request) => void;
     onApprovalClick?: (req: Request) => void;
     onUnassign?: (req: Request) => void;
+    onGallery?: (e: React.MouseEvent, photos: string[]) => void; // New Prop
     currentUser: User;
     workplaces: Workplace[];
     technologies: Technology[];
@@ -34,6 +35,7 @@ export const RequestsTable = ({
     onAssignSelf,
     onApprovalClick,
     onUnassign,
+    onGallery,
     currentUser, 
     technologies,
     users,
@@ -201,6 +203,7 @@ export const RequestsTable = ({
                 <table className="w-full text-sm text-left border-collapse">
                     <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                         <tr>
+                            <th className="px-4 py-2 font-semibold w-10"></th>
                             <th className="px-4 py-2 font-semibold min-w-[150px]">{t('form.title')}</th>
                             <th className="px-4 py-2 font-semibold min-w-[150px]">Technologie</th>
                             <th className="px-4 py-2 font-semibold whitespace-nowrap">Vytvořeno</th>
@@ -214,6 +217,7 @@ export const RequestsTable = ({
                             <th className="px-4 py-2 font-semibold text-right">{t('common.actions')}</th>
                         </tr>
                         <tr className="bg-slate-100 border-b border-slate-200">
+                            <th className="px-2 py-2"></th>
                             <th className="px-2 py-2">
                                 <div className="relative">
                                     <input 
@@ -268,7 +272,7 @@ export const RequestsTable = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {paginatedRequests.length === 0 ? (
-                            <tr><td colSpan={11} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
+                            <tr><td colSpan={12} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
                         ) : (
                             paginatedRequests.map(r => {
                                 const tech = technologies.find(t => t.id === r.techId);
@@ -279,9 +283,17 @@ export const RequestsTable = ({
                                 if (r.assignedSupplierId === 'internal') { isInternal = true; }
                                 else if (r.assignedSupplierId) { supplierName = suppliers.find(s => s.id === r.assignedSupplierId)?.name || '?'; }
                                 else { if (tech?.supplierId) { supplierName = suppliers.find(s => s.id === tech.supplierId)?.name || '-'; } else { isInternal = true; } }
+                                const hasPhotos = r.photoUrls && r.photoUrls.length > 0;
 
                                 return (
                                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-4 py-3 text-center">
+                                            {hasPhotos && onGallery && (
+                                                <button onClick={(e) => onGallery(e, r.photoUrls)} className="text-blue-500 hover:text-blue-700" title="Zobrazit fotky">
+                                                    <ImageIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-slate-800">{r.title}</td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">{tech?.name || '-'}</td>
                                         <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">

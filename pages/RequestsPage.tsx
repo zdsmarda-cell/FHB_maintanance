@@ -10,6 +10,7 @@ import { Modal, Pagination, ConfirmModal, AlertModal } from '../components/Share
 import { ApprovalModal } from '../components/requests/modals/ApprovalModal';
 import { AssignModal } from '../components/requests/modals/AssignModal';
 import { UnassignModal } from '../components/requests/modals/UnassignModal';
+import { GalleryModal } from '../components/requests/modals/GalleryModal';
 import { Plus, Printer, Loader, FilterX } from 'lucide-react';
 import { generateWorkListPDF } from '../lib/pdf';
 
@@ -31,6 +32,11 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [locations, setLocations] = useState<Location[]>([]); // Added state for locations
     const [users, setUsers] = useState<User[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+    // Gallery Modal State
+    const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
     // CRITICAL: Always get the fresh user from DB/State to ensure Limits are up-to-date
     // In production we look in loaded users, fallback to initial
@@ -512,6 +518,16 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         );
     }
 
+    // Gallery Handlers
+    const openGallery = (e: React.MouseEvent, photos: string[]) => {
+        e.stopPropagation();
+        if (photos && photos.length > 0) {
+            setGalleryImages(photos);
+            setGalleryIndex(0);
+            setIsGalleryOpen(true);
+        }
+    };
+
     // --- Main Content Render ---
     const renderContent = () => {
         if (loading && requests.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
@@ -543,7 +559,8 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                     onAssign={() => openAssignModal(selectedRequest)} 
                     onUnassign={() => setUnassignModalOpen(true)}
                     onCancel={(reason) => updateRequestState('cancelled', reason)}
-                    onApproveChange={handleApproveChange} onGallery={() => {}} 
+                    onApproveChange={handleApproveChange} 
+                    onGallery={openGallery} 
                     renderStatusBadge={(s) => <span className="badge">{s}</span>} renderPrioBadge={(p) => <span className="badge">{p}</span>} refresh={refresh}
                 />
             );
@@ -589,6 +606,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                         onAssignSelf={openAssignModal}
                         onApprovalClick={openApprovalModal}
                         onUnassign={openUnassignModal}
+                        onGallery={openGallery}
                         currentUser={currentUser} 
                         workplaces={workplaces}
                         technologies={technologies}
@@ -667,6 +685,16 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
             {approvalReq && <ApprovalModal request={approvalReq} technologies={technologies} onClose={() => setApprovalReq(null)} onApprove={handleApprovalModalAction} />}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
+            
+            {isGalleryOpen && (
+                <GalleryModal 
+                    images={galleryImages} 
+                    currentIndex={galleryIndex} 
+                    onClose={() => setIsGalleryOpen(false)} 
+                    onNext={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev + 1) % galleryImages.length); }} 
+                    onPrev={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length); }}
+                />
+            )}
         </>
     );
 };

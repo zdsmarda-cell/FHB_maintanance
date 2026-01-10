@@ -13,7 +13,7 @@ import { AssetsPage } from './pages/Assets';
 import { RequestsPage } from './pages/RequestsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { CalendarPage } from './pages/CalendarPage';
-import { seedData, db, api } from './lib/db';
+import { seedData, db } from './lib/db'; // Removed api import, defined locally or used direct fetch
 import { User } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server, Lock, User as UserIcon } from 'lucide-react';
@@ -250,13 +250,22 @@ const App = () => {
       } else {
           try {
               setIsLoggingIn(true);
-              // Use API helper or direct fetch
-              const res = await api.post('/auth/forgot-password', { email: resetEmail });
-              setAuthView('link-sent');
-              // For prod, we don't show the link in UI, but the message says it was sent
-              setGeneratedLink('Odkaz byl odeslán na váš email.'); 
+              // Use DIRECT FETCH instead of api helper because user is not logged in (no token)
+              const res = await fetch(`${PROD_API_URL}/api/auth/forgot-password`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: resetEmail })
+              });
+              
+              if (res.ok) {
+                  setAuthView('link-sent');
+                  setGeneratedLink('Odkaz byl odeslán na váš email.'); 
+              } else {
+                  throw new Error('Server error');
+              }
           } catch(e) {
-              setAuthError("Chyba při odesílání požadavku.");
+              console.error(e);
+              setAuthError("Chyba při odesílání požadavku. Zkuste to prosím později.");
           } finally {
               setIsLoggingIn(false);
           }
@@ -279,11 +288,22 @@ const App = () => {
       } else {
            try {
                setIsLoggingIn(true);
-               await api.post('/auth/reset-password', { token: resetToken, password: newPassword });
-               setAuthSuccess(t('auth.reset_success'));
-               setAuthView('login');
-               setNewPassword('');
-               setResetToken(null);
+               // Use DIRECT FETCH for public endpoint
+               const res = await fetch(`${PROD_API_URL}/api/auth/reset-password`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ token: resetToken, password: newPassword })
+               });
+
+               if (res.ok) {
+                   setAuthSuccess(t('auth.reset_success'));
+                   setAuthView('login');
+                   setNewPassword('');
+                   setResetToken(null);
+               } else {
+                   const errData = await res.json();
+                   setAuthError(errData.error || "Chyba při obnově hesla.");
+               }
            } catch(e: any) {
                setAuthError("Neplatný nebo expirovaný odkaz, nebo chyba serveru.");
            } finally {
