@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { User, Request, RequestPriority, Workplace, Technology, Supplier, Location } from '../lib/types';
+import { User, Request, RequestPriority, Workplace, Technology, Supplier, Location, RequestHistoryEntry } from '../lib/types';
 import { RequestsTable } from '../components/requests/RequestsTable';
 import { RequestDetail } from '../components/requests/RequestDetail';
 import { RequestForm } from '../components/requests/RequestForm';
@@ -343,7 +343,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
             
             // Prepare History Entry including reason/note
-            const historyEntry = {
+            const historyEntry: RequestHistoryEntry = {
                 date: new Date().toISOString(),
                 userId: userId || currentUser.id,
                 action: 'status_change',
@@ -386,7 +386,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
             
             // Prepare History
-            const historyEntry = {
+            const historyEntry: RequestHistoryEntry = {
                 date: new Date().toISOString(),
                 userId: currentUser.id,
                 action: isApproved ? 'approved' : 'rejected',
@@ -434,24 +434,17 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     
     const saveStatusChange = async () => { 
         if (statusModal.req && newStatus) { 
-            // Reuse updateRequestState logic but adapted for this context or call it directly if possible
-            // For simplicity calling logic similar to updateRequestState but with closure access
-            
             const updates: any = {};
             if (newStatus === 'new') {
                 updates.solverId = '';
             }
-            
-            // We can call updateRequestState but we need to trick selectedRequest logic or pass ID
-            // Since updateRequestState depends on selectedRequest which might be null here (list view),
-            // we'll implement direct update here.
             
             setLoading(true);
             try {
                 const token = localStorage.getItem('auth_token');
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 
-                const historyEntry = {
+                const historyEntry: RequestHistoryEntry = {
                     date: new Date().toISOString(),
                     userId: currentUser.id,
                     action: 'status_change',
@@ -502,7 +495,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 const token = localStorage.getItem('auth_token');
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 
-                const historyEntry = {
+                const historyEntry: RequestHistoryEntry = {
                     date: new Date().toISOString(),
                     userId: currentUser.id,
                     action: 'edited',
@@ -533,7 +526,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
                 const updates = { solverId: '' };
                 
-                const historyEntry = {
+                const historyEntry: RequestHistoryEntry = {
                     date: new Date().toISOString(),
                     userId: currentUser.id,
                     action: 'edited',
