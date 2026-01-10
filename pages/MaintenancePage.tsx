@@ -29,6 +29,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     // Filter States
     const [filters, setFilters] = useState({
         techName: '',
+        serialNumber: '', // Added Serial Number filter
         supplierId: '',
         responsiblePersonId: ''
     });
@@ -106,6 +107,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     const resetFilters = () => {
         setFilters({
             techName: '',
+            serialNumber: '',
             supplierId: '',
             responsiblePersonId: ''
         });
@@ -223,9 +225,13 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         }
 
         const tech = technologies.find(t => t.id === m.techId);
+        
+        // --- FILTERS ---
         if (filters.techName && !tech?.name.toLowerCase().includes(filters.techName.toLowerCase())) return false;
+        if (filters.serialNumber && !tech?.serialNumber?.toLowerCase().includes(filters.serialNumber.toLowerCase())) return false;
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
         if (filters.responsiblePersonId) { if (!m.responsiblePersonIds?.includes(filters.responsiblePersonId)) return false; }
+        
         return true;
     });
 
@@ -408,10 +414,14 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         <span className="font-bold text-slate-700">{t('common.filter')}</span>
                         <button onClick={resetFilters} className="text-xs text-blue-600 hover:underline">Reset</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
                             <label className="block text-xs text-slate-500 mb-1">Název technologie</label>
                             <input className="w-full p-1.5 border rounded" value={filters.techName} onChange={e => setFilters({...filters, techName: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-slate-500 mb-1">{t('form.serial_number')}</label>
+                            <input className="w-full p-1.5 border rounded" placeholder="S.N." value={filters.serialNumber} onChange={e => setFilters({...filters, serialNumber: e.target.value})} />
                         </div>
                         <div>
                              <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
@@ -433,7 +443,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">Generování</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('col.open_requests')}</th>
+                                <th className="px-4 py-3 whitespace-nowrap text-center">{t('col.open_requests')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
