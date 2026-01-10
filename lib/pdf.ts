@@ -39,7 +39,8 @@ const formatTimeHHMM = (minutes: number) => {
 };
 
 const formatCurrency = (amount: number | undefined) => {
-    return `${amount || 0} EUR`;
+    const val = Number(amount) || 0;
+    return `${val.toFixed(2)} EUR`;
 };
 
 const formatDateCZ = (isoDate: string | undefined) => {
@@ -210,8 +211,8 @@ export const generateWorkListPDF = async (
     const calculateTotals = (reqs: Request[]) => {
         return {
             count: reqs.length,
-            time: reqs.reduce((sum, r) => sum + (r.estimatedTime || 0), 0),
-            cost: reqs.reduce((sum, r) => sum + (r.estimatedCost || 0), 0)
+            time: reqs.reduce((sum, r) => sum + (Number(r.estimatedTime) || 0), 0),
+            cost: reqs.reduce((sum, r) => sum + (Number(r.estimatedCost) || 0), 0)
         };
     };
 
