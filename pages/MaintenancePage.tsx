@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
+import { calculateNextMaintenanceDate } from '../lib/helpers';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
 import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Modal, ConfirmModal } from '../components/Shared';
@@ -175,37 +176,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         }
     };
 
-    // Calculate Next Run Logic (mirrors worker logic)
-    const calculateNextRun = (m: Maintenance) => {
-        if (!m.isActive) return null;
-        
-        const baseDateStr = m.lastGeneratedDate || m.createdAt;
-        const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
-        baseDate.setHours(0,0,0,0);
-
-        // Theoretical next date
-        const nextDate = new Date(baseDate);
-        nextDate.setDate(baseDate.getDate() + m.interval);
-
-        // Check allowed days
-        let targetDate = new Date(nextDate);
-        let safetyCounter = 0;
-        const allowedDays = m.allowedDays || [];
-
-        // If no allowed days specified, assume all? Usually defaults to [1..5]
-        if (allowedDays.length === 0) return targetDate;
-
-        while (safetyCounter < 30) {
-            const day = targetDate.getDay();
-            if (allowedDays.includes(day)) {
-                return targetDate;
-            }
-            targetDate.setDate(targetDate.getDate() + 1);
-            safetyCounter++;
-        }
-        return targetDate;
-    };
-
     // Filter Logic
     const filteredTemplates = templates.filter(m => {
         // Operator Restriction Logic
@@ -333,7 +303,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
         const dayNames = selectedTemplate.allowedDays.sort().map(d => t(`day.${d}`)).join(', ');
         
-        const nextRun = calculateNextRun(selectedTemplate);
+        const nextRun = calculateNextMaintenanceDate(selectedTemplate);
 
         return (
             <div className="space-y-6">
@@ -459,7 +429,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                     const supplier = suppliers.find(s => s.id === m.supplierId);
                                     const responsibleNames = m.responsiblePersonIds
                                         ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
-                                    const nextRun = calculateNextRun(m);
+                                    const nextRun = calculateNextMaintenanceDate(m);
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer group">
@@ -562,7 +532,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     template={runNowTemplate} 
                     onConfirm={handleRunNow} 
                     onCancel={() => setRunNowTemplate(null)}
-                    nextRunDate={calculateNextRun(runNowTemplate)}
+                    nextRunDate={calculateNextMaintenanceDate(runNowTemplate)}
                 />
             )}
 

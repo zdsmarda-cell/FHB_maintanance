@@ -1,5 +1,6 @@
 
 import { db, api, isProductionDomain } from './db';
+import { Maintenance } from './types';
 
 // Helper to parse JSON string (e.g., '{"cs":"Sklad","en":"Warehouse"}') and return current lang
 export const getLocalized = (data: string | undefined, lang: string): string => {
@@ -19,6 +20,45 @@ export const getLocalized = (data: string | undefined, lang: string): string => 
         }
     }
     return data;
+};
+
+// Shared Logic for calculating Next Run Date
+// Ensures Dashboard and Maintenance Page show the exact same date
+export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
+    if (!m.isActive) return null;
+    
+    // Determine base date: Last Generated -> Created At -> Now
+    const baseDateStr = m.lastGeneratedDate || m.createdAt;
+    const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
+    
+    // Normalize time to midnight to avoid timezone shift issues during addition
+    baseDate.setHours(0,0,0,0);
+
+    // Theoretical next date based purely on interval
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + m.interval);
+
+    // Check allowed days logic (skip weekends etc.)
+    let targetDate = new Date(nextDate);
+    let safetyCounter = 0;
+    const allowedDays = m.allowedDays || [];
+
+    // If no specific days allowed (empty array), usually implies all days are allowed or legacy data
+    // If logic dictates specific days must be set, we assume default 1-5 if empty, 
+    // but here we just return targetDate if array is empty to be safe.
+    if (allowedDays.length === 0) return targetDate;
+
+    while (safetyCounter < 30) {
+        const day = targetDate.getDay(); // 0 = Sunday, 1 = Monday...
+        if (allowedDays.includes(day)) {
+            return targetDate;
+        }
+        // Try next day
+        targetDate.setDate(targetDate.getDate() + 1);
+        safetyCounter++;
+    }
+    
+    return targetDate;
 };
 
 // Helper to prepare data for saving - calls API if translation enabled

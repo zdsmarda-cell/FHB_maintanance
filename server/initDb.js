@@ -208,6 +208,12 @@ const migrations = [
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS assigned_supplier_id VARCHAR(255)`,
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS planned_resolution_date DATE`
         ]
+    },
+    {
+        name: '010_add_cancellation_reason',
+        up: [
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`
+        ]
     }
 ];
 

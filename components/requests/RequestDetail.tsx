@@ -4,6 +4,7 @@ import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
 import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, FileCheck, History as HistoryIcon, UserMinus } from 'lucide-react';
+import { CancelModal } from './modals/CancelModal';
 
 interface RequestDetailProps {
     request: Request;
@@ -14,7 +15,7 @@ interface RequestDetailProps {
     onSolve: () => void;
     onAssign: () => void;
     onUnassign: () => void;
-    onCancel: () => void;
+    onCancel: (reason: string) => void;
     onApproveChange: (val: boolean) => void;
     onGallery: (images: string[], e: React.MouseEvent) => void;
     renderStatusBadge: (status: string) => React.ReactNode;
@@ -41,6 +42,11 @@ export const RequestDetail = ({
     const { t } = useI18n();
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
+    
+    // Cancellation Logic
+    const [cancelModalOpen, setCancelModalOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelError, setCancelError] = useState('');
 
     // Calculate Approval Rights
     const tech = technologies.find(t => t.id === request.techId);
@@ -65,6 +71,16 @@ export const RequestDetail = ({
         refresh(); // Refresh parent to reload comments
     };
 
+    const handleCancelConfirm = () => {
+        if (!cancelReason.trim()) {
+            setCancelError(t('validation.required'));
+            return;
+        }
+        onCancel(cancelReason);
+        setCancelModalOpen(false);
+        setCancelReason('');
+    };
+
     return (
         <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
@@ -75,9 +91,7 @@ export const RequestDetail = ({
                     {/* Action Buttons */}
                     {(request.state === 'new' || request.state === 'assigned') && (
                         <>
-                             {/* REMOVED Assign Button - Moved to List View Icons */}
-                             
-                             <button onClick={onCancel} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded hover:bg-red-100 text-sm">
+                             <button onClick={() => setCancelModalOpen(true)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded hover:bg-red-100 text-sm">
                                  Storno
                              </button>
                              {request.state === 'assigned' && request.solverId === currentUser.id && (
@@ -128,6 +142,13 @@ export const RequestDetail = ({
                             <h4 className="font-bold text-sm text-slate-700 mb-2">{t('form.description')}</h4>
                             <p className="text-slate-600 whitespace-pre-wrap">{request.description}</p>
                         </div>
+
+                        {request.cancellationReason && (
+                            <div className="bg-red-50 p-4 rounded border border-red-100 text-sm text-red-800">
+                                <h4 className="font-bold mb-1">Důvod storna:</h4>
+                                <p>{request.cancellationReason}</p>
+                            </div>
+                        )}
 
                         {request.photoUrls && request.photoUrls.length > 0 && (
                             <div>
@@ -270,6 +291,16 @@ export const RequestDetail = ({
                     </div>
                 </div>
             </div>
+
+            {/* Cancel Modal */}
+            <CancelModal 
+                isOpen={cancelModalOpen}
+                onClose={() => setCancelModalOpen(false)}
+                onConfirm={handleCancelConfirm}
+                reason={cancelReason}
+                setReason={setCancelReason}
+                error={cancelError}
+            />
         </div>
     );
 }

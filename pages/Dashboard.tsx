@@ -2,10 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { AlertCircle, CheckCircle, Clock, List, Calendar, Wrench, Inbox, FileCheck, Loader, ArrowRight, AlertTriangle, Euro } from 'lucide-react';
+import { calculateNextMaintenanceDate } from '../lib/helpers';
+import { AlertCircle, CheckCircle, Clock, List, Calendar, Wrench, Inbox, FileCheck, Loader, ArrowRight, AlertTriangle, Euro, UserPlus, Eye } from 'lucide-react';
 import { User, Maintenance, Request, Technology, Supplier } from '../lib/types';
 import { Modal } from '../components/Shared';
 import { RequestDetail } from '../components/requests/RequestDetail';
+import { AssignModal } from '../components/requests/modals/AssignModal';
 
 interface DashboardProps {
     user: User;
@@ -26,6 +28,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   // Modal States
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
+
+  // Assign Modal State
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignTargetReq, setAssignTargetReq] = useState<Request | null>(null);
+  const [assignSolverId, setAssignSolverId] = useState('');
+  const [assignDate, setAssignDate] = useState('');
 
   const loadData = async () => {
       setLoading(true);
@@ -64,10 +72,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       loadData();
   }, [user]);
 
+  // --- Actions ---
+  const openAssignModal = (req: Request) => { 
+      setAssignTargetReq(req); 
+      // If already assigned, prefill solver and date
+      if (req.solverId) {
+           setAssignSolverId(req.solverId);
+      } else {
+           // Default to current user if they are admin/maintenance
+           setAssignSolverId(user.role === 'maintenance' || user.role === 'admin' ? user.id : ''); 
+      }
+      setAssignDate(req.plannedResolutionDate || new Date().toISOString().split('T')[0]); 
+      setAssignModalOpen(true); 
+  };
+
+  const handleAssignConfirm = async () => {
+      if (assignTargetReq && assignSolverId && assignDate) {
+          const updates: any = { solverId: assignSolverId, plannedResolutionDate: assignDate };
+          const newState = assignTargetReq.state === 'new' ? 'assigned' : assignTargetReq.state;
+          
+          setLoading(true);
+          try {
+              const token = localStorage.getItem('auth_token');
+              const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+              
+              if (isMock) {
+                  db.requests.updateState(assignTargetReq.id, newState, 'Přiřazeno z přehledu', user.id, updates);
+              } else {
+                  await api.put(`/requests/${assignTargetReq.id}`, {
+                      state: newState,
+                      ...updates
+                  });
+              }
+              setAssignModalOpen(false); 
+              setAssignTargetReq(null); 
+              loadData();
+          } catch(e) { console.error(e); setLoading(false); }
+      }
+  };
+
   if (loading) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
   // --- Calculations ---
-  
   const activeMaintenance = maintenance.filter(m => m.isActive).length;
   const totalAssets = techs.length;
   const myUnresolved = requests.filter(r => r.authorId === user.id && r.state !== 'solved' && r.state !== 'cancelled').length;
@@ -87,19 +133,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       (r.state === 'new' || r.state === 'assigned')
   ).sort((a, b) => new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime());
 
-  // Helper to calculate next date
-  const getNextDate = (m: Maintenance) => {
-      const base = m.lastGeneratedDate ? new Date(m.lastGeneratedDate) : new Date();
-      const next = new Date(base);
-      next.setDate(base.getDate() + m.interval);
-      return next;
-  };
-
+  // Maintenance List Logic using Shared Helper
   const upcomingMaintenance = maintenance
     .filter(m => m.isActive)
-    .map(m => ({ ...m, nextDateObj: getNextDate(m) }))
-    .sort((a, b) => a.nextDateObj.getTime() - b.nextDateObj.getTime())
-    .slice(0, 10); // Increased limit slightly
+    .map(m => ({ ...m, nextDateObj: calculateNextMaintenanceDate(m) }))
+    .filter(m => m.nextDateObj !== null) // Filter out nulls if any
+    .sort((a, b) => {
+        if (!a.nextDateObj || !b.nextDateObj) return 0;
+        return a.nextDateObj.getTime() - b.nextDateObj.getTime();
+    })
+    .slice(0, 10);
 
   const renderStatusBadge = (status: string) => {
         const styles: any = {
@@ -194,6 +237,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                               <th className="px-4 py-3 text-center">Pracnost</th>
                               <th className="px-4 py-3 text-center">Stav</th>
                               <th className="px-4 py-3 text-center">Schválení</th>
+                              <th className="px-4 py-3 text-right">Akce</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-red-100">
@@ -203,6 +247,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                               const supplier = r.assignedSupplierId && r.assignedSupplierId !== 'internal' 
                                   ? suppliers.find(s => s.id === r.assignedSupplierId) 
                                   : null;
+                              
+                              const canAssign = user.role === 'admin' || user.role === 'maintenance';
 
                               return (
                                   <tr key={r.id} onClick={() => setSelectedRequest(r)} className="hover:bg-red-100 cursor-pointer transition-colors bg-white">
@@ -215,7 +261,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                           {r.plannedResolutionDate ? new Date(r.plannedResolutionDate).toLocaleDateString() : '-'}
                                       </td>
                                       <td className="px-4 py-3 text-slate-600 text-xs font-medium">
-                                          {solver ? solver.name : <span className="text-slate-400 italic">Nepřiřazeno</span>}
+                                          {solver ? (
+                                              solver.name 
+                                          ) : (
+                                              canAssign && r.state === 'new' ? (
+                                                  <button 
+                                                    onClick={(e) => { e.stopPropagation(); openAssignModal(r); }}
+                                                    className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors" 
+                                                    title="Převzít požadavek"
+                                                  >
+                                                      <UserPlus className="w-3 h-3 mr-1" /> Převzít
+                                                  </button>
+                                              ) : <span className="text-slate-400 italic">Nepřiřazeno</span>
+                                          )}
                                       </td>
                                       <td className="px-4 py-3 text-slate-600 text-xs">
                                           {supplier ? supplier.name : <span className="text-slate-400">Interní</span>}
@@ -234,6 +292,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                               ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> 
                                               : <div className="w-2 h-2 rounded-full bg-amber-400 mx-auto" title="Čeká" />
                                           }
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                          <button onClick={() => setSelectedRequest(r)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded">
+                                              <Eye className="w-4 h-4" />
+                                          </button>
                                       </td>
                                   </tr>
                               );
@@ -284,7 +347,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                         <td className="px-4 py-3 font-mono text-xs text-slate-500">{tech?.serialNumber || '-'}</td>
                                         <td className="px-4 py-3">{m.interval} {t('common.days')}</td>
                                         <td className="px-4 py-3 text-slate-800 font-medium">
-                                            {m.nextDateObj.toLocaleDateString()}
+                                            {m.nextDateObj ? m.nextDateObj.toLocaleDateString() : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">
                                             {supplier ? supplier.name : <span className="text-slate-400 italic">Interní</span>}
@@ -322,9 +385,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       renderPrioBadge={(p) => <span className="text-xs font-bold uppercase">{p}</span>}
                       refresh={loadData}
                   />
-                  {/* Overlay to disable complex interactions if needed, or allow full interactivity if desired. 
-                      Here we assume read-only/light interaction for dashboard view, 
-                      though `RequestDetail` component is fully interactive. */}
               </div>
           </Modal>
       )}
@@ -352,7 +412,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       </div>
                       <div>
                           <span className="block text-xs text-slate-500">{t('col.next_maintenance')}</span>
-                          <span className="font-medium text-blue-700">{getNextDate(selectedMaintenance).toLocaleDateString()}</span>
+                          <span className="font-medium text-blue-700">
+                              {calculateNextMaintenanceDate(selectedMaintenance)?.toLocaleDateString() || '-'}
+                          </span>
                       </div>
                       <div>
                           <span className="block text-xs text-slate-500">{t('form.supplier')}</span>
@@ -385,6 +447,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                   </div>
               </div>
           </Modal>
+      )}
+
+      {/* Assign Modal from Urgent Table */}
+      {assignModalOpen && assignTargetReq && (
+          <AssignModal 
+              isOpen={assignModalOpen} 
+              onClose={() => setAssignModalOpen(false)} 
+              onConfirm={handleAssignConfirm}
+              assignDate={assignDate} 
+              setAssignDate={setAssignDate} 
+              assignSolverId={assignSolverId} 
+              setAssignSolverId={setAssignSolverId}
+              candidates={users.filter(u => u.role !== 'operator' && !u.isBlocked)} 
+              currentUser={user}
+              isAlreadyAssigned={false}
+          />
       )}
     </div>
   );

@@ -542,7 +542,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                     onBack={handleBack} onEdit={() => handleEditClick(selectedRequest)} onSolve={() => updateRequestState('solved')}
                     onAssign={() => openAssignModal(selectedRequest)} 
                     onUnassign={() => setUnassignModalOpen(true)}
-                    onCancel={() => updateRequestState('cancelled', 'Cancelled by user')}
+                    onCancel={(reason) => updateRequestState('cancelled', reason)}
                     onApproveChange={handleApproveChange} onGallery={() => {}} 
                     renderStatusBadge={(s) => <span className="badge">{s}</span>} renderPrioBadge={(p) => <span className="badge">{p}</span>} refresh={refresh}
                 />
