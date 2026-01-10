@@ -130,7 +130,21 @@ const db = {
   auth: {
       createResetToken: (email: string) => { /* ... */ return 'token'; }, // simplified
       validateToken: (t: string) => true,
-      resetPassword: (t: string, p: string) => true
+      resetPassword: (t: string, p: string) => true,
+      changePassword: (userId: string, oldP: string, newP: string) => {
+          const users = db.get<User>('tmp_users');
+          const userIndex = users.findIndex(u => u.id === userId);
+          if (userIndex === -1) return false;
+          
+          const user = users[userIndex];
+          const actualPass = user.password || 'password';
+          
+          if (oldP !== actualPass) return false;
+          
+          users[userIndex] = { ...user, password: newP };
+          db.set('tmp_users', users);
+          return true;
+      }
   },
   settings: {
     get: (): AppSettings => JSON.parse(localStorage.getItem('tmp_settings') || '{"enableOnlineTranslation": false}'),
