@@ -56,6 +56,9 @@ router.post('/', async (req, res) => {
         note: 'Request created'
     }];
 
+    // Sanitize Date (Strip time if present to avoid MySQL errors)
+    const cleanPlannedDate = plannedResolutionDate ? String(plannedResolutionDate).slice(0, 10) : null;
+
     // 1. Create Request
     const [result] = await pool.execute(
       `INSERT INTO requests (
@@ -64,7 +67,7 @@ router.post('/', async (req, res) => {
       ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
       [
         techId, authorId, description, priority, title || 'Nový požadavek', false, JSON.stringify(history),
-        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, plannedResolutionDate || null
+        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate
       ]
     );
     
@@ -101,7 +104,14 @@ router.put('/:id', async (req, res) => {
         if (body.assignedSupplierId !== undefined) { updates.push('assigned_supplier_id = ?'); values.push(body.assignedSupplierId); }
         if (body.estimatedCost !== undefined) { updates.push('estimated_cost = ?'); values.push(body.estimatedCost); }
         if (body.estimatedTime !== undefined) { updates.push('estimated_time = ?'); values.push(body.estimatedTime); }
-        if (body.plannedResolutionDate !== undefined) { updates.push('planned_resolution_date = ?'); values.push(body.plannedResolutionDate || null); }
+        
+        if (body.plannedResolutionDate !== undefined) { 
+            // Sanitize Date (Strip time if present)
+            const cleanDate = body.plannedResolutionDate ? String(body.plannedResolutionDate).slice(0, 10) : null;
+            updates.push('planned_resolution_date = ?'); 
+            values.push(cleanDate); 
+        }
+        
         if (body.cancellationReason !== undefined) { updates.push('cancellation_reason = ?'); values.push(body.cancellationReason); }
         if (body.isApproved !== undefined) { updates.push('is_approved = ?'); values.push(body.isApproved ? 1 : 0); }
         if (body.photoUrls !== undefined) { updates.push('photo_urls = ?'); values.push(JSON.stringify(body.photoUrls)); }

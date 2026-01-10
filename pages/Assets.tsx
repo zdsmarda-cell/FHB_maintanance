@@ -374,8 +374,13 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const getOpenRequestCount = (techId: string) => {
         return requests.filter(r => {
             if (r.techId !== techId) return false;
-            if (r.state === 'solved' || r.state === 'cancelled') return false;
-            if (user.role === 'operator' && r.authorId !== user.id) return false;
+            // Filter out solved/cancelled
+            if (['solved', 'cancelled'].includes(r.state)) return false;
+            
+            // Strictly filter by author for operators
+            if (user.role === 'operator') {
+                return r.authorId === user.id;
+            }
             return true;
         }).length;
     };
