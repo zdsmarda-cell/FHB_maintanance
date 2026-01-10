@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Request, User, Workplace, Technology, Supplier } from '../../lib/types';
 import { useI18n } from '../../lib/i18n';
-import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw, Clock, Euro } from 'lucide-react';
 import { Pagination, MultiSelect } from '../Shared';
 
 // Interface now includes filterState for controlled mode
@@ -182,7 +182,7 @@ export const RequestsTable = ({
         if (!minutes) return '-';
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        return `${h}:${m.toString().padStart(2, '0')}`;
     }
 
     // Prepare Options for MultiSelects
@@ -207,7 +207,8 @@ export const RequestsTable = ({
                             <th className="px-4 py-2 font-semibold whitespace-nowrap">Termín vyřízení</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">Řešitel</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">{t('form.supplier')}</th>
-                            <th className="px-4 py-2 font-semibold text-center">Pracnost</th>
+                            <th className="px-4 py-2 font-semibold text-center w-24">Cena</th>
+                            <th className="px-4 py-2 font-semibold text-center w-24">Pracnost</th>
                             <th className="px-4 py-2 font-semibold min-w-[120px]">{t('common.status')}</th>
                             <th className="px-4 py-2 font-semibold text-center min-w-[120px]">{t('col.approved')}</th>
                             <th className="px-4 py-2 font-semibold text-right">{t('common.actions')}</th>
@@ -241,6 +242,8 @@ export const RequestsTable = ({
                             </th>
                             <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={userOptions} selectedIds={fSolverIds} onChange={setFSolverIds} /></div></th>
                             <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={supplierOptions} selectedIds={fSupplierIds} onChange={setFSupplierIds} /></div></th>
+                            {/* No filters for Price and Time */}
+                            <th className="px-2 py-2"></th>
                             <th className="px-2 py-2"></th>
                             <th className="px-2 py-2"><div className="font-normal"><MultiSelect label="" options={statusOptions} selectedIds={fStatusIds} onChange={setFStatusIds} /></div></th>
                             <th className="px-2 py-2">
@@ -265,7 +268,7 @@ export const RequestsTable = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {paginatedRequests.length === 0 ? (
-                            <tr><td colSpan={10} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
+                            <tr><td colSpan={11} className="p-8 text-center text-slate-400">{t('msg.no_my_requests')}</td></tr>
                         ) : (
                             paginatedRequests.map(r => {
                                 const tech = technologies.find(t => t.id === r.techId);
@@ -315,7 +318,12 @@ export const RequestsTable = ({
                                         <td className="px-4 py-3 text-slate-600 text-xs">
                                             {isInternal ? <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"><Wrench className="w-3 h-3 mr-1" /> Interní</span> : <span>{supplierName}</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-center text-xs font-mono">{formatTime(r.estimatedTime)}</td>
+                                        <td className="px-4 py-3 text-center text-xs font-mono">
+                                            {r.estimatedCost ? <span className="flex items-center justify-center gap-1"><Euro className="w-3 h-3 text-slate-400"/> {r.estimatedCost}</span> : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-xs font-mono">
+                                            {r.estimatedTime ? <span className="flex items-center justify-center gap-1"><Clock className="w-3 h-3 text-slate-400"/> {formatTime(r.estimatedTime)}</span> : '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-center">{renderStatusBadge(r.state, isAuthorized ? () => onStatusChangeClick(r) : undefined)}</td>
                                         <td className="px-4 py-3 text-center">{renderApprovalBadge(r)}</td>
                                         <td className="px-4 py-3 text-right">

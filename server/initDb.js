@@ -149,7 +149,6 @@ const migrations = [
     {
         name: '002_add_weight_column',
         up: [
-            // Safe add column if it was missing in some deployments
             `ALTER TABLE technologies ADD COLUMN IF NOT EXISTS weight INT DEFAULT 0`
         ]
     },
@@ -180,14 +179,27 @@ const migrations = [
     {
         name: '007_multilingual_support',
         up: [
-            // Change Name columns to TEXT to support JSON strings ({"cs":"...", "en":"..."})
-            // VARCHAR(255) is too short for 3 languages.
             `ALTER TABLE tech_types MODIFY name TEXT`,
             `ALTER TABLE tech_states MODIFY name TEXT`,
             `ALTER TABLE locations MODIFY name TEXT`,
             `ALTER TABLE workplaces MODIFY name TEXT`,
             `ALTER TABLE workplaces MODIFY description TEXT`,
             `ALTER TABLE suppliers MODIFY description TEXT`
+        ]
+    },
+    {
+        name: '008_maintenance_logs',
+        up: [
+            `CREATE TABLE IF NOT EXISTS maintenance_logs (
+                id VARCHAR(255) PRIMARY KEY,
+                maintenance_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                executed_at TIMESTAMP NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                error_message TEXT,
+                request_id VARCHAR(255),
+                template_snapshot JSON
+            )`
         ]
     }
 ];

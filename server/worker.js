@@ -76,7 +76,6 @@ const generateMaintenanceRequests = async () => {
         if(templates.length === 0) return;
 
         const today = new Date();
-        // Zero out time for clean date comparison
         today.setHours(0,0,0,0);
 
         for (const template of templates) {
@@ -88,11 +87,9 @@ const generateMaintenanceRequests = async () => {
             const nextDueDate = new Date(lastGenerated);
             nextDueDate.setDate(lastGenerated.getDate() + template.interval_days);
 
-            // If not yet due, skip
             if (nextDueDate > today) continue;
 
             // Logic: "Save to nearest allowed day"
-            // We start checking from nextDueDate. If allowed, good. If not, increment day and check again.
             let targetDate = new Date(nextDueDate);
             let safetyCounter = 0;
             const allowedDays = template.allowed_days || []; // JSON array [0, 1, 2...]
@@ -100,69 +97,86 @@ const generateMaintenanceRequests = async () => {
             while (safetyCounter < 30) {
                  const currentDayOfWeek = targetDate.getDay(); // 0 = Sun
                  if (allowedDays.includes(currentDayOfWeek)) {
-                     break; // Found allowed day
+                     break; 
                  }
-                 // Move to next day
                  targetDate.setDate(targetDate.getDate() + 1);
                  safetyCounter++;
             }
 
-            // If targetDate is in future (after adjusting for allowed days), we wait.
-            // But if targetDate <= today, we must generate.
             if (targetDate > today) continue;
             
-            // IDEMPOTENCY CHECK:
-            // "Na jeden den nemohou z toto sablony vzniknout 2 pozadavky"
-            // We check if a request already exists for this template with planned_resolution_date == targetDate
-            // Note: Use ISO string YYYY-MM-DD for comparison
             const targetDateStr = targetDate.toISOString().split('T')[0];
             
+            // Check existence in REQUESTS (Legacy check, primarily relies on maintenance_logs now but kept for idempotency)
             const [existing] = await pool.query(
                 'SELECT id FROM requests WHERE maintenance_id = ? AND planned_resolution_date = ?',
                 [template.id, targetDateStr]
             );
 
             if (existing.length > 0) {
-                // Already generated for this target date. 
-                // However, we must update last_generated_at to this target date to prevent getting stuck if script runs multiple times
-                // or if we need to advance the interval base.
-                // But only if targetDate > template.last_generated_at
+                // Update maintenance record to move window forward if stuck
                 if (!template.last_generated_at || new Date(template.last_generated_at) < targetDate) {
                      await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
                 }
                 continue;
             }
 
-            // GENERATE REQUEST
-            console.log(`[MAINT] Generating request for template ${template.title} on ${targetDateStr}`);
+            // --- NEW LOGGING LOGIC ---
             
-            // Auto-Assignment Logic:
-            // If template has responsible persons, assign the first one as 'solver' and state 'assigned'.
-            // Otherwise, keep solver null and state 'new'.
-            const responsibleIds = template.responsible_person_ids || [];
-            const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
-            const state = solverId ? 'assigned' : 'new';
-            const authorId = 'system'; 
+            console.log(`[MAINT] Processing template ${template.title} for ${targetDateStr}`);
+            const logId = crypto.randomUUID();
             
-            // Generate UUID for the new request
-            const requestId = crypto.randomUUID();
-
-            // Insert Request (Fixed: Added 'id' column and value)
+            // 1. Create Log Entry (Pending)
             await pool.execute(
-                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
-                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
+                `INSERT INTO maintenance_logs (id, maintenance_id, status, template_snapshot, created_at) 
+                 VALUES (?, ?, 'pending', ?, ?)`,
+                [logId, template.id, JSON.stringify(template), targetDateStr] // using targetDateStr as created_at reference for the "plan"
             );
 
-            // Update Template
-            await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
+            // 2. Try Create Request
+            try {
+                const responsibleIds = template.responsible_person_ids || [];
+                const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
+                const state = solverId ? 'assigned' : 'new';
+                const authorId = 'system'; 
+                const requestId = crypto.randomUUID();
 
-            // Optional: Send Email Notification
-            const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
-            await pool.execute(
-                'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                ['maintenance@tech.com', `Nová údržba: ${template.title}`, emailBody]
-            );
+                await pool.execute(
+                    `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
+                    [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
+                );
+
+                // 3. Success: Update Log & Maintenance
+                await pool.execute(
+                    `UPDATE maintenance_logs SET status = 'success', executed_at = NOW(), request_id = ? WHERE id = ?`,
+                    [requestId, logId]
+                );
+                await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
+
+                // 4. Send Email (Correct Recipient)
+                let emailRecipient = 'maintenance@tech.com'; // Fallback
+                if (solverId) {
+                    const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [solverId]);
+                    if (users.length > 0 && users[0].email) {
+                        emailRecipient = users[0].email;
+                    }
+                }
+
+                const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
+                await pool.execute(
+                    'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+                    [emailRecipient, `Nová údržba: ${template.title}`, emailBody]
+                );
+
+            } catch (createErr) {
+                // 5. Error: Update Log
+                console.error(`[MAINT] Failed to create request for template ${template.id}`, createErr);
+                await pool.execute(
+                    `UPDATE maintenance_logs SET status = 'error', executed_at = NOW(), error_message = ? WHERE id = ?`,
+                    [createErr.message, logId]
+                );
+            }
         }
 
     } catch (err) {
@@ -189,7 +203,6 @@ export const startWorker = () => {
         generateMaintenanceRequests();
 
         // Daily Job at 00:01
-        // We check if hour is 0, minute is 1, and we haven't run it yet today
         const currentDay = now.getDate();
         if (now.getHours() === 0 && now.getMinutes() === 1) {
             if (lastOverdueCheck !== currentDay) {

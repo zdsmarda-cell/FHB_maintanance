@@ -35,11 +35,29 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET History Logs
+router.get('/:id/history', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await pool.query('SELECT * FROM maintenance_logs WHERE maintenance_id = ? ORDER BY created_at DESC', [id]);
+        res.json(rows.map(r => ({
+            id: r.id,
+            maintenanceId: r.maintenance_id,
+            createdAt: r.created_at,
+            executedAt: r.executed_at,
+            status: r.status,
+            errorMessage: r.error_message,
+            requestId: r.request_id
+        })));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/', async (req, res) => {
     const data = req.body;
     const id = crypto.randomUUID();
     try {
-        // Removed 'type' from query as requested previously
         await pool.query(`INSERT INTO maintenances 
             (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -51,37 +69,55 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Force Run Maintenance NOW
+// Force Run Maintenance NOW (Updated to use logs)
 router.post('/:id/run', async (req, res) => {
     const { id } = req.params;
     try {
-        // 1. Get Template
         const [templates] = await pool.query('SELECT * FROM maintenances WHERE id = ?', [id]);
         if (templates.length === 0) return res.status(404).json({ error: 'Template not found' });
         
         const template = templates[0];
-        
-        // 2. Prepare Data
         const todayStr = new Date().toISOString().split('T')[0];
-        const responsibleIds = template.responsible_person_ids ? (typeof template.responsible_person_ids === 'string' ? JSON.parse(template.responsible_person_ids) : template.responsible_person_ids) : [];
-        const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
-        const state = solverId ? 'assigned' : 'new';
-        const authorId = req.user?.id || 'system';
-        const requestId = crypto.randomUUID();
+        const logId = crypto.randomUUID();
 
-        // 3. Create Request
+        // 1. Log Start
         await pool.execute(
-            `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
-            [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr]
+            `INSERT INTO maintenance_logs (id, maintenance_id, status, template_snapshot, created_at) 
+             VALUES (?, ?, 'pending', ?, NOW())`,
+            [logId, template.id, JSON.stringify(template)]
         );
 
-        // 4. Update Maintenance last_generated_at to NOW (Resetting interval)
-        await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [todayStr, id]);
+        try {
+            const responsibleIds = template.responsible_person_ids ? (typeof template.responsible_person_ids === 'string' ? JSON.parse(template.responsible_person_ids) : template.responsible_person_ids) : [];
+            const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
+            const state = solverId ? 'assigned' : 'new';
+            const authorId = req.user?.id || 'system';
+            const requestId = crypto.randomUUID();
 
-        res.json({ success: true, message: 'Maintenance request created successfully' });
+            await pool.execute(
+                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
+                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr]
+            );
+
+            await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [todayStr, id]);
+            
+            // Log Success
+            await pool.execute(
+                `UPDATE maintenance_logs SET status = 'success', executed_at = NOW(), request_id = ? WHERE id = ?`,
+                [requestId, logId]
+            );
+
+            res.json({ success: true, message: 'Maintenance request created successfully' });
+        } catch (createErr) {
+            // Log Error
+            await pool.execute(
+                `UPDATE maintenance_logs SET status = 'error', executed_at = NOW(), error_message = ? WHERE id = ?`,
+                [createErr.message, logId]
+            );
+            throw createErr;
+        }
     } catch (err) {
-        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });

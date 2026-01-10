@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap } from 'lucide-react';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Modal, ConfirmModal } from '../components/Shared';
 
 interface MaintenancePageProps {
@@ -34,11 +34,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     });
     const [showFilters, setShowFilters] = useState(user.role !== 'operator');
 
-    // Delete State
+    // Action States
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    
-    // Run Now State
     const [runNowTemplate, setRunNowTemplate] = useState<Maintenance | null>(null);
+    const [historyTemplate, setHistoryTemplate] = useState<Maintenance | null>(null);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [logsLoading, setLogsLoading] = useState(false);
 
     const refresh = async () => {
         setLoading(true);
@@ -80,6 +81,28 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         refresh();
     }, []);
 
+    // Load logs when history modal opens
+    useEffect(() => {
+        if (historyTemplate) {
+            const fetchLogs = async () => {
+                setLogsLoading(true);
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+                    
+                    if (isMock) {
+                        setLogs([]); // Mock logs not implemented in basic FE state for now
+                    } else {
+                        const data = await api.get(`/maintenance/${historyTemplate.id}/history`);
+                        setLogs(data);
+                    }
+                } catch(e) { console.error(e); }
+                finally { setLogsLoading(false); }
+            }
+            fetchLogs();
+        }
+    }, [historyTemplate]);
+
     const resetFilters = () => {
         setFilters({
             techName: '',
@@ -108,7 +131,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             }
             setShowDeleteConfirm(false);
             setSelectedTemplate(null);
-            setView('list');
             refresh();
         } catch (e) {
             console.error("Delete Error", e);
@@ -288,11 +310,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             }
             setIsCreateOpen(false);
             refresh();
-            if (view === 'detail' && editingId) {
-                // Update selected template in view if we just edited it
-                const updated = { ...selectedTemplate, ...maintForm } as Maintenance;
-                setSelectedTemplate(updated);
-            }
         } catch (e) {
             console.error("Save Error", e);
         } finally {
@@ -308,8 +325,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         const supplier = suppliers.find(s => s.id === selectedTemplate.supplierId);
         const responsibleNames = selectedTemplate.responsiblePersonIds
             ?.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
-        
-        const canEditMaint = user.role !== 'operator';
         const dayNames = selectedTemplate.allowedDays.sort().map(d => t(`day.${d}`)).join(', ');
         
         const nextRun = calculateNextRun(selectedTemplate);
@@ -320,21 +335,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                      <button onClick={() => setView('list')} className="text-blue-600 hover:underline flex items-center">
                         <ArrowLeft className="w-4 h-4 mr-1"/> {t('common.back')}
                      </button>
-                     <div className="flex gap-2">
-                        {canEditMaint && (
-                            <>
-                                <button onClick={() => setRunNowTemplate(selectedTemplate)} className="bg-amber-100 text-amber-700 px-3 py-2 rounded flex items-center hover:bg-amber-200 border border-amber-200">
-                                    <Zap className="w-4 h-4 mr-2" /> Vytvořit ihned
-                                </button>
-                                <button onClick={() => openEditModal(selectedTemplate)} className="bg-slate-200 text-slate-700 px-3 py-2 rounded flex items-center hover:bg-slate-300">
-                                    <Edit className="w-4 h-4 mr-2" /> {t('common.edit')}
-                                </button>
-                                <button onClick={() => setShowDeleteConfirm(true)} className="bg-red-50 text-red-700 px-3 py-2 rounded flex items-center hover:bg-red-100 border border-red-200">
-                                    <Trash className="w-4 h-4 mr-2" /> {t('common.delete')}
-                                </button>
-                            </>
-                        )}
-                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -380,46 +380,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         </div>
                     </div>
                 </div>
-
-                {/* Modals are handled at bottom of component */}
-                {isCreateOpen && (
-                    <MaintModal 
-                        isOpen={isCreateOpen} 
-                        onClose={() => setIsCreateOpen(false)} 
-                        data={maintForm} 
-                        setData={setMaintForm} 
-                        isEdit={!!editingId}
-                        onSave={handleSave}
-                        selectedLocId={selectedLocId}
-                        setSelectedLocId={setSelectedLocId}
-                        selectedWpId={selectedWpId}
-                        setSelectedWpId={setSelectedWpId}
-                        errors={errors}
-                        t={t}
-                        locations={locations}
-                        workplaces={workplaces}
-                        technologies={technologies}
-                        suppliers={suppliers}
-                        users={users}
-                    />
-                )}
-
-                {showDeleteConfirm && (
-                    <ConfirmModal 
-                        message={t('msg.confirm_delete')} 
-                        onConfirm={handleDelete} 
-                        onCancel={() => setShowDeleteConfirm(false)} 
-                    />
-                )}
-
-                {runNowTemplate && (
-                    <RunNowModal 
-                        template={runNowTemplate} 
-                        onConfirm={handleRunNow} 
-                        onCancel={() => setRunNowTemplate(null)}
-                        nextRunDate={calculateNextRun(runNowTemplate)}
-                    />
-                )}
             </div>
         );
     }
@@ -492,7 +452,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                     const nextRun = calculateNextRun(m);
 
                                     return (
-                                        <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer">
+                                        <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer group">
                                             <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Neznámá technologie'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
@@ -516,13 +476,36 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                             <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>
                                             <td className="px-4 py-3 text-right">
                                                 {user.role !== 'operator' && (
-                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); setRunNowTemplate(m); }}
-                                                        className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-full transition-colors"
-                                                        title="Vytvořit požadavek ihned"
-                                                    >
-                                                        <Zap className="w-4 h-4" />
-                                                    </button>
+                                                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setHistoryTemplate(m); }}
+                                                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded transition-colors"
+                                                            title="Historie spouštění"
+                                                        >
+                                                            <Clock className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setRunNowTemplate(m); }}
+                                                            className="p-1.5 text-amber-500 hover:bg-amber-50 rounded transition-colors"
+                                                            title="Vytvořit požadavek ihned"
+                                                        >
+                                                            <Zap className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); openEditModal(m); }}
+                                                            className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                                                            title="Editovat"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedTemplate(m); setShowDeleteConfirm(true); }}
+                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                            title="Smazat"
+                                                        >
+                                                            <Trash className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -556,12 +539,29 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                 />
             )}
 
+            {showDeleteConfirm && (
+                <ConfirmModal 
+                    message={t('msg.confirm_delete')} 
+                    onConfirm={handleDelete} 
+                    onCancel={() => setShowDeleteConfirm(false)} 
+                />
+            )}
+
             {runNowTemplate && (
                 <RunNowModal 
                     template={runNowTemplate} 
                     onConfirm={handleRunNow} 
                     onCancel={() => setRunNowTemplate(null)}
                     nextRunDate={calculateNextRun(runNowTemplate)}
+                />
+            )}
+
+            {historyTemplate && (
+                <HistoryModal 
+                    template={historyTemplate} 
+                    logs={logs}
+                    loading={logsLoading}
+                    onClose={() => { setHistoryTemplate(null); setLogs([]); }}
                 />
             )}
         </div>
@@ -592,6 +592,52 @@ const RunNowModal = ({ template, onConfirm, onCancel, nextRunDate }: any) => {
         </Modal>
     );
 }
+
+const HistoryModal = ({ template, logs, loading, onClose }: any) => {
+    return (
+        <Modal title={`Historie spouštění: ${template.title}`} onClose={onClose}>
+            <div className="max-h-[60vh] overflow-auto">
+                {loading ? (
+                    <div className="p-8 flex justify-center"><Loader className="animate-spin w-6 h-6 text-blue-600"/></div>
+                ) : logs.length === 0 ? (
+                    <div className="p-4 text-center text-slate-500">Žádná historie není k dispozici.</div>
+                ) : (
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
+                            <tr>
+                                <th className="p-2">Datum plánu</th>
+                                <th className="p-2">Spuštěno</th>
+                                <th className="p-2">Stav</th>
+                                <th className="p-2">Info</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {logs.map((log: any) => (
+                                <tr key={log.id}>
+                                    <td className="p-2 whitespace-nowrap">{new Date(log.createdAt).toLocaleDateString()}</td>
+                                    <td className="p-2 whitespace-nowrap text-xs text-slate-500">
+                                        {log.executedAt ? new Date(log.executedAt).toLocaleString() : '-'}
+                                    </td>
+                                    <td className="p-2">
+                                        {log.status === 'success' && <span className="text-green-600 flex items-center gap-1 text-xs font-bold"><CheckCircle className="w-3 h-3"/> OK</span>}
+                                        {log.status === 'error' && <span className="text-red-600 flex items-center gap-1 text-xs font-bold"><AlertTriangle className="w-3 h-3"/> Chyba</span>}
+                                        {log.status === 'pending' && <span className="text-amber-600 text-xs font-bold">Čeká</span>}
+                                    </td>
+                                    <td className="p-2 text-xs">
+                                        {log.status === 'error' ? <span className="text-red-600">{log.errorMessage}</span> : (log.requestId ? <span className="text-slate-400">ID: {log.requestId.slice(0,8)}...</span> : '-')}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+            <div className="flex justify-end pt-4 border-t mt-2">
+                <button onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-600 rounded hover:bg-slate-200">Zavřít</button>
+            </div>
+        </Modal>
+    );
+};
 
 // Refactored Modal for better readability (Same as before)
 const MaintModal = ({ 
