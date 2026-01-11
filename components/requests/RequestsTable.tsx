@@ -3,7 +3,7 @@ import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology, Supplier } from '../../lib/types';
 import { getLocalized } from '../../lib/helpers';
 import { MultiSelect, Pagination } from '../Shared';
-import { Search, CheckCircle, Clock, Euro } from 'lucide-react';
+import { Search, CheckCircle, Clock, Euro, X } from 'lucide-react';
 
 interface RequestsTableProps {
     requests: Request[];
@@ -39,7 +39,7 @@ export const RequestsTable = ({
         fPriorities, setFPriorities,
         fApproved, setFApproved,
         fAuthorId, // Author Filter
-        fMaintenanceId // Maintenance Filter
+        fMaintenanceId, setFMaintenanceId // Maintenance Filter
     } = filterState;
 
     // --- Filtering Logic ---
@@ -50,7 +50,7 @@ export const RequestsTable = ({
             // Author Filter Logic
             if (fAuthorId && req.authorId !== fAuthorId) return false;
 
-            // Maintenance Filter Logic
+            // Maintenance Filter Logic (External filter)
             if (fMaintenanceId && req.maintenanceId !== fMaintenanceId) return false;
 
             if (fTitle) {
@@ -127,11 +127,48 @@ export const RequestsTable = ({
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
+    const supplierOptions = [
+        { id: 'internal', name: t('form.internal_solution') },
+        ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
+    ];
+
+    const handleClearFilters = () => {
+        setFTitle('');
+        setFTechIds([]);
+        setFDateResFrom('');
+        setFDateResTo('');
+        setFSolverIds([]);
+        setFSupplierIds([]);
+        setFStatusIds([]);
+        setFPriorities([]);
+        setFApproved('all');
+        if (setFMaintenanceId) setFMaintenanceId(null);
+    };
+
+    // Check if any filter is active
+    const hasActiveFilters = fTitle || 
+        fTechIds.length > 0 || 
+        fDateResFrom || 
+        fDateResTo || 
+        fSolverIds.length > 0 || 
+        fSupplierIds.length > 0 || 
+        fStatusIds.length > 0 || 
+        fPriorities.length > 0 || 
+        fApproved !== 'all' ||
+        fMaintenanceId;
     
     return (
         <>
             {showFilters && (
                 <div className="p-4 bg-slate-50 border-b border-slate-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-semibold text-slate-700">{t('common.filter')}</span>
+                        {hasActiveFilters && (
+                            <button onClick={handleClearFilters} className="text-xs text-blue-600 hover:text-blue-800 flex items-center">
+                                <X className="w-3 h-3 mr-1" /> {t('common.clear_filter')}
+                            </button>
+                        )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                             <div className="mb-1 text-xs text-slate-500 font-medium">{t('form.title')}</div>
@@ -153,6 +190,10 @@ export const RequestsTable = ({
                             </div>
                         </div>
                         <div><MultiSelect label={t('form.priority')} options={priorityOptions} selectedIds={fPriorities} onChange={setFPriorities} /></div>
+                        
+                        {/* RESTORED SUPPLIER FILTER */}
+                        <div><MultiSelect label={t('form.supplier')} options={supplierOptions} selectedIds={fSupplierIds} onChange={setFSupplierIds} /></div>
+
                         <div>
                             <div className="mb-1 text-xs text-slate-500 font-medium">{t('headers.approval')}</div>
                             <select className="w-full p-1.5 border rounded text-sm bg-white" value={fApproved} onChange={e => setFApproved(e.target.value)}>
