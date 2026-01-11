@@ -34,14 +34,31 @@ const processEmailQueue = async () => {
       try {
         console.log(`[MAILER] Sending to ${email.to_address}: ${email.subject}`);
         
-        // Decode Base64 body from DB to UTF-8 HTML string
-        const decodedBody = Buffer.from(email.body, 'base64').toString('utf-8');
+        // Smart Body Handling:
+        // New system stores Raw HTML (contains spaces, tags).
+        // Legacy/Other systems might store Base64 (no spaces, blocks of text).
+        // Logic: If it contains spaces or starts with '<', treat as Raw HTML. Else try decode.
+        
+        let bodyToSend = email.body;
+        
+        // Check for Legacy Base64: No spaces AND doesn't start with typical HTML tag
+        if (bodyToSend && !bodyToSend.includes(' ') && !bodyToSend.trim().startsWith('<')) {
+            try {
+                const decoded = Buffer.from(bodyToSend, 'base64').toString('utf-8');
+                // Use decoded only if it looks like valid HTML/Text
+                if (decoded.includes('<') || decoded.includes(' ')) {
+                    bodyToSend = decoded;
+                }
+            } catch (e) {
+                // If decode fails, assume it was just a plain string without spaces
+            }
+        }
 
         const mailOptions = {
           from: process.env.EMAIL_FROM || '"FHB Maintain" <noreply@fhb.sk>',
           to: email.to_address,
           subject: email.subject,
-          html: decodedBody, // Send decoded HTML
+          html: bodyToSend, // Send correct body
           attachments: []
         };
 

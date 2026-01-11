@@ -48,18 +48,31 @@ export const RequestForm = ({
         }
     }, [isEditMode, availLocs, selLoc]);
 
-    // Filter workplaces based on selected location with safety checks
-    const availWps = (user.role === 'admin' ? workplaces : workplaces.filter((w: any) => (user.assignedWorkplaceIds || []).includes(w.id)))
-        .filter((w: any) => !selLoc || w.locationId === selLoc);
+    // STRICT HIERARCHY: Filter workplaces based on selected location
+    // If no location selected, return empty array to prevent random pre-filling
+    const availWps = useMemo(() => {
+        if (!selLoc) return [];
+        
+        const allowedWps = user.role === 'admin' 
+            ? workplaces 
+            : workplaces.filter((w: any) => (user.assignedWorkplaceIds || []).includes(w.id));
+            
+        return allowedWps.filter((w: any) => w.locationId === selLoc);
+    }, [selLoc, workplaces, user]);
 
-    // Auto-prefill Workplace if only one is available (New Request Mode)
+    // Auto-prefill Workplace if only one is available AND location is selected
     useEffect(() => {
         if (!isEditMode && selLoc && !selWp && availWps.length === 1) {
             setSelWp(availWps[0].id);
         }
     }, [isEditMode, selLoc, availWps, selWp]);
 
-    const availTechs = technologies.filter((t: any) => !selWp || t.workplaceId === selWp);
+    // STRICT HIERARCHY: Filter technologies based on selected workplace
+    // If no workplace selected, return empty array
+    const availTechs = useMemo(() => {
+        if (!selWp) return [];
+        return technologies.filter((t: any) => t.workplaceId === selWp && t.isVisible);
+    }, [selWp, technologies]);
 
     // If editing, try to resolve location/workplace from techId if not set manually
     useEffect(() => {
@@ -67,11 +80,13 @@ export const RequestForm = ({
              const tech = technologies.find((t: any) => t.id === formData.techId);
              const wp = workplaces.find((w: any) => w.id === tech?.workplaceId);
              if (wp) {
-                 setSelWp(wp.id);
                  setSelLoc(wp.locationId);
+                 // Determine WP in next cycle or force here if data available, 
+                 // but better to let effects settle or set strictly:
+                 setSelWp(wp.id);
              }
         }
-    }, [isEditMode, formData.techId, technologies, workplaces]);
+    }, [isEditMode, formData.techId, technologies, workplaces, selLoc]);
 
     // Force 'internal' supplier for operators if not already set
     useEffect(() => {
@@ -110,22 +125,29 @@ export const RequestForm = ({
                     <select 
                         className="w-full p-2 rounded border" 
                         value={selLoc} 
-                        onChange={e => { setSelLoc(e.target.value); setSelWp(''); }}
-                        disabled={isEditMode || availLocs.length <= 1} // Disable if only 1 option
+                        onChange={e => { 
+                            setSelLoc(e.target.value); 
+                            setSelWp(''); // Reset Workplace
+                            setFormData({...formData, techId: ''}); // Reset Tech
+                        }}
+                        disabled={isEditMode}
                     >
-                        {availLocs.length > 1 && <option value="">{t('form.select_location')}</option>}
+                        <option value="">{t('option.select_location')}</option>
                         {availLocs.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
                     <select 
-                        className="w-full p-2 rounded border" 
+                        className={`w-full p-2 rounded border ${!selLoc ? 'bg-slate-100' : ''}`}
                         value={selWp} 
-                        onChange={e => { setSelWp(e.target.value); }}
-                        disabled={!selLoc || isEditMode || availWps.length <= 1} // Disable if only 1 option
+                        onChange={e => { 
+                            setSelWp(e.target.value); 
+                            setFormData({...formData, techId: ''}); // Reset Tech
+                        }}
+                        disabled={!selLoc || isEditMode} // Strict Disable: No location -> No workplace select
                     >
-                        {availWps.length > 1 && <option value="">{t('form.select_workplace')}</option>}
+                        <option value="">{t('option.select_wp')}</option>
                         {availWps.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                     </select>
                 </div>
@@ -134,12 +156,12 @@ export const RequestForm = ({
              <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.technology')} *</label>
                 <select 
-                    className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${isEditMode ? 'bg-slate-100' : ''}`}
+                    className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${(!selWp || isEditMode) ? 'bg-slate-100' : ''}`}
                     value={formData.techId || ''} 
                     onChange={e => setFormData({...formData, techId: e.target.value})}
-                    disabled={isEditMode}
+                    disabled={!selWp || isEditMode} // Strict Disable: No workplace -> No tech select
                 >
-                    <option value="">{selWp ? t('form.select_tech') : t('form.select_tech_first')}</option>
+                    <option value="">{selWp ? t('option.select_tech') : t('option.select_wp_first')}</option>
                     {availTechs.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                 </select>
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}

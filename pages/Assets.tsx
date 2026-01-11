@@ -55,15 +55,17 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         }
     }, [initialData, workplaces]);
 
-    // Filter workplaces based on selected Location
+    // Filter workplaces strictly based on selected Location
+    // If no location is selected, show NO workplaces to enforce hierarchy
     const filteredWorkplaces = selectedLocId 
         ? workplaces.filter((w: any) => w.locationId === selectedLocId)
-        : workplaces;
+        : [];
 
     const validate = () => {
         const errs: Record<string, string> = {};
         if(!data.name) errs.name = t('validation.required');
         if(!data.workplaceId) errs.workplaceId = t('validation.required');
+        if(!selectedLocId) errs.locationId = t('validation.required'); // Ensure location is picked visually
         if(!data.typeId) errs.typeId = t('validation.required');
         if(!data.stateId) errs.stateId = t('validation.required');
         
@@ -171,28 +173,28 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                      </div>
                 </div>
                 
-                {/* Location & Workplace */}
+                {/* Location & Workplace - STRICT HIERARCHY */}
                 <div className="grid grid-cols-2 gap-4">
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')}</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')} *</label>
                         <select 
-                            className="w-full border p-2 rounded" 
+                            className={`w-full border p-2 rounded ${errors.locationId ? 'border-red-500' : ''}`} 
                             value={selectedLocId} 
                             onChange={e => { setSelectedLocId(e.target.value); setData({...data, workplaceId: ''}); }}
                         >
-                            <option value="">-- {t('common.all')} --</option>
+                            <option value="">{t('option.select_location')}</option>
                             {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                         </select>
                      </div>
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')} *</label>
                         <select 
                             className={`w-full border p-2 rounded ${errors.workplaceId ? 'border-red-500' : ''}`} 
                             value={data.workplaceId} 
                             onChange={e => setData({...data, workplaceId: e.target.value})}
-                            disabled={!selectedLocId && filteredWorkplaces.length > 20} // Optional UX improvement
+                            disabled={!selectedLocId} // Must pick location first
                         >
-                            <option value="">-</option>
+                            <option value="">{t('option.select_wp')}</option>
                             {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                         </select>
                      </div>

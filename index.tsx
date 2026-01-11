@@ -58,7 +58,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
 
-    return (this.props as any).children;
+    return this.props.children;
   }
 }
 

@@ -135,8 +135,8 @@ export const getNewRequestEmailBody = (lang = 'cs', data) => {
 
     return {
         subject: `FHB main - ${s.new_request} - ${title}`,
-        // Base64 encode the body to prevent line breaks and encoding issues
-        body: Buffer.from(html).toString('base64')
+        // Send raw HTML string (DB handles UTF-8)
+        body: html
     };
 };
 
@@ -175,8 +175,8 @@ export const getMaintenanceEmail = (lang, data) => {
 
     return {
         subject: `FHB main - ${s.new_maintenance}: ${data.title}`,
-        // Base64 encode the body
-        body: Buffer.from(html).toString('base64')
+        // Send raw HTML string
+        body: html
     };
 };
 
@@ -186,6 +186,6 @@ export const getPasswordResetEmail = (lang, link) => {
     
     return {
         subject: s.reset_pass_subject,
-        body: Buffer.from(html).toString('base64')
+        body: html // Send raw HTML string
     };
 };
