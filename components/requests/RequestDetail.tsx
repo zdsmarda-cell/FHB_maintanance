@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
-import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon } from 'lucide-react';
-import { getLocalized } from '../../lib/helpers';
+import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon, Loader } from 'lucide-react';
+import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 interface RequestDetailProps {
     request: Request;
@@ -29,16 +29,33 @@ export const RequestDetail = ({
     const { t, lang } = useI18n();
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     
-    const addComment = () => {
+    const addComment = async () => {
         if(!commentText.trim()) {
             setCommentError(t('validation.required'));
             return;
         }
         setCommentError('');
-        db.comments.add({ requestId: request.id, authorId: currentUser.id, content: commentText });
-        setCommentText('');
-        refresh(); // Refresh parent to reload comments
+        setIsSubmittingComment(true);
+
+        try {
+            // Translate comment content based on settings
+            const translatedContent = await prepareMultilingual(commentText);
+
+            db.comments.add({ 
+                requestId: request.id, 
+                authorId: currentUser.id, 
+                content: translatedContent 
+            });
+            
+            setCommentText('');
+            refresh(); // Refresh parent to reload comments
+        } catch (e) {
+            console.error("Failed to add comment", e);
+        } finally {
+            setIsSubmittingComment(false);
+        }
     };
 
     return (
@@ -109,7 +126,7 @@ export const RequestDetail = ({
                                                 <span className="font-bold text-slate-700">{author?.name}</span>
                                                 <span>{new Date(c.date).toLocaleString()}</span>
                                             </div>
-                                            <p>{c.content}</p>
+                                            <p className="text-slate-800">{getLocalized(c.content, lang)}</p>
                                         </div>
                                     )
                                 })}
@@ -120,9 +137,16 @@ export const RequestDetail = ({
                                     className={`flex-1 border rounded p-2 text-sm ${commentError ? 'border-red-500' : ''}`} 
                                     placeholder={t('placeholder.write_comment')} 
                                     value={commentText} 
-                                    onChange={e => setCommentText(e.target.value)} 
+                                    onChange={e => setCommentText(e.target.value)}
+                                    disabled={isSubmittingComment}
                                 />
-                                <button onClick={addComment} className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700 text-sm">{t('common.send')}</button>
+                                <button 
+                                    onClick={addComment} 
+                                    disabled={isSubmittingComment}
+                                    className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700 text-sm flex items-center min-w-[80px] justify-center"
+                                >
+                                    {isSubmittingComment ? <Loader className="animate-spin w-4 h-4" /> : t('common.send')}
+                                </button>
                             </div>
                         </div>
                     </div>
