@@ -1,10 +1,8 @@
-
 import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
-import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, FileCheck, History as HistoryIcon, UserPlus } from 'lucide-react';
-import { CancelModal } from './modals/CancelModal';
+import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon } from 'lucide-react';
 import { getLocalized } from '../../lib/helpers';
 
 interface RequestDetailProps {
@@ -12,12 +10,6 @@ interface RequestDetailProps {
     currentUser: User;
     technologies: Technology[];
     onBack: () => void;
-    onEdit: () => void;
-    onSolve: () => void;
-    onAssign: () => void;
-    onUnassign: () => void;
-    onCancel: (reason: string) => void;
-    onApproveChange: (val: boolean) => void;
     onGallery: (images: string[], e: React.MouseEvent) => void;
     renderStatusBadge: (status: string) => React.ReactNode;
     renderPrioBadge: (prio: string) => React.ReactNode;
@@ -29,12 +21,6 @@ export const RequestDetail = ({
     currentUser,
     technologies,
     onBack,
-    onEdit,
-    onSolve,
-    onAssign,
-    onUnassign,
-    onCancel,
-    onApproveChange,
     onGallery,
     renderStatusBadge,
     renderPrioBadge,
@@ -44,24 +30,6 @@ export const RequestDetail = ({
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
     
-    // Cancellation Logic
-    const [cancelModalOpen, setCancelModalOpen] = useState(false);
-    const [cancelReason, setCancelReason] = useState('');
-    const [cancelError, setCancelError] = useState('');
-
-    // Calculate Approval Rights
-    const tech = technologies.find(t => t.id === request.techId);
-    const wp = db.workplaces.list().find(w => w.id === tech?.workplaceId);
-    const userLimit = currentUser.approvalLimits?.[wp?.locationId || ''];
-    const hasLimitSet = userLimit !== undefined && userLimit !== null;
-    const hasSufficientLimit = hasLimitSet && (userLimit >= (request.estimatedCost || 0));
-    
-    // Admin behaves like Maintenance regarding limits now
-    const canApproveRole = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
-    const canAssignRole = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
-
-    const canSolve = request.isApproved;
-
     const addComment = () => {
         if(!commentText.trim()) {
             setCommentError(t('validation.required'));
@@ -73,62 +41,12 @@ export const RequestDetail = ({
         refresh(); // Refresh parent to reload comments
     };
 
-    const handleCancelConfirm = () => {
-        if (!cancelReason.trim()) {
-            setCancelError(t('validation.required'));
-            return;
-        }
-        onCancel(cancelReason);
-        setCancelModalOpen(false);
-        setCancelReason('');
-    };
-
     return (
         <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                 <button onClick={onBack} className="flex items-center text-blue-600 hover:underline">
                     <ChevronLeft className="w-4 h-4 mr-1" /> {t('common.back')}
                 </button>
-                <div className="flex gap-2 items-center">
-                    {/* Action Buttons */}
-                    {(request.state === 'new' || request.state === 'assigned') && (
-                        <>
-                             {/* Take Over Button for Maintenance if not already assigned to self */}
-                             {canAssignRole && request.solverId !== currentUser.id && (
-                                <button 
-                                    onClick={onAssign}
-                                    className="flex items-center text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                                >
-                                    <UserPlus className="w-4 h-4 mr-1" /> {request.solverId ? t('action.reassign') : t('action.take_over')}
-                                </button>
-                             )}
-
-                             <button onClick={() => setCancelModalOpen(true)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded hover:bg-red-100 text-sm">
-                                 {t('action.cancel')}
-                             </button>
-                             {request.state === 'assigned' && request.solverId === currentUser.id && (
-                                <div className="relative group">
-                                     <button 
-                                        onClick={canSolve ? onSolve : undefined} 
-                                        disabled={!canSolve}
-                                        className={`flex items-center text-sm px-3 py-1 rounded ${
-                                            canSolve 
-                                            ? 'bg-green-600 text-white hover:bg-green-700' 
-                                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                        }`}
-                                     >
-                                         <CheckCircle2 className="w-3 h-3 mr-1" /> {t('action.solve')}
-                                     </button>
-                                     {!canSolve && (
-                                         <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                             {t('msg.must_be_approved_short')}
-                                         </div>
-                                     )}
-                                </div>
-                             )}
-                        </>
-                    )}
-                </div>
             </div>
             
             <div className="p-6">
@@ -244,40 +162,6 @@ export const RequestDetail = ({
                                 </div>
                             )}
                         </div>
-
-                            {/* Approval Box */}
-                            {canApproveRole && (
-                            <div className="bg-amber-50 p-4 rounded border border-amber-100 text-sm">
-                                <h4 className="font-bold text-amber-800 mb-2 flex items-center"><FileCheck className="w-4 h-4 mr-2"/> {t('headers.approval')}</h4>
-                                <p className="text-amber-700 mb-3 text-xs">
-                                    {t('form.estimated_cost')}: <strong>{request.estimatedCost || 0} EUR</strong>
-                                </p>
-                                
-                                {!hasSufficientLimit && !request.isApproved && (
-                                    <div className="mb-3 p-2 bg-red-100 text-red-800 text-xs rounded border border-red-200">
-                                        {t('msg.approval_limit_warning')}: <strong>{hasLimitSet ? userLimit : 0} EUR</strong><br/>
-                                        {t('msg.approval_limit_exceeded')}
-                                    </div>
-                                )}
-
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => onApproveChange(true)} 
-                                        disabled={request.isApproved || !hasSufficientLimit}
-                                        className={`flex-1 py-1 rounded flex items-center justify-center transition-colors ${request.isApproved || !hasSufficientLimit ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 mr-1"/> {t('common.approve')}
-                                    </button>
-                                    <button 
-                                        onClick={() => onApproveChange(false)} 
-                                        className={`flex-1 py-1 rounded flex items-center justify-center transition-colors ${!request.isApproved || (request.estimatedCost || 0) === 0 || !hasSufficientLimit ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
-                                        disabled={!request.isApproved || (request.estimatedCost || 0) === 0 || !hasSufficientLimit}
-                                    >
-                                        <XCircle className="w-4 h-4 mr-1"/> {request.isApproved ? t('action.remove_approval') : t('common.reject')}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                         
                         {/* History Log */}
                         <div className="bg-white border rounded p-4 text-sm max-h-60 overflow-y-auto">
@@ -303,16 +187,6 @@ export const RequestDetail = ({
                     </div>
                 </div>
             </div>
-
-            {/* Cancel Modal */}
-            <CancelModal 
-                isOpen={cancelModalOpen}
-                onClose={() => setCancelModalOpen(false)}
-                onConfirm={handleCancelConfirm}
-                reason={cancelReason}
-                setReason={setCancelReason}
-                error={cancelError}
-            />
         </div>
     );
 }

@@ -446,12 +446,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       currentUser={user}
                       technologies={techs}
                       onBack={() => setSelectedRequest(null)}
-                      onEdit={() => {}} // Not allowed from dashboard quick view
-                      onSolve={() => handleDetailAction('solve')} 
-                      onAssign={() => {}} 
-                      onUnassign={() => {}}
-                      onCancel={(reason) => handleDetailAction('cancel', reason)}
-                      onApproveChange={(isApproved) => handleDetailAction('approve', isApproved)} 
                       onGallery={openGallery}
                       renderStatusBadge={renderStatusBadge}
                       renderPrioBadge={(p) => <span className="text-xs font-bold uppercase">{p}</span>}

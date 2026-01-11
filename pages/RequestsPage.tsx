@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { Request, User, Technology, Supplier } from '../lib/types';
 import { Loader, Plus, Filter, Download } from 'lucide-react';
-import { Modal } from '../components/Shared';
+import { Modal, AlertModal } from '../components/Shared';
 import { RequestsTable } from '../components/requests/RequestsTable';
 import { RequestForm } from '../components/requests/RequestForm';
 import { RequestDetail } from '../components/requests/RequestDetail';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
+import { AssignModal } from '../components/requests/modals/AssignModal';
+import { CancelModal } from '../components/requests/modals/CancelModal';
+import { ApprovalModal } from '../components/requests/modals/ApprovalModal';
+import { StatusModal } from '../components/requests/modals/StatusModal';
 import { generateWorkListPDF } from '../lib/pdf';
 import { getLocalized, prepareMultilingual } from '../lib/helpers';
 
@@ -28,11 +32,29 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [locations, setLocations] = useState<any[]>([]);
     const [workplaces, setWorkplaces] = useState<any[]>([]);
 
-    // View State
-    const [view, setView] = useState<'list' | 'detail'>('list');
-    const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+    // View & Action States
+    const [selectedRequest, setSelectedRequest] = useState<Request | null>(null); // For Detail
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    
+    // Action Modals State
+    const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [assignTargetReq, setAssignTargetReq] = useState<Request | null>(null);
+    const [assignDate, setAssignDate] = useState('');
+    const [assignSolverId, setAssignSolverId] = useState('');
+
+    const [cancelModalOpen, setCancelModalOpen] = useState(false);
+    const [cancelTargetReq, setCancelTargetReq] = useState<Request | null>(null);
+    const [cancelReason, setCancelReason] = useState('');
+
+    const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+    const [approvalTargetReq, setApprovalTargetReq] = useState<Request | null>(null);
+    const [approvalHasLimit, setApprovalHasLimit] = useState(true); // New State
+
+    const [statusModalOpen, setStatusModalOpen] = useState(false);
+    const [statusTargetReq, setStatusTargetReq] = useState<Request | null>(null);
+
+    const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
     // Form Data
     const emptyForm = { title: '', description: '', techId: '', priority: 'basic', estimatedCost: 0, estimatedTime: 0, photoUrls: [], assignedSupplierId: 'internal' };
@@ -127,7 +149,58 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     useEffect(() => { loadData(); }, []);
 
-    // --- Actions ---
+    // --- Filtering Logic (Moved from Table) ---
+    const filteredRequests = useMemo(() => {
+        return requests.filter(req => {
+            const tech = technologies.find(t => t.id === req.techId);
+            
+            if (fAuthorId && req.authorId !== fAuthorId) return false;
+            if (fMaintenanceId && req.maintenanceId !== fMaintenanceId) return false;
+
+            if (fTitle) {
+                const localizedTitle = getLocalized(req.title, lang);
+                if (!localizedTitle.toLowerCase().includes(fTitle.toLowerCase())) return false;
+            }
+            if (fTechIds.length > 0 && !fTechIds.includes(req.techId)) return false;
+
+            if (fDateResFrom || fDateResTo) {
+                if (!req.plannedResolutionDate) return false;
+                const resDate = new Date(req.plannedResolutionDate).getTime();
+                if (fDateResFrom) {
+                    if (resDate < new Date(fDateResFrom).setHours(0,0,0,0)) return false;
+                }
+                if (fDateResTo) {
+                    if (resDate > new Date(fDateResTo).setHours(23,59,59,999)) return false;
+                }
+            }
+
+            if (fSolverIds.length > 0) {
+                if (!req.solverId) return false;
+                if (!fSolverIds.includes(req.solverId)) return false;
+            }
+
+            if (fSupplierIds.length > 0) {
+                const effectiveSupplierId = req.assignedSupplierId || tech?.supplierId || 'internal';
+                if (fSupplierIds.includes('external')) {
+                    if (effectiveSupplierId === 'internal') return false;
+                } else if (fSupplierIds.includes('internal')) {
+                    if (effectiveSupplierId !== 'internal') return false;
+                } else {
+                    if (!fSupplierIds.includes(effectiveSupplierId)) return false;
+                }
+            }
+
+            if (fStatusIds.length > 0 && !fStatusIds.includes(req.state)) return false;
+            if (fPriorities && fPriorities.length > 0 && !fPriorities.includes(req.priority)) return false;
+            if (fApproved === 'yes' && !req.isApproved) return false;
+            if (fApproved === 'no' && req.isApproved) return false;
+
+            return true;
+        });
+    }, [requests, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, lang, fAuthorId, fMaintenanceId]);
+
+
+    // --- Create / Edit Handlers ---
 
     const handleOpenCreate = () => {
         setFormData({...emptyForm, authorId: user.id});
@@ -136,12 +209,12 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         setIsCreateOpen(true);
     };
 
-    const handleEditRequest = () => {
-        if (!selectedRequest) return;
+    const handleEditRequest = (req: Request) => {
+        setSelectedRequest(req); // Keep reference
         setFormData({
-            ...selectedRequest,
-            title: getLocalized(selectedRequest.title, lang),
-            description: getLocalized(selectedRequest.description, lang)
+            ...req,
+            title: getLocalized(req.title, lang),
+            description: getLocalized(req.description, lang)
         });
         setFormErrors({});
         setIsEditMode(true);
@@ -182,7 +255,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 }
             }
             setIsCreateOpen(false);
-            if (isEditMode) setSelectedRequest(null); // Close detail if editing
+            if (isEditMode) setSelectedRequest(null);
             loadData();
         } catch (e) {
             console.error(e);
@@ -191,46 +264,127 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         }
     };
 
-    const handleRowClick = (req: Request) => {
+    // --- Action Handlers from Table ---
+
+    const handleDetail = (req: Request) => {
         setSelectedRequest(req);
-        setView('detail');
     };
 
-    const handleAction = async (action: string, data?: any) => {
-        if (!selectedRequest) return;
+    const handleTakeOver = (req: Request) => {
+        setAssignTargetReq(req);
+        // Default to self if maintenance/admin, otherwise empty
+        setAssignSolverId(user.role === 'admin' || user.role === 'maintenance' ? user.id : '');
+        setAssignDate(req.plannedResolutionDate || new Date().toISOString().split('T')[0]);
+        setAssignModalOpen(true);
+    };
+
+    const handleConfirmAssign = async () => {
+        if (!assignTargetReq || !assignSolverId || !assignDate) return;
         try {
-            const token = localStorage.getItem('auth_token');
-            const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
+            const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+            const updates = { solverId: assignSolverId, plannedResolutionDate: assignDate, state: 'assigned' };
             
-            let updates: any = {};
+            if (isMock) {
+                db.requests.updateState(assignTargetReq.id, 'assigned', '', user.id, updates);
+            } else {
+                await api.put(`/requests/${assignTargetReq.id}`, updates);
+            }
+            setAssignModalOpen(false);
+            setAssignTargetReq(null);
+            loadData();
+        } catch(e) { console.error(e); }
+    };
+
+    const handleCancel = (req: Request) => {
+        setCancelTargetReq(req);
+        setCancelReason('');
+        setCancelModalOpen(true);
+    };
+
+    const handleConfirmCancel = async () => {
+        if (!cancelTargetReq || !cancelReason.trim()) return;
+        try {
+            const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+            const updates = { state: 'cancelled', cancellationReason: cancelReason };
             
-            if (action === 'cancel') {
-                updates = { state: 'cancelled', cancellationReason: data };
-            } else if (action === 'solve') {
-                updates = { state: 'solved' };
-            } else if (action === 'approve') {
-                updates = { isApproved: data };
-            } else if (action === 'assign') {
-                // If data (userId) passed, assign to user. If null, assign to self.
-                const solverId = data || user.id;
-                // If it's a takeover (reassign), we assume the date is passed in data if it's an object, but simple takeover assumes self.
-                // The AssignModal handles complex assignment. This is for quick actions.
-                updates = { solverId: solverId, state: 'assigned' };
+            if (isMock) {
+                db.requests.updateState(cancelTargetReq.id, 'cancelled', cancelReason, user.id, updates);
+            } else {
+                await api.put(`/requests/${cancelTargetReq.id}`, updates);
+            }
+            setCancelModalOpen(false);
+            setCancelTargetReq(null);
+            loadData();
+        } catch(e) { console.error(e); }
+    };
+
+    const handleApproval = (req: Request) => {
+        // Calculate limits logic
+        const tech = technologies.find(t => t.id === req.techId);
+        const wp = workplaces.find(w => w.id === tech?.workplaceId);
+        
+        // Strict approval limits check for ALL users (including Admin)
+        // User must have a limit defined for the specific location
+        const userLimit = user.approvalLimits?.[wp?.locationId || ''];
+        
+        // Treat undefined/null limit as 0 (not set)
+        // Rule: Limit must be SET and must be >= Cost
+        const hasLimitSet = userLimit !== undefined && userLimit !== null;
+        const limitValue = hasLimitSet ? userLimit : 0;
+        const requestCost = req.estimatedCost || 0;
+        
+        // If cost is 0, we can arguably approve without limit, but strict rule implies limit existence.
+        // Assuming if limit is NOT set, they cannot approve financial requests.
+        const hasSufficientLimit = hasLimitSet && (limitValue >= requestCost);
+        
+        setApprovalHasLimit(hasSufficientLimit);
+        setApprovalTargetReq(req);
+        setApprovalModalOpen(true);
+    };
+
+    const handleConfirmApproval = async (approve: boolean) => {
+        if (!approvalTargetReq) return;
+        try {
+            const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+            const updates = { isApproved: approve };
+            
+            if (isMock) {
+                db.requests.updateState(approvalTargetReq.id, approvalTargetReq.state, '', user.id, updates);
+            } else {
+                await api.put(`/requests/${approvalTargetReq.id}`, updates);
+            }
+            setApprovalModalOpen(false);
+            setApprovalTargetReq(null);
+            loadData();
+        } catch(e) { console.error(e); }
+    }
+
+    const handleStatusClick = (req: Request) => {
+        setStatusTargetReq(req);
+        setStatusModalOpen(true);
+    };
+
+    const handleConfirmStatusChange = async (newStatus: string) => {
+        if (!statusTargetReq) return;
+        try {
+            const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+            let updates: any = { state: newStatus };
+            
+            // Rule: If changed to 'new', remove solver
+            if (newStatus === 'new') {
+                updates.solverId = null;
             }
 
             if (isMock) {
-                db.requests.updateState(selectedRequest.id, updates.state || selectedRequest.state, updates.cancellationReason || '', user.id, updates);
+                db.requests.updateState(statusTargetReq.id, newStatus, '', user.id, updates);
             } else {
-                await api.put(`/requests/${selectedRequest.id}`, updates);
+                await api.put(`/requests/${statusTargetReq.id}`, updates);
             }
-            
+            setStatusModalOpen(false);
+            setStatusTargetReq(null);
             loadData();
-            setSelectedRequest(null);
-            setView('list');
-        } catch (e) {
-            console.error(e);
-        }
-    };
+        } catch(e) { console.error(e); }
+    }
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -267,8 +421,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     };
 
     const handleExportPDF = async () => {
-        // Simple export of current view
-        await generateWorkListPDF(requests, user, 'All Requests', t, lang, technologies, suppliers, users);
+        // Pass filteredRequests to export only what is seen
+        await generateWorkListPDF(filteredRequests, user, 'Requests Export', t, lang, technologies, suppliers, users);
     };
 
     const openGallery = (photos: string[], e: React.MouseEvent) => {
@@ -300,7 +454,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 rounded border ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-600'}`}>
                          <Filter className="w-5 h-5" />
                     </button>
-                    <button onClick={handleExportPDF} className="px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded hover:bg-slate-50" title="Exportovat seznam do PDF">
+                    <button onClick={handleExportPDF} className="px-3 py-2 bg-white border border-slate-200 text-red-600 rounded hover:bg-red-50" title="Exportovat do PDF">
                         <Download className="w-5 h-5" />
                     </button>
                     <button onClick={handleOpenCreate} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
@@ -312,12 +466,18 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             {/* Content */}
             <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
                 <RequestsTable 
-                    requests={requests}
+                    requests={filteredRequests} // Pass ALREADY FILTERED requests
                     currentUser={user}
                     technologies={technologies}
                     suppliers={suppliers}
                     users={users}
-                    onRowClick={handleRowClick}
+                    workplaces={workplaces}
+                    onDetail={handleDetail}
+                    onEdit={handleEditRequest}
+                    onCancel={handleCancel}
+                    onTakeOver={handleTakeOver}
+                    onApproval={handleApproval}
+                    onStatusChange={handleStatusClick}
                     currentPage={currentPage}
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}
@@ -339,7 +499,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 />
             </div>
 
-            {/* Detail Modal */}
+            {/* Detail Modal (Read Only) */}
             {selectedRequest && (
                 <Modal title={t('headers.request_detail')} onClose={() => setSelectedRequest(null)}>
                     <div className="max-h-[85vh] overflow-y-auto -m-4">
@@ -348,12 +508,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                             currentUser={user}
                             technologies={technologies}
                             onBack={() => setSelectedRequest(null)}
-                            onEdit={handleEditRequest}
-                            onSolve={() => handleAction('solve')}
-                            onAssign={() => handleAction('assign')} // Quick self-assign
-                            onUnassign={() => handleAction('assign', null)} 
-                            onCancel={(reason) => handleAction('cancel', reason)}
-                            onApproveChange={(val) => handleAction('approve', val)}
                             onGallery={openGallery}
                             renderStatusBadge={(s) => <span className="font-bold uppercase">{t(`status.${s}`)}</span>}
                             renderPrioBadge={(p) => <span className="font-bold uppercase">{t(`prio.${p}`)}</span>}
@@ -388,6 +542,55 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 </Modal>
             )}
 
+            {/* Assign Modal */}
+            {assignModalOpen && assignTargetReq && (
+                <AssignModal 
+                    isOpen={assignModalOpen} 
+                    onClose={() => setAssignModalOpen(false)} 
+                    onConfirm={handleConfirmAssign}
+                    assignDate={assignDate} 
+                    setAssignDate={setAssignDate} 
+                    assignSolverId={assignSolverId} 
+                    setAssignSolverId={setAssignSolverId}
+                    candidates={users.filter(u => u.role !== 'operator' && !u.isBlocked)} 
+                    currentUser={user}
+                    isAlreadyAssigned={false}
+                />
+            )}
+
+            {/* Cancel Modal */}
+            {cancelModalOpen && cancelTargetReq && (
+                <CancelModal 
+                    isOpen={cancelModalOpen} 
+                    onClose={() => setCancelModalOpen(false)} 
+                    onConfirm={handleConfirmCancel}
+                    reason={cancelReason} 
+                    setReason={setCancelReason} 
+                    error="" 
+                />
+            )}
+
+            {/* Approval Modal */}
+            {approvalModalOpen && approvalTargetReq && (
+                <ApprovalModal 
+                    request={approvalTargetReq} 
+                    technologies={technologies} 
+                    hasSufficientLimit={approvalHasLimit}
+                    onClose={() => setApprovalModalOpen(false)} 
+                    onApprove={handleConfirmApproval} 
+                />
+            )}
+
+            {/* Status Change Modal */}
+            {statusModalOpen && statusTargetReq && (
+                <StatusModal 
+                    isOpen={statusModalOpen}
+                    onClose={() => setStatusModalOpen(false)}
+                    currentStatus={statusTargetReq.state}
+                    onConfirm={handleConfirmStatusChange}
+                />
+            )}
+
             {/* Gallery Modal */}
             {isGalleryOpen && (
                 <GalleryModal 
@@ -398,6 +601,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     onPrev={(e) => { e.stopPropagation(); setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length); }}
                 />
             )}
+
+            {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
         </div>
     );
 };
