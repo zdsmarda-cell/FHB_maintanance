@@ -284,7 +284,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
               <div className="p-4 border-b border-red-200 bg-red-100/50 flex items-center justify-between">
                   <div className="flex items-center font-bold text-red-800">
                       <AlertTriangle className="w-5 h-5 mr-2 text-red-600" />
-                      Urgentní požadavky ({urgentRequests.length})
+                      {t('dashboard.urgent_requests')} ({urgentRequests.length})
                   </div>
               </div>
               <div className="overflow-x-auto">

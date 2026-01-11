@@ -54,6 +54,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.subject': 'Předmět',
     'common.recipient': 'Příjemce',
     'common.retry': 'Znovu odeslat',
+    'common.send': 'Odeslat',
 
     'auth.login': 'Přihlásit se',
     'auth.password': 'Heslo',
@@ -89,6 +90,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.no_my_requests': 'Nemáte žádné aktivní požadavky.',
     'msg.cost_exceeds_limit': 'Cena přesahuje váš schvalovací limit. Požadavek byl označen jako neschválený.',
     'msg.must_be_approved': 'Požadavek musí být schválen před zahájením nebo dokončením prací.',
+    'msg.waiting_for_approval': 'Čeká na schválení',
+    'msg.approval_limit_warning': 'Váš limit',
+    'msg.approval_limit_exceeded': 'Nemáte dostatečné oprávnění pro schválení této částky.',
+    'msg.must_be_approved_short': 'Požadavek musí být schválen před vyřešením.',
+    'msg.no_comments': 'Žádné komentáře',
 
     'validation.required': 'Toto pole je povinné',
 
@@ -142,6 +148,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.select_tech_first': '-- Nejdříve vyberte pracoviště --',
     'form.internal_solution': '-- Interní řešení --',
     'form.default_for_tech': '(Výchozí pro technologii)',
+    'form.technology': 'Technologie',
+    'form.priority': 'Priorita',
+    'form.estimated_time': 'Očekávaná pracnost (min)',
+    'form.solution': 'Řešení (Dodavatel)',
 
     'day.0': 'Ne',
     'day.1': 'Po',
@@ -178,6 +188,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.complete_maintenance': 'Dokončení údržby',
     'headers.change_approval': 'Změna schválení',
     'headers.emails': 'Správa Emailů',
+    'headers.information': 'Informace',
+    'headers.approval': 'Schvalování',
+    'headers.change_history': 'Historie změn',
 
     'dashboard.requests_overview': 'Agenda Požadavků',
     'dashboard.my_unresolved': 'Moje nevyřešené',
@@ -187,6 +200,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.active_maintenance': 'Aktivní šablony',
     'dashboard.total_assets': 'Celkem Technologií',
     'dashboard.upcoming_maintenance': 'Nadcházející údržba',
+    'dashboard.urgent_requests': 'Urgentní požadavky',
 
     'role.admin': 'Administrátor',
     'role.maintenance': 'Údržbář',
@@ -210,13 +224,28 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Požadavky',
     'col.next_maintenance': 'Perioda',
     'col.approved': 'Schváleno',
+    'col.technology': 'Technologie',
+    'col.solver': 'Řešitel',
+    'col.cost': 'Cena',
+    'col.time': 'Pracnost',
+    'col.supplier': 'Dodavatel',
 
     'action.created': 'Vytvořeno',
     'action.status_change': 'Změna stavu',
     'action.approved': 'Schváleno',
     'action.rejected': 'Zamítnuto',
     'action.edited': 'Upraveno',
-    'action.comment': 'Komentář'
+    'action.comment': 'Komentář',
+    'action.cancel': 'Storno',
+    'action.solve': 'Vyřešit',
+    'action.take_over': 'Převzít',
+    'action.reassign': 'Přebrat',
+    'action.remove_approval': 'Odebrat souhlas',
+
+    'label.author': 'Autor',
+    'label.source': 'Zdroj',
+    'label.auto_maintenance': 'Automatická údržba',
+    'placeholder.write_comment': 'Napsat komentář...',
   },
   en: {
     'app.name': 'FHB maintein',
@@ -262,6 +291,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.subject': 'Subject',
     'common.recipient': 'Recipient',
     'common.retry': 'Retry Sending',
+    'common.send': 'Send',
 
     'auth.login': 'Log In',
     'auth.password': 'Password',
@@ -297,6 +327,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.no_my_requests': 'You have no active requests.',
     'msg.cost_exceeds_limit': 'Cost exceeds your approval limit. Request marked as not approved.',
     'msg.must_be_approved': 'Request must be approved before starting or completing work.',
+    'msg.waiting_for_approval': 'Waiting for approval',
+    'msg.approval_limit_warning': 'Your limit',
+    'msg.approval_limit_exceeded': 'You do not have sufficient permission to approve this amount.',
+    'msg.must_be_approved_short': 'Must be approved before resolving.',
+    'msg.no_comments': 'No comments',
 
     'validation.required': 'This field is required',
 
@@ -350,6 +385,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.select_tech_first': '-- Select Workplace First --',
     'form.internal_solution': '-- Internal Solution --',
     'form.default_for_tech': '(Default for technology)',
+    'form.technology': 'Technology',
+    'form.priority': 'Priority',
+    'form.estimated_time': 'Estimated Time (min)',
+    'form.solution': 'Solution (Supplier)',
 
     'day.0': 'Sun',
     'day.1': 'Mon',
@@ -386,6 +425,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.complete_maintenance': 'Complete Maintenance',
     'headers.change_approval': 'Change Approval',
     'headers.emails': 'Email Management',
+    'headers.information': 'Information',
+    'headers.approval': 'Approval',
+    'headers.change_history': 'Change History',
 
     'dashboard.requests_overview': 'Requests Overview',
     'dashboard.my_unresolved': 'My Unresolved',
@@ -395,6 +437,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.active_maintenance': 'Active Templates',
     'dashboard.total_assets': 'Total Assets',
     'dashboard.upcoming_maintenance': 'Upcoming',
+    'dashboard.urgent_requests': 'Urgent Requests',
 
     'role.admin': 'Administrator',
     'role.maintenance': 'Maintenance',
@@ -418,13 +461,28 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Requests',
     'col.next_maintenance': 'Interval',
     'col.approved': 'Approved',
+    'col.technology': 'Technology',
+    'col.solver': 'Solver',
+    'col.cost': 'Cost',
+    'col.time': 'Time',
+    'col.supplier': 'Supplier',
 
     'action.created': 'Created',
     'action.status_change': 'Status Change',
     'action.approved': 'Approved',
     'action.rejected': 'Rejected',
     'action.edited': 'Edited',
-    'action.comment': 'Comment'
+    'action.comment': 'Comment',
+    'action.cancel': 'Cancel',
+    'action.solve': 'Resolve',
+    'action.take_over': 'Take Over',
+    'action.reassign': 'Reassign',
+    'action.remove_approval': 'Remove Approval',
+
+    'label.author': 'Author',
+    'label.source': 'Source',
+    'label.auto_maintenance': 'Automated Maintenance',
+    'placeholder.write_comment': 'Write a comment...',
   },
   uk: {
     'app.name': 'FHB maintein',
@@ -470,6 +528,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.subject': 'Тема',
     'common.recipient': 'Одержувач',
     'common.retry': 'Повторити відправку',
+    'common.send': 'Надіслати',
 
     'auth.login': 'Увійти',
     'auth.password': 'Пароль',
@@ -505,6 +564,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.no_my_requests': 'У вас немає активних запитів.',
     'msg.cost_exceeds_limit': 'Вартість перевищує ваш ліміт схвалення. Запит позначено як не схвалений.',
     'msg.must_be_approved': 'Запит повинен бути схвалений перед початком або завершенням робіт.',
+    'msg.waiting_for_approval': 'Очікує на схвалення',
+    'msg.approval_limit_warning': 'Ваш ліміт',
+    'msg.approval_limit_exceeded': 'У вас недостатньо прав для схвалення цієї суми.',
+    'msg.must_be_approved_short': 'Необхідно схвалити перед вирішенням.',
+    'msg.no_comments': 'Немає коментарів',
 
     'validation.required': "Це поле є обов'язковим",
 
@@ -558,6 +622,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.select_tech_first': '-- Спочатку виберіть робоче місце --',
     'form.internal_solution': '-- Внутрішнє рішення --',
     'form.default_for_tech': '(За замовчуванням для технології)',
+    'form.technology': 'Технологія',
+    'form.priority': 'Пріоритет',
+    'form.estimated_time': 'Орієнтовний час (хв)',
+    'form.solution': 'Рішення (Постачальник)',
 
     'day.0': 'Нд',
     'day.1': 'Пн',
@@ -594,6 +662,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.complete_maintenance': 'Завершення обслуговування',
     'headers.change_approval': 'Зміна схвалення',
     'headers.emails': 'Управління Email',
+    'headers.information': 'Інформація',
+    'headers.approval': 'Схвалення',
+    'headers.change_history': 'Історія змін',
 
     'dashboard.requests_overview': 'Запити',
     'dashboard.my_unresolved': 'Мої невирішені',
@@ -603,6 +674,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.active_maintenance': 'Активні шаблони',
     'dashboard.total_assets': 'Всього активів',
     'dashboard.upcoming_maintenance': 'Майбутнє',
+    'dashboard.urgent_requests': 'Термінові запити',
 
     'role.admin': 'Адміністратор',
     'role.maintenance': 'Технік',
@@ -626,13 +698,28 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Запити',
     'col.next_maintenance': 'Інтервал',
     'col.approved': 'Схвалено',
+    'col.technology': 'Технологія',
+    'col.solver': 'Виконавець',
+    'col.cost': 'Вартість',
+    'col.time': 'Час',
+    'col.supplier': 'Постачальник',
 
     'action.created': 'Створено',
     'action.status_change': 'Зміна статусу',
     'action.approved': 'Схвалено',
     'action.rejected': 'Відхилено',
     'action.edited': 'Відредаговано',
-    'action.comment': 'Коментар'
+    'action.comment': 'Коментар',
+    'action.cancel': 'Скасувати',
+    'action.solve': 'Вирішити',
+    'action.take_over': 'Прийняти',
+    'action.reassign': 'Перепризначити',
+    'action.remove_approval': 'Скасувати схвалення',
+
+    'label.author': 'Автор',
+    'label.source': 'Джерело',
+    'label.auto_maintenance': 'Автоматичне обслуговування',
+    'placeholder.write_comment': 'Написати коментар...',
   }
 };
 

@@ -99,12 +99,12 @@ export const RequestDetail = ({
                                     onClick={onAssign}
                                     className="flex items-center text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                                 >
-                                    <UserPlus className="w-4 h-4 mr-1" /> {request.solverId ? 'Přebrat' : 'Převzít'}
+                                    <UserPlus className="w-4 h-4 mr-1" /> {request.solverId ? t('action.reassign') : t('action.take_over')}
                                 </button>
                              )}
 
                              <button onClick={() => setCancelModalOpen(true)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded hover:bg-red-100 text-sm">
-                                 Storno
+                                 {t('action.cancel')}
                              </button>
                              {request.state === 'assigned' && request.solverId === currentUser.id && (
                                 <div className="relative group">
@@ -117,11 +117,11 @@ export const RequestDetail = ({
                                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                         }`}
                                      >
-                                         <CheckCircle2 className="w-3 h-3 mr-1" /> Vyřešit
+                                         <CheckCircle2 className="w-3 h-3 mr-1" /> {t('action.solve')}
                                      </button>
                                      {!canSolve && (
                                          <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                             Požadavek musí být schválen před vyřešením.
+                                             {t('msg.must_be_approved_short')}
                                          </div>
                                      )}
                                 </div>
@@ -145,7 +145,7 @@ export const RequestDetail = ({
                                     <span className="flex items-center"><Euro className="w-3 h-3 mr-1" /> {request.estimatedCost || 0}</span>
                                     <span className={`flex items-center px-2 py-0.5 rounded text-xs font-medium ${request.isApproved ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
                                         {request.isApproved ? <CheckCircle2 className="w-3 h-3 mr-1"/> : <XCircle className="w-3 h-3 mr-1"/>}
-                                        {request.isApproved ? 'Schváleno' : 'Čeká na schválení'}
+                                        {request.isApproved ? t('form.is_approved') : t('msg.waiting_for_approval')}
                                     </span>
                             </div>
                         </div>
@@ -157,7 +157,7 @@ export const RequestDetail = ({
 
                         {request.cancellationReason && (
                             <div className="bg-red-50 p-4 rounded border border-red-100 text-sm text-red-800">
-                                <h4 className="font-bold mb-1">Důvod storna:</h4>
+                                <h4 className="font-bold mb-1">{t('form.cancellation_reason')}:</h4>
                                 <p>{request.cancellationReason}</p>
                             </div>
                         )}
@@ -195,16 +195,16 @@ export const RequestDetail = ({
                                         </div>
                                     )
                                 })}
-                                {db.comments.list(request.id).length === 0 && <p className="text-slate-400 italic text-sm">Žádné komentáře</p>}
+                                {db.comments.list(request.id).length === 0 && <p className="text-slate-400 italic text-sm">{t('msg.no_comments')}</p>}
                             </div>
                             <div className="flex gap-2">
                                 <input 
                                     className={`flex-1 border rounded p-2 text-sm ${commentError ? 'border-red-500' : ''}`} 
-                                    placeholder="Napsat komentář..." 
+                                    placeholder={t('placeholder.write_comment')} 
                                     value={commentText} 
                                     onChange={e => setCommentText(e.target.value)} 
                                 />
-                                <button onClick={addComment} className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700 text-sm">Odeslat</button>
+                                <button onClick={addComment} className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700 text-sm">{t('common.send')}</button>
                             </div>
                         </div>
                     </div>
@@ -212,17 +212,17 @@ export const RequestDetail = ({
                     {/* Right Sidebar */}
                     <div className="space-y-6">
                         <div className="bg-slate-50 p-4 rounded border border-slate-100 text-sm space-y-3">
-                            <h4 className="font-bold border-b pb-2">Informace</h4>
+                            <h4 className="font-bold border-b pb-2">{t('headers.information')}</h4>
                             <div>
-                                <span className="block text-slate-500 text-xs">Technologie</span>
+                                <span className="block text-slate-500 text-xs">{t('form.technology')}</span>
                                 <span className="font-medium">{getLocalized(technologies.find(t => t.id === request.techId)?.name, lang)}</span>
                             </div>
                             <div>
-                                <span className="block text-slate-500 text-xs">Autor</span>
+                                <span className="block text-slate-500 text-xs">{t('label.author')}</span>
                                 <span className="font-medium">{db.users.list().find(u => u.id === request.authorId)?.name}</span>
                             </div>
                             <div>
-                                <span className="block text-slate-500 text-xs">Řešitel</span>
+                                <span className="block text-slate-500 text-xs">{t('col.solver')}</span>
                                 {request.solverId ? (
                                     <div className="flex items-center justify-between">
                                         <span className="font-medium">{db.users.list().find(u => u.id === request.solverId)?.name}</span>
@@ -233,14 +233,14 @@ export const RequestDetail = ({
                             </div>
                             {request.plannedResolutionDate && (
                                 <div>
-                                    <span className="block text-slate-500 text-xs">Termín</span>
+                                    <span className="block text-slate-500 text-xs">{t('common.date')}</span>
                                     <span className="font-medium text-slate-800">{new Date(request.plannedResolutionDate).toLocaleDateString()}</span>
                                 </div>
                             )}
                             {request.maintenanceId && (
                                     <div>
-                                    <span className="block text-slate-500 text-xs">Zdroj</span>
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs">Automatická údržba</span>
+                                    <span className="block text-slate-500 text-xs">{t('label.source')}</span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs">{t('label.auto_maintenance')}</span>
                                 </div>
                             )}
                         </div>
@@ -248,15 +248,15 @@ export const RequestDetail = ({
                             {/* Approval Box */}
                             {canApproveRole && (
                             <div className="bg-amber-50 p-4 rounded border border-amber-100 text-sm">
-                                <h4 className="font-bold text-amber-800 mb-2 flex items-center"><FileCheck className="w-4 h-4 mr-2"/> Schvalování</h4>
+                                <h4 className="font-bold text-amber-800 mb-2 flex items-center"><FileCheck className="w-4 h-4 mr-2"/> {t('headers.approval')}</h4>
                                 <p className="text-amber-700 mb-3 text-xs">
-                                    Odhadovaná cena: <strong>{request.estimatedCost || 0} EUR</strong>
+                                    {t('form.estimated_cost')}: <strong>{request.estimatedCost || 0} EUR</strong>
                                 </p>
                                 
                                 {!hasSufficientLimit && !request.isApproved && (
                                     <div className="mb-3 p-2 bg-red-100 text-red-800 text-xs rounded border border-red-200">
-                                        Váš limit: <strong>{hasLimitSet ? userLimit : 0} EUR</strong><br/>
-                                        Nemáte dostatečné oprávnění pro schválení této částky.
+                                        {t('msg.approval_limit_warning')}: <strong>{hasLimitSet ? userLimit : 0} EUR</strong><br/>
+                                        {t('msg.approval_limit_exceeded')}
                                     </div>
                                 )}
 
@@ -266,14 +266,14 @@ export const RequestDetail = ({
                                         disabled={request.isApproved || !hasSufficientLimit}
                                         className={`flex-1 py-1 rounded flex items-center justify-center transition-colors ${request.isApproved || !hasSufficientLimit ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                                     >
-                                        <CheckCircle2 className="w-4 h-4 mr-1"/> Schválit
+                                        <CheckCircle2 className="w-4 h-4 mr-1"/> {t('common.approve')}
                                     </button>
                                     <button 
                                         onClick={() => onApproveChange(false)} 
                                         className={`flex-1 py-1 rounded flex items-center justify-center transition-colors ${!request.isApproved || (request.estimatedCost || 0) === 0 || !hasSufficientLimit ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
                                         disabled={!request.isApproved || (request.estimatedCost || 0) === 0 || !hasSufficientLimit}
                                     >
-                                        <XCircle className="w-4 h-4 mr-1"/> Zamítnout
+                                        <XCircle className="w-4 h-4 mr-1"/> {request.isApproved ? t('action.remove_approval') : t('common.reject')}
                                     </button>
                                 </div>
                             </div>
@@ -281,7 +281,7 @@ export const RequestDetail = ({
                         
                         {/* History Log */}
                         <div className="bg-white border rounded p-4 text-sm max-h-60 overflow-y-auto">
-                            <h4 className="font-bold mb-3 flex items-center"><HistoryIcon className="w-4 h-4 mr-2"/> Historie změn</h4>
+                            <h4 className="font-bold mb-3 flex items-center"><HistoryIcon className="w-4 h-4 mr-2"/> {t('headers.change_history')}</h4>
                             <div className="space-y-3">
                                 {request.history?.slice().reverse().map((h: any, i: number) => {
                                     const u = db.users.list().find(x => x.id === h.userId);

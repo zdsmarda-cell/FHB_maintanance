@@ -83,18 +83,12 @@ export const getNewRequestEmailBody = (lang = 'cs', data) => {
     const priority = data.priority || 'Basic';
     const createdDate = new Date().toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-US');
 
-    // Handle Image Preview
-    // If photoUrl is provided, we try to show it. 
-    // Note: Most email clients block external images by default, or base64 might be too large.
-    // Ideally, this should be a link (cid) or a public URL.
-    // If data.photoUrl is a relative path like '/uploads/...', prefix with APP_URL
     let imgHtml = '';
     if (data.photoUrl) {
         let src = data.photoUrl;
         if (src.startsWith('/')) {
             src = `${APP_URL}${src}`;
         }
-        // If it's a data URI (base64), use it directly (though support varies)
         imgHtml = `
             <div style="margin-top: 15px; border: 1px solid #ddd; padding: 5px; display: inline-block;">
                 <img src="${src}" alt="Preview" style="max-width: 200px; max-height: 200px;" />
@@ -141,7 +135,8 @@ export const getNewRequestEmailBody = (lang = 'cs', data) => {
 
     return {
         subject: `FHB main - ${s.new_request} - ${title}`,
-        body: html
+        // Base64 encode the body to prevent line breaks and encoding issues
+        body: Buffer.from(html).toString('base64')
     };
 };
 
@@ -180,14 +175,17 @@ export const getMaintenanceEmail = (lang, data) => {
 
     return {
         subject: `FHB main - ${s.new_maintenance}: ${data.title}`,
-        body: html
+        // Base64 encode the body
+        body: Buffer.from(html).toString('base64')
     };
 };
 
 export const getPasswordResetEmail = (lang, link) => {
     const s = getStrings(lang);
+    const html = `${s.reset_pass_body}<br/><br/><a href="${link}">${link}</a><br/><br/>${s.reset_pass_link_validity}`;
+    
     return {
         subject: s.reset_pass_subject,
-        body: `${s.reset_pass_body}<br/><br/><a href="${link}">${link}</a><br/><br/>${s.reset_pass_link_validity}`
+        body: Buffer.from(html).toString('base64')
     };
 };

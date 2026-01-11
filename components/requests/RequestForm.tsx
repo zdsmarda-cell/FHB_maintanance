@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Euro, Trash2, Upload, Loader, Clock, Calendar } from 'lucide-react';
@@ -131,7 +132,7 @@ export const RequestForm = ({
              </div>
              
              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Technologie *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.technology')} *</label>
                 <select 
                     className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${isEditMode ? 'bg-slate-100' : ''}`}
                     value={formData.techId || ''} 
@@ -147,7 +148,7 @@ export const RequestForm = ({
              {/* Supplier Selection - Hidden for Operators */}
              {user.role !== 'operator' && (
                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Řešení (Dodavatel)</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.solution')}</label>
                     <select 
                         className="w-full p-2 rounded border"
                         value={formData.assignedSupplierId || 'internal'} 
@@ -175,7 +176,7 @@ export const RequestForm = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Priorita</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.priority')}</label>
                     <select className="w-full p-2 rounded border" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
                         <option value="basic">{t('prio.basic')}</option>
                         <option value="priority">{t('prio.priority')}</option>
@@ -213,7 +214,7 @@ export const RequestForm = ({
                     </div>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Očekávaná pracnost (min)</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.estimated_time')}</label>
                     <div className="relative">
                         <input 
                             type="number" 

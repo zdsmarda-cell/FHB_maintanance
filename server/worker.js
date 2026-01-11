@@ -34,11 +34,14 @@ const processEmailQueue = async () => {
       try {
         console.log(`[MAILER] Sending to ${email.to_address}: ${email.subject}`);
         
+        // Decode Base64 body from DB to UTF-8 HTML string
+        const decodedBody = Buffer.from(email.body, 'base64').toString('utf-8');
+
         const mailOptions = {
           from: process.env.EMAIL_FROM || '"FHB Maintain" <noreply@fhb.sk>',
           to: email.to_address,
           subject: email.subject,
-          html: email.body, // We assume body is HTML
+          html: decodedBody, // Send decoded HTML
           attachments: []
         };
 
