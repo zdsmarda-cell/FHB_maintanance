@@ -129,7 +129,7 @@ export const getNewRequestEmailBody = (lang = 'cs', data) => {
                 ${s.link_text}
             </a>
         </div>
-        <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">FHB Maintain System</p>
+        <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">FHB Maintein System</p>
     </div>
     `;
 
@@ -169,7 +169,7 @@ export const getMaintenanceEmail = (lang, data) => {
                 ${s.link_text}
             </a>
         </div>
-        <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">FHB Maintain System</p>
+        <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">FHB Maintein System</p>
     </div>
     `;
 
