@@ -33,7 +33,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [workplaces, setWorkplaces] = useState<any[]>([]);
 
     // View & Action States
-    const [selectedRequest, setSelectedRequest] = useState<Request | null>(null); // For Detail
+    const [selectedRequest, setSelectedRequest] = useState<Request | null>(null); // Purely for Detail Modal
+    const [editingRequest, setEditingRequest] = useState<Request | null>(null); // Purely for Edit Logic
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     
@@ -49,7 +50,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     const [approvalModalOpen, setApprovalModalOpen] = useState(false);
     const [approvalTargetReq, setApprovalTargetReq] = useState<Request | null>(null);
-    const [approvalHasLimit, setApprovalHasLimit] = useState(true); // New State
+    const [approvalHasLimit, setApprovalHasLimit] = useState(true);
 
     const [statusModalOpen, setStatusModalOpen] = useState(false);
     const [statusTargetReq, setStatusTargetReq] = useState<Request | null>(null);
@@ -149,7 +150,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     useEffect(() => { loadData(); }, []);
 
-    // --- Filtering Logic (Moved from Table) ---
+    // --- Filtering Logic ---
     const filteredRequests = useMemo(() => {
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
@@ -206,11 +207,12 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         setFormData({...emptyForm, authorId: user.id});
         setFormErrors({});
         setIsEditMode(false);
+        setEditingRequest(null);
         setIsCreateOpen(true);
     };
 
     const handleEditRequest = (req: Request) => {
-        setSelectedRequest(req); // Keep reference
+        setEditingRequest(req); // Separate state for editing
         setFormData({
             ...req,
             title: getLocalized(req.title, lang),
@@ -242,20 +244,20 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             const payload = { ...formData, title: translatedTitle, description: translatedDesc };
 
             if (isMock) {
-                if (isEditMode && selectedRequest) {
-                    db.requests.update(selectedRequest.id, payload);
+                if (isEditMode && editingRequest) {
+                    db.requests.update(editingRequest.id, payload);
                 } else {
                     db.requests.add(payload);
                 }
             } else {
-                if (isEditMode && selectedRequest) {
-                    await api.put(`/requests/${selectedRequest.id}`, payload);
+                if (isEditMode && editingRequest) {
+                    await api.put(`/requests/${editingRequest.id}`, payload);
                 } else {
                     await api.post('/requests', payload);
                 }
             }
             setIsCreateOpen(false);
-            if (isEditMode) setSelectedRequest(null);
+            setEditingRequest(null);
             loadData();
         } catch (e) {
             console.error(e);
@@ -319,22 +321,14 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     };
 
     const handleApproval = (req: Request) => {
-        // Calculate limits logic
         const tech = technologies.find(t => t.id === req.techId);
         const wp = workplaces.find(w => w.id === tech?.workplaceId);
         
-        // Strict approval limits check for ALL users (including Admin)
-        // User must have a limit defined for the specific location
         const userLimit = user.approvalLimits?.[wp?.locationId || ''];
-        
-        // Treat undefined/null limit as 0 (not set)
-        // Rule: Limit must be SET and must be >= Cost
         const hasLimitSet = userLimit !== undefined && userLimit !== null;
         const limitValue = hasLimitSet ? userLimit : 0;
         const requestCost = req.estimatedCost || 0;
         
-        // If cost is 0, we can arguably approve without limit, but strict rule implies limit existence.
-        // Assuming if limit is NOT set, they cannot approve financial requests.
         const hasSufficientLimit = hasLimitSet && (limitValue >= requestCost);
         
         setApprovalHasLimit(hasSufficientLimit);
@@ -370,7 +364,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
             let updates: any = { state: newStatus };
             
-            // Rule: If changed to 'new', remove solver
             if (newStatus === 'new') {
                 updates.solverId = null;
             }
@@ -421,7 +414,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     };
 
     const handleExportPDF = async () => {
-        // Pass filteredRequests to export only what is seen
         await generateWorkListPDF(filteredRequests, user, 'Requests Export', t, lang, technologies, suppliers, users);
     };
 
@@ -466,7 +458,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             {/* Content */}
             <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
                 <RequestsTable 
-                    requests={filteredRequests} // Pass ALREADY FILTERED requests
+                    requests={filteredRequests} 
                     currentUser={user}
                     technologies={technologies}
                     suppliers={suppliers}
