@@ -235,7 +235,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       {/* Quick Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {user.role === 'operator' ? (
-             <Card title={t('dashboard.my_unresolved')} value={myUnresolved} icon={List} color="bg-amber-500" onClick={() => onNavigate('requests')} />
+             <Card 
+                title={t('dashboard.my_unresolved')} 
+                value={myUnresolved} 
+                icon={List} 
+                color="bg-amber-500" 
+                onClick={() => onNavigate('requests', { authorId: user.id, status: ['new', 'assigned'] })} 
+             />
         ) : (
             <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 col-span-1 md:col-span-2">
                 <div className="flex items-center mb-4">

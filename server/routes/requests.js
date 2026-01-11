@@ -81,38 +81,51 @@ router.post('/', async (req, res) => {
     // Fetch the newly created ID
     const [newRequest] = await pool.query('SELECT * FROM requests WHERE tech_id = ? AND author_id = ? ORDER BY created_date DESC LIMIT 1', [techId, authorId]);
     
+    // Fetch Tech Name for Email
+    const [techRows] = await pool.query('SELECT name FROM technologies WHERE id = ?', [techId]);
+    const techName = techRows[0]?.name || '';
+
     // 2. Email Logic (Real DB Users)
     const currentUserId = req.user ? req.user.id : authorId; // Logic relies on authenticated user via middleware
-    const emailBody = getNewRequestEmailBody(priority, description);
-    const emailSubject = `Nový požadavek: ${title || priority}`;
-
-    const recipients = new Set();
+    
+    // Map to store Email -> Language
+    const recipientsMap = new Map(); // Map<email, language>
 
     if (solverId) {
         // A) Request is assigned immediately
         // Only send email if I am NOT assigning it to myself
         if (solverId !== currentUserId) {
-            const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [solverId]);
+            const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [solverId]);
             if (users.length > 0 && users[0].email) {
-                recipients.add(users[0].email);
+                recipientsMap.set(users[0].email, users[0].language || 'cs');
             }
         }
     } else {
         // B) Request is unassigned (New) -> Notify all Maintenance staff
         // Exclude the author if they are maintenance to prevent spamming themselves
-        const [maintUsers] = await pool.query("SELECT email, id FROM users WHERE role = 'maintenance' AND isBlocked = 0");
+        const [maintUsers] = await pool.query("SELECT email, id, language FROM users WHERE role = 'maintenance' AND isBlocked = 0");
         maintUsers.forEach(u => {
             if (u.id !== currentUserId && u.email) {
-                recipients.add(u.email);
+                recipientsMap.set(u.email, u.language || 'cs');
             }
         });
     }
 
-    // Insert emails into queue
-    for (const email of recipients) {
+    // Iterate over recipients and generate localized emails
+    for (const [email, lang] of recipientsMap.entries()) {
+        const emailData = {
+            title: title || 'Bez názvu',
+            description: description,
+            priority: priority,
+            techName: techName,
+            photoUrl: (photoUrls && photoUrls.length > 0) ? photoUrls[0] : null
+        };
+
+        const { subject, body } = getNewRequestEmailBody(lang, emailData);
+
         await pool.execute(
             'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-            [email, emailSubject, emailBody]
+            [email, subject, body]
         );
     }
 
@@ -163,12 +176,19 @@ router.put('/:id', async (req, res) => {
         // --- Email Logic on Assignment (PUT) ---
         // If solverId was changed AND it wasn't a self-assignment
         if (body.solverId && body.solverId !== currentUserId) {
-             const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [body.solverId]);
+             const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [body.solverId]);
              if (users.length > 0 && users[0].email) {
-                 const emailBody = `Byl vám přiřazen požadavek.\n\nZkontrolujte systém FHB Maintein.`;
+                 const lang = users[0].language || 'cs';
+                 const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
+                 const emailBody = lang === 'en' 
+                    ? `A request has been assigned to you.\n\nCheck FHB Maintein.` 
+                    : (lang === 'uk' 
+                        ? `Вам призначено запит.\n\nПеревірте FHB Maintein.` 
+                        : `Byl vám přiřazen požadavek.\n\nZkontrolujte systém FHB Maintein.`);
+
                  await pool.execute(
                     'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                    [users[0].email, `Přiřazení úkolu`, emailBody]
+                    [users[0].email, subject, emailBody]
                  );
              }
         }

@@ -58,7 +58,8 @@ export const RequestsTable = ({
         fSupplierIds, setFSupplierIds,
         fStatusIds, setFStatusIds,
         fPriorities, setFPriorities,
-        fApproved, setFApproved
+        fApproved, setFApproved,
+        fAuthorId, setFAuthorId // Author Filter
     } = filterState;
 
     // Check if any filter is active
@@ -70,7 +71,8 @@ export const RequestsTable = ({
         fSupplierIds.length > 0 || 
         fStatusIds.length > 0 || 
         fPriorities.length > 0 || 
-        fApproved !== 'all';
+        fApproved !== 'all' ||
+        fAuthorId; // Check author filter
 
     const handleClearAllFilters = () => {
         setFTitle('');
@@ -82,6 +84,7 @@ export const RequestsTable = ({
         setFStatusIds([]);
         setFPriorities([]);
         setFApproved('all');
+        setFAuthorId('');
     };
 
     // -- Filtering Logic --
@@ -89,9 +92,9 @@ export const RequestsTable = ({
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
             
-            if (currentUser.role === 'operator') {
-                if (req.authorId !== currentUser.id) return false;
-            }
+            // Note: Strict operator restriction removed in parent RequestsPage to allow full visibility on tech
+            // Author Filter Logic (fAuthorId) is handled here now:
+            if (fAuthorId && req.authorId !== fAuthorId) return false;
 
             if (fTitle) {
                 const localizedTitle = getLocalized(req.title, lang);
@@ -135,7 +138,7 @@ export const RequestsTable = ({
 
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, lang]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, lang, fAuthorId]);
 
     // -- Pagination Logic --
     const totalItems = filteredRequests.length;
@@ -236,7 +239,18 @@ export const RequestsTable = ({
                             <th className="px-4 py-2 font-semibold text-right">{t('common.actions')}</th>
                         </tr>
                         <tr className="bg-slate-100 border-b border-slate-200">
-                            <th className="px-2 py-2"></th>
+                            <th className="px-2 py-2 text-center">
+                                {/* Toggle for "My Requests" - Primarily for Operators */}
+                                <div className="flex items-center justify-center" title="Zobrazit pouze moje">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        checked={fAuthorId === currentUser.id}
+                                        onChange={(e) => setFAuthorId(e.target.checked ? currentUser.id : '')}
+                                    />
+                                    <span className="ml-1 text-[10px] text-slate-500 whitespace-nowrap">Jen moje</span>
+                                </div>
+                            </th>
                             <th className="px-2 py-2">
                                 <div className="relative">
                                     <input 

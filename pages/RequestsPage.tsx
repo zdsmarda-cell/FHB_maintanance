@@ -54,6 +54,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     const [fPriorities, setFPriorities] = useState<string[]>([]); // Added Priority Filter
     const [fApproved, setFApproved] = useState('all');
     const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null); // New Maintenance Filter
+    const [fAuthorId, setFAuthorId] = useState<string>(''); // Added Author Filter (specifically for Operators)
 
     // --- Data Fetching ---
     const refresh = async () => {
@@ -99,13 +100,14 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     // Load initial filters
     useEffect(() => {
         if (initialFilters && Object.keys(initialFilters).length > 0) {
-            if (initialFilters.status) setFStatusIds([initialFilters.status]);
+            if (initialFilters.status) {
+                const statuses = Array.isArray(initialFilters.status) ? initialFilters.status : [initialFilters.status];
+                setFStatusIds(statuses);
+            }
             if (initialFilters.solverId) setFSolverIds([initialFilters.solverId]);
+            if (initialFilters.authorId) setFAuthorId(initialFilters.authorId);
             if (initialFilters.mode === 'approval') {
                 setFApproved('no');
-                // Ensure we see requests that need approval (usually new or assigned)
-                // If status isn't specified, we might default to active ones, 
-                // but 'no' on approval + Admin role usually implies the Dashboard link.
                 if (!initialFilters.status) setFStatusIds(['new', 'assigned']);
             }
             if (initialFilters.date) {
@@ -129,10 +131,11 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         return requests.filter(req => {
             const tech = technologies.find(t => t.id === req.techId);
             
-            // 1. Role-based Access
-            if (currentUser.role === 'operator') {
-                if (req.authorId !== currentUser.id) return false;
-            }
+            // Removed strict Operator role restriction. Now operators can see all requests
+            // unless filtered explicitly (e.g. by fAuthorId).
+            
+            // 1. Author Filter (Explicit)
+            if (fAuthorId && req.authorId !== fAuthorId) return false;
 
             // 2. Title Filter (Text) - Localized check
             if (fTitle) {
@@ -189,7 +192,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId, fPriorities, lang]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId, fPriorities, lang, fAuthorId]);
 
 
     // Modals
@@ -731,7 +734,8 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                             fSupplierIds, setFSupplierIds,
                             fStatusIds, setFStatusIds,
                             fPriorities, setFPriorities,
-                            fApproved, setFApproved
+                            fApproved, setFApproved,
+                            fAuthorId, setFAuthorId // Pass Author Filter state
                         }}
                     />
                 </div>
