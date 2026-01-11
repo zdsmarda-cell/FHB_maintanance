@@ -105,7 +105,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
 
           {/* Calendar for Maintenance/Admin */}
           {(user.role === 'admin' || user.role === 'maintenance') && (
-             <MenuLink page="calendar" icon={CalendarDays} label="Kalendář" />
+             <MenuLink page="calendar" icon={CalendarDays} label={t('menu.calendar')} />
           )}
 
           {/* Maintenance separate tab for Admin/Maintenance */}
@@ -128,7 +128,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
               <MenuLink page="users" icon={Users} label={t('menu.users')} />
               <MenuLink page="emails" icon={Mail} label={t('menu.emails')} />
               <div className="my-2 border-t border-slate-800"></div>
-              <MenuLink page="settings" icon={Settings} label="Nastavení" />
+              <MenuLink page="settings" icon={Settings} label={t('menu.settings')} />
             </>
           )}
         </nav>

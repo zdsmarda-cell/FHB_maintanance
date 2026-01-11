@@ -388,17 +388,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                     {t('dashboard.upcoming_maintenance')}
                 </div>
                 <button onClick={() => onNavigate('maintenance')} className="text-xs text-blue-600 hover:underline flex items-center">
-                    Zobrazit vše <ArrowRight className="w-3 h-3 ml-1" />
+                    {t('dashboard.view_all')} <ArrowRight className="w-3 h-3 ml-1" />
                 </button>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                         <tr>
-                            <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
+                            <th className="px-4 py-3 whitespace-nowrap">{t('col.technology')}</th>
                             <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
                             <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
-                            <th className="px-4 py-3 whitespace-nowrap">Generování</th>
+                            <th className="px-4 py-3 whitespace-nowrap">{t('col.generation')}</th>
                             <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
                             <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
                         </tr>

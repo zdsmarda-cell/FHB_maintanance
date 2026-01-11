@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../../lib/db';
 import { Loader } from 'lucide-react';
+import { useI18n } from '../../lib/i18n';
 
 export const SettingsPage = () => {
+    const { t } = useI18n();
     const [loading, setLoading] = useState(false);
     const [settings, setSettings] = useState<any>({});
     
@@ -72,16 +74,16 @@ export const SettingsPage = () => {
 
     return (
         <div className="bg-white p-6 rounded shadow-sm border border-slate-200">
-            <h3 className="font-bold text-lg mb-4">Administrátorské nastavení</h3>
+            <h3 className="font-bold text-lg mb-4">{t('settings.title')}</h3>
             {isMock && (
                 <div className="mb-4 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">
-                    Běžíte v Mock/Demo režimu. Změny se neukládají na server. Přihlašte se reálným účtem pro produkční použití.
+                    {t('settings.mock_mode_warning')}
                 </div>
             )}
             <div className="flex items-center justify-between py-3 border-b">
                 <div>
-                    <div className="font-medium">Online překlady</div>
-                    <div className="text-xs text-slate-500">Automaticky překládat uživatelské vstupy pomocí externí služby.</div>
+                    <div className="font-medium">{t('settings.online_translation')}</div>
+                    <div className="text-xs text-slate-500">{t('settings.online_translation_desc')}</div>
                 </div>
                 <button 
                     onClick={toggleTranslation}

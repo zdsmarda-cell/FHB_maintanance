@@ -143,12 +143,12 @@ export const UsersPage = ({ onNavigate }: any) => {
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                             <tr>
-                                <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Jméno</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} /></th>
-                                <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Email</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={emailFilter} onChange={e => setEmailFilter(e.target.value)} /></th>
+                                <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">{t('form.user_name')}</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder={t('common.search')} value={nameFilter} onChange={e => setNameFilter(e.target.value)} /></th>
+                                <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">{t('form.email')}</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder={t('common.search')} value={emailFilter} onChange={e => setEmailFilter(e.target.value)} /></th>
                                 <th className="px-4 py-3 align-top">{t('col.role')}</th>
-                                <th className="px-4 py-3 align-top">Práce</th>
-                                <th className="px-4 py-3 align-top">Limity schvalování</th>
-                                <th className="px-4 py-3 align-top text-center">Stav</th>
+                                <th className="px-4 py-3 align-top">{t('col.work_load')}</th>
+                                <th className="px-4 py-3 align-top">{t('col.approval_limits')}</th>
+                                <th className="px-4 py-3 align-top text-center">{t('common.status')}</th>
                                 <th className="px-4 py-3 align-top text-center">{t('common.actions')}</th>
                             </tr>
                         </thead>
@@ -182,7 +182,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                                             ) : <span className="text-slate-400">-</span>}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            {u.isBlocked ? <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 text-xs font-medium"><Lock className="w-3 h-3 mr-1" /> Blokován</span> : <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium"><CheckCircle className="w-3 h-3 mr-1" /> Aktivní</span>}
+                                            {u.isBlocked ? <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 text-xs font-medium"><Lock className="w-3 h-3 mr-1" /> {t('status.blocked')}</span> : <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium"><CheckCircle className="w-3 h-3 mr-1" /> {t('status.active')}</span>}
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
@@ -229,7 +229,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                             </select>
                              <label className="flex items-center gap-2 cursor-pointer mt-2 bg-slate-50 p-2 rounded border">
                                  <input type="checkbox" checked={editingUser.isBlocked} onChange={e => setEditingUser({...editingUser, isBlocked: e.target.checked})} />
-                                 <span className={`text-sm font-medium ${editingUser.isBlocked ? 'text-red-600' : 'text-slate-700'}`}>{editingUser.isBlocked ? 'Uživatel je blokován' : 'Uživatel je aktivní'}</span>
+                                 <span className={`text-sm font-medium ${editingUser.isBlocked ? 'text-red-600' : 'text-slate-700'}`}>{editingUser.isBlocked ? t('msg.user_blocked') : t('msg.user_active')}</span>
                              </label>
                         </div>
                         <div className="border-t pt-2">

@@ -21,6 +21,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.maintenance': 'Šablony Údržby',
     'menu.users': 'Uživatelé',
     'menu.emails': 'Emaily',
+    'menu.calendar': 'Kalendář',
+    'menu.settings': 'Nastavení',
     
     'common.add': 'Přidat',
     'common.edit': 'Upravit',
@@ -103,6 +105,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.maintenance_self_assign_only': 'Jako údržbář můžete úkoly přebírat pouze na sebe.',
     'msg.req_will_be_in_progress': 'Požadavek bude označen jako "V řešení".',
     'msg.calendar_legend': '* Zobrazují se aktivní úkoly pro vybraného uživatele.',
+    'msg.user_active': 'Uživatel je aktivní',
+    'msg.user_blocked': 'Uživatel je blokován',
 
     'validation.required': 'Toto pole je povinné',
     'val.name_length': 'Název musí mít alespoň 2 znaky.',
@@ -232,6 +236,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.total_assets': 'Celkem Technologií',
     'dashboard.upcoming_maintenance': 'Nadcházející údržba',
     'dashboard.urgent_requests': 'Urgentní požadavky',
+    'dashboard.view_all': 'Zobrazit vše',
 
     'role.admin': 'Administrátor',
     'role.maintenance': 'Údržbář',
@@ -247,6 +252,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.sent': 'Odesláno',
     'status.pending': 'Čeká',
     'status.error': 'Chyba',
+    'status.active': 'Aktivní',
+    'status.blocked': 'Blokován',
     
     'prio.basic': 'Běžná',
     'prio.priority': 'Prioritní',
@@ -264,6 +271,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.deadline': 'Termín',
     'col.effort': 'Pracnost',
     'col.role': 'Role',
+    'col.generation': 'Generování',
+    'col.work_load': 'Práce',
+    'col.approval_limits': 'Limity schvalování',
 
     'action.created': 'Vytvořeno',
     'action.status_change': 'Změna stavu',
@@ -299,6 +309,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'modal.change_password': 'Změna hesla',
     'modal.assign_title_edit': 'Změnit řešitele / Termín',
     'modal.assign_title_new': 'Přiřazení / Plánování',
+    'modal.retry_email_title': 'Potvrzení odeslání',
+    'modal.retry_email_msg': 'Opravdu chcete znovu odeslat vybrané emaily?',
 
     'filter.visibility_all': 'Viditelnost: Vše',
     'filter.visibility_yes': 'Viditelnost: Ano',
@@ -314,6 +326,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': '-- Nepřiřazeno --',
 
     'tooltip.print_day': 'Tisk denního plánu',
+
+    'settings.title': 'Administrátorské nastavení',
+    'settings.online_translation': 'Online překlady',
+    'settings.online_translation_desc': 'Automaticky překládat uživatelské vstupy pomocí externí služby.',
+    'settings.mock_mode_warning': 'Běžíte v Mock/Demo režimu. Změny se neukládají na server. Přihlašte se reálným účtem pro produkční použití.',
 
     'pdf.title_worklist': 'FHB Maintain - List pracnosti',
     'pdf.title_tasklist': 'Seznam úkolů',
@@ -344,6 +361,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.maintenance': 'Maintenance Templates',
     'menu.users': 'Users',
     'menu.emails': 'Emails',
+    'menu.calendar': 'Calendar',
+    'menu.settings': 'Settings',
     
     'common.add': 'Add',
     'common.edit': 'Edit',
@@ -426,6 +445,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.maintenance_self_assign_only': 'As maintenance, you can only assign tasks to yourself.',
     'msg.req_will_be_in_progress': 'Request will be marked as "In Progress".',
     'msg.calendar_legend': '* Showing active tasks for selected user.',
+    'msg.user_active': 'User is active',
+    'msg.user_blocked': 'User is blocked',
 
     'validation.required': 'This field is required',
     'val.name_length': 'Name must be at least 2 chars.',
@@ -555,6 +576,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.total_assets': 'Total Assets',
     'dashboard.upcoming_maintenance': 'Upcoming',
     'dashboard.urgent_requests': 'Urgent Requests',
+    'dashboard.view_all': 'View All',
 
     'role.admin': 'Administrator',
     'role.maintenance': 'Maintenance',
@@ -570,6 +592,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.sent': 'Sent',
     'status.pending': 'Pending',
     'status.error': 'Error',
+    'status.active': 'Active',
+    'status.blocked': 'Blocked',
     
     'prio.basic': 'Basic',
     'prio.priority': 'Priority',
@@ -587,6 +611,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.deadline': 'Deadline',
     'col.effort': 'Effort',
     'col.role': 'Role',
+    'col.generation': 'Generation',
+    'col.work_load': 'Work',
+    'col.approval_limits': 'Approval Limits',
 
     'action.created': 'Created',
     'action.status_change': 'Status Change',
@@ -622,6 +649,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'modal.change_password': 'Change Password',
     'modal.assign_title_edit': 'Change Solver / Deadline',
     'modal.assign_title_new': 'Assign / Plan',
+    'modal.retry_email_title': 'Confirm Resend',
+    'modal.retry_email_msg': 'Do you really want to resend selected emails?',
 
     'filter.visibility_all': 'Visibility: All',
     'filter.visibility_yes': 'Visibility: Yes',
@@ -637,6 +666,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': '-- Unassigned --',
 
     'tooltip.print_day': 'Print Daily Plan',
+
+    'settings.title': 'Admin Settings',
+    'settings.online_translation': 'Online Translation',
+    'settings.online_translation_desc': 'Automatically translate user inputs using external service.',
+    'settings.mock_mode_warning': 'Running in Mock/Demo mode. Changes are not saved to server. Login with real account for production use.',
 
     'pdf.title_worklist': 'FHB Maintain - Work List',
     'pdf.title_tasklist': 'Task List',
@@ -667,6 +701,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.maintenance': 'Шаблони обслуговування',
     'menu.users': 'Користувачі',
     'menu.emails': 'Електронні листи',
+    'menu.calendar': 'Календар',
+    'menu.settings': 'Налаштування',
     
     'common.add': 'Додати',
     'common.edit': 'Редагувати',
@@ -749,6 +785,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.maintenance_self_assign_only': 'Як технік, ви можете призначати завдання тільки собі.',
     'msg.req_will_be_in_progress': 'Запит буде позначено як "В роботі".',
     'msg.calendar_legend': '* Показані активні завдання для вибраного користувача.',
+    'msg.user_active': 'Користувач активний',
+    'msg.user_blocked': 'Користувач заблокований',
 
     'validation.required': "Це поле є обов'язковим",
     'val.name_length': "Ім'я повинно містити мінімум 2 символи.",
@@ -878,6 +916,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'dashboard.total_assets': 'Всього активів',
     'dashboard.upcoming_maintenance': 'Майбутнє',
     'dashboard.urgent_requests': 'Термінові запити',
+    'dashboard.view_all': 'Показати всі',
 
     'role.admin': 'Адміністратор',
     'role.maintenance': 'Технік',
@@ -893,6 +932,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.sent': 'Надіслано',
     'status.pending': 'Очікує',
     'status.error': 'Помилка',
+    'status.active': 'Активний',
+    'status.blocked': 'Заблокований',
     
     'prio.basic': 'Звичайна',
     'prio.priority': 'Пріоритетна',
@@ -910,6 +951,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.deadline': 'Термін',
     'col.effort': 'Зусилля',
     'col.role': 'Роль',
+    'col.generation': 'Генерація',
+    'col.work_load': 'Робота',
+    'col.approval_limits': 'Ліміти схвалення',
 
     'action.created': 'Створено',
     'action.status_change': 'Зміна статусу',
@@ -945,6 +989,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'modal.change_password': 'Зміна пароля',
     'modal.assign_title_edit': 'Змінити виконавця / Термін',
     'modal.assign_title_new': 'Призначення / Планування',
+    'modal.retry_email_title': 'Підтвердження відправлення',
+    'modal.retry_email_msg': 'Ви дійсно хочете повторно надіслати вибрані листи?',
 
     'filter.visibility_all': 'Видимість: Всі',
     'filter.visibility_yes': 'Видимість: Так',
@@ -960,6 +1006,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': '-- Непризначено --',
 
     'tooltip.print_day': 'Друк денного плану',
+
+    'settings.title': 'Налаштування адміністратора',
+    'settings.online_translation': 'Онлайн-переклад',
+    'settings.online_translation_desc': 'Автоматичний переклад вводу користувача за допомогою зовнішнього сервісу.',
+    'settings.mock_mode_warning': 'Ви працюєте в режимі Mock/Demo. Зміни не зберігаються на сервері. Увійдіть через реальний обліковий запис для використання в продакшн.',
 
     'pdf.title_worklist': 'FHB Maintain - Робочий лист',
     'pdf.title_tasklist': 'Список завдань',

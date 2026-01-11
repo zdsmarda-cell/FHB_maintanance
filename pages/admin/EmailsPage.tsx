@@ -218,8 +218,8 @@ export const EmailsPage = () => {
 
             {showConfirm && (
                 <ConfirmModal 
-                    title="Potvrzení odeslání"
-                    message={`Opravdu chcete znovu odeslat ${selectedIds.length} označených emailů?`}
+                    title={t('modal.retry_email_title')}
+                    message={t('modal.retry_email_msg')}
                     onConfirm={executeRetry}
                     onCancel={() => setShowConfirm(false)}
                 />
