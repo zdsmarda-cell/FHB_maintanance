@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { useI18n } from '../lib/i18n';
 import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole } from 'lucide-react';
-import { User } from '../lib/types';
+import { User, Lang } from '../lib/types';
 import { ChangePasswordModal } from './modals/ChangePasswordModal';
+import { api, isProductionDomain } from '../lib/db';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
       onNavigate(page);
       setIsMobileMenuOpen(false); // Close menu on navigation
   };
+
+  const handleLangChange = async (newLang: Lang) => {
+      setLang(newLang);
+      
+      const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+      if (!isMock && user.id) {
+          try {
+              // Persist language preference to DB
+              await api.put(`/users/${user.id}`, { language: newLang });
+          } catch (e) {
+              console.error("Failed to save language preference", e);
+          }
+      }
+  };
+
+  // Sync initial language from user profile on load (if mismatched)
+  React.useEffect(() => {
+      if (user.language && user.language !== lang) {
+          setLang(user.language as Lang);
+      }
+  }, [user.language]);
 
   const MenuLink = ({ page, icon: Icon, label }: { page: string, icon: any, label: string }) => (
     <button
@@ -114,9 +136,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
         <div className="p-4 border-t border-slate-800 bg-slate-900">
           <div className="flex items-center justify-between mb-4">
              <div className="flex space-x-2">
-                <button onClick={() => setLang('cs')} className={`text-xs p-1 rounded ${lang === 'cs' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>CZ</button>
-                <button onClick={() => setLang('en')} className={`text-xs p-1 rounded ${lang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>EN</button>
-                <button onClick={() => setLang('uk')} className={`text-xs p-1 rounded ${lang === 'uk' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>UA</button>
+                <button onClick={() => handleLangChange('cs')} className={`text-xs p-1 rounded ${lang === 'cs' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>CZ</button>
+                <button onClick={() => handleLangChange('en')} className={`text-xs p-1 rounded ${lang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>EN</button>
+                <button onClick={() => handleLangChange('uk')} className={`text-xs p-1 rounded ${lang === 'uk' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>UA</button>
              </div>
              <Globe className="w-4 h-4 text-slate-500" />
           </div>

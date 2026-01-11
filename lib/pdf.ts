@@ -143,9 +143,9 @@ export const generateWorkListPDF = async (
         const plannedDate = formatDateCZ(r.plannedResolutionDate);
 
         return [
-            { content: r.title, styles: { fontStyle: 'bold' } },
+            { content: getLocalized(r.title, lang), styles: { fontStyle: 'bold' } },
             techName + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
-            { content: r.description || '', styles: { cellWidth: 60 } }, 
+            { content: getLocalized(r.description, lang) || '', styles: { cellWidth: 60 } }, 
             solverName,
             plannedDate,
             localizedPrio,

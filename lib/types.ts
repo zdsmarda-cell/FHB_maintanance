@@ -16,6 +16,7 @@ export interface User {
   email: string;
   phone: string;
   role: Role;
+  language?: Lang; // Added language preference
   password?: string; // Added for password reset simulation
   isBlocked: boolean;
   assignedLocationIds: string[]; 

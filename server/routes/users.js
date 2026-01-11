@@ -15,6 +15,7 @@ router.get('/', async (req, res) => {
         email: u.email,
         role: u.role,
         phone: u.phone,
+        language: u.language || 'cs', // Added language
         isBlocked: !!u.isBlocked,
         assignedLocationIds: typeof u.assignedLocationIds === 'string' ? JSON.parse(u.assignedLocationIds || '[]') : u.assignedLocationIds,
         assignedWorkplaceIds: typeof u.assignedWorkplaceIds === 'string' ? JSON.parse(u.assignedWorkplaceIds || '[]') : u.assignedWorkplaceIds,
@@ -27,11 +28,11 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, email, role, phone } = req.body;
+  const { name, email, role, phone, language } = req.body;
   try {
     const [result] = await pool.execute(
-      'INSERT INTO users (id, name, email, role, phone, isBlocked, assignedLocationIds, assignedWorkplaceIds, approval_limits) VALUES (UUID(), ?, ?, ?, ?, 0, "[]", "[]", "{}")',
-      [name, email, role, phone]
+      'INSERT INTO users (id, name, email, role, phone, isBlocked, assignedLocationIds, assignedWorkplaceIds, approval_limits, language) VALUES (UUID(), ?, ?, ?, ?, 0, "[]", "[]", "{}", ?)',
+      [name, email, role, phone, language || 'cs']
     );
     // Fetch created
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -42,16 +43,33 @@ router.post('/', async (req, res) => {
 // Update User
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, email, role, phone, isBlocked, assignedLocationIds, assignedWorkplaceIds, approvalLimits } = req.body;
+    const { name, email, role, phone, isBlocked, assignedLocationIds, assignedWorkplaceIds, approvalLimits, language } = req.body;
     
     try {
         // Ensure approvalLimits is an object before stringifying, or handle undefined
         const limitsJson = approvalLimits ? JSON.stringify(approvalLimits) : '{}';
         
-        await pool.query(
-            `UPDATE users SET name=?, email=?, role=?, phone=?, isBlocked=?, assignedLocationIds=?, assignedWorkplaceIds=?, approval_limits=? WHERE id=?`,
-            [name, email, role, phone, isBlocked, JSON.stringify(assignedLocationIds), JSON.stringify(assignedWorkplaceIds), limitsJson, id]
-        );
+        // Dynamic query construction to allow partial updates (e.g. just language)
+        let query = 'UPDATE users SET ';
+        const params = [];
+        const updates = [];
+
+        if (name !== undefined) { updates.push('name=?'); params.push(name); }
+        if (email !== undefined) { updates.push('email=?'); params.push(email); }
+        if (role !== undefined) { updates.push('role=?'); params.push(role); }
+        if (phone !== undefined) { updates.push('phone=?'); params.push(phone); }
+        if (isBlocked !== undefined) { updates.push('isBlocked=?'); params.push(isBlocked); }
+        if (assignedLocationIds !== undefined) { updates.push('assignedLocationIds=?'); params.push(JSON.stringify(assignedLocationIds)); }
+        if (assignedWorkplaceIds !== undefined) { updates.push('assignedWorkplaceIds=?'); params.push(JSON.stringify(assignedWorkplaceIds)); }
+        if (approvalLimits !== undefined) { updates.push('approval_limits=?'); params.push(limitsJson); }
+        if (language !== undefined) { updates.push('language=?'); params.push(language); }
+
+        if (updates.length === 0) return res.json({ message: 'No changes' });
+
+        query += updates.join(', ') + ' WHERE id=?';
+        params.push(id);
+
+        await pool.query(query, params);
         res.json({ id, ...req.body });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

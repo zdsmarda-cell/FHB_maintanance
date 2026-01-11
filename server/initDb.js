@@ -214,6 +214,12 @@ const migrations = [
         up: [
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`
         ]
+    },
+    {
+        name: '011_add_user_language',
+        up: [
+            `ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'cs'`
+        ]
     }
 ];
 
@@ -275,8 +281,8 @@ export const initDb = async () => {
       const passwordHash = await bcrypt.hash('1234', 10);
       const userId = crypto.randomUUID();
       await pool.query(
-        `INSERT INTO users (id, name, email, password, role, isBlocked, phone, assignedLocationIds, assignedWorkplaceIds, approval_limits) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, name, email, password, role, isBlocked, phone, assignedLocationIds, assignedWorkplaceIds, approval_limits, language) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cs')`,
         [userId, 'Zdeněk Šmarda', adminEmail, passwordHash, 'admin', false, '', '[]', '[]', '{}']
       );
     }

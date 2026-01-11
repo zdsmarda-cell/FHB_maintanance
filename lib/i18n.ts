@@ -55,6 +55,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.recipient': 'Příjemce',
     'common.retry': 'Znovu odeslat',
 
+    'auth.login': 'Přihlásit se',
+    'auth.password': 'Heslo',
     'auth.forgot_password': 'Zapomenuté heslo',
     'auth.send_link': 'Odeslat odkaz',
     'auth.link_sent_title': 'Odkaz odeslán',
@@ -64,6 +66,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.reset_success': 'Heslo bylo úspěšně změněno.',
     'auth.token_invalid': 'Neplatný nebo již použitý odkaz pro obnovu hesla.',
     'auth.back_to_login': 'Zpět na přihlášení',
+    'auth.enter_email': 'Zadejte email a heslo.',
+    'auth.demo_accounts': 'Demo účty (klikni pro vyplnění)',
+    'auth.local_data': 'Lokální data (Mock)',
 
     'msg.confirm_delete': 'Opravdu chcete smazat tento záznam?',
     'msg.cannot_delete_used': 'Záznam nelze smazat, protože je používán.',
@@ -239,6 +244,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.recipient': 'Recipient',
     'common.retry': 'Retry Sending',
 
+    'auth.login': 'Log In',
+    'auth.password': 'Password',
     'auth.forgot_password': 'Forgot Password',
     'auth.send_link': 'Send Link',
     'auth.link_sent_title': 'Link Sent',
@@ -248,6 +255,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.reset_success': 'Password changed successfully.',
     'auth.token_invalid': 'Invalid or expired password reset link.',
     'auth.back_to_login': 'Back to Login',
+    'auth.enter_email': 'Enter email and password.',
+    'auth.demo_accounts': 'Demo accounts (click to fill)',
+    'auth.local_data': 'Local data (Mock)',
 
     'msg.confirm_delete': 'Are you sure you want to delete this record?',
     'msg.cannot_delete_used': 'Cannot delete, record is in use.',
@@ -423,6 +433,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.recipient': 'Одержувач',
     'common.retry': 'Повторити відправку',
 
+    'auth.login': 'Увійти',
+    'auth.password': 'Пароль',
     'auth.forgot_password': 'Забули пароль',
     'auth.send_link': 'Надіслати посилання',
     'auth.link_sent_title': 'Посилання надіслано',
@@ -432,6 +444,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.reset_success': 'Пароль успішно змінено.',
     'auth.token_invalid': 'Недійсне або прострочене посилання.',
     'auth.back_to_login': 'Повернутися до входу',
+    'auth.enter_email': 'Введіть email та пароль.',
+    'auth.demo_accounts': 'Демо-акаунти (натисніть, щоб заповнити)',
+    'auth.local_data': 'Локальні дані (Mock)',
 
     'msg.confirm_delete': 'Ви впевнені, що хочете видалити цей запис?',
     'msg.cannot_delete_used': 'Неможливо видалити, запис використовується.',
@@ -564,9 +579,21 @@ const translations: Record<Lang, Record<string, string>> = {
   }
 };
 
+const getSavedLang = (): Lang => {
+    try {
+        const saved = localStorage.getItem('app_lang');
+        return (saved === 'cs' || saved === 'en' || saved === 'uk') ? saved : 'cs';
+    } catch {
+        return 'cs';
+    }
+};
+
 export const useI18n = create<I18nStore>((set, get) => ({
-  lang: 'cs',
-  setLang: (lang) => set({ lang }),
+  lang: getSavedLang(),
+  setLang: (lang) => {
+      localStorage.setItem('app_lang', lang);
+      set({ lang });
+  },
   t: (key) => {
     const lang = get().lang;
     return translations[lang][key] || key;

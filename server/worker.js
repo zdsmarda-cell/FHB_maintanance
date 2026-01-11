@@ -1,7 +1,7 @@
 
 import pool from './db.js';
 import nodemailer from 'nodemailer';
-import { getNewRequestEmailBody } from './templates/email.js';
+import { getNewRequestEmailBody, getMaintenanceEmail } from './templates/email.js';
 import { checkDailyOverdue } from './workers/dailyOverdue.js';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
@@ -70,8 +70,13 @@ const processEmailQueue = async () => {
 
 const generateMaintenanceRequests = async () => {
     try {
-        // Fetch active templates
-        const [templates] = await pool.query('SELECT * FROM maintenances WHERE is_active = TRUE');
+        // Fetch active templates WITH tech name for the email
+        const [templates] = await pool.query(`
+            SELECT m.*, t.name as tech_name 
+            FROM maintenances m 
+            LEFT JOIN technologies t ON m.tech_id = t.id
+            WHERE m.is_active = TRUE
+        `);
         
         if(templates.length === 0) return;
 
@@ -166,31 +171,38 @@ const generateMaintenanceRequests = async () => {
                 );
                 await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
 
-                // 4. Send Email (Real Recipients)
-                const emailBody = getNewRequestEmailBody('priority', `(Automatická údržba) ${template.description}`);
-                const emailSubject = `Nová údržba: ${template.title}`;
-                
-                const recipients = new Set();
+                // 4. Send Email (Real Recipients with Localization)
+                // Determine recipients map: Email -> Language
+                const recipients = new Map(); // email -> language
 
                 if (solverId) {
                     // Send to assigned responsible person
-                    const [users] = await pool.query('SELECT email FROM users WHERE id = ?', [solverId]);
+                    const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [solverId]);
                     if (users.length > 0 && users[0].email) {
-                        recipients.add(users[0].email);
+                        recipients.set(users[0].email, users[0].language || 'cs');
                     }
                 } else {
                     // No responsible person set -> Send to ALL maintenance staff
-                    const [maintUsers] = await pool.query("SELECT email FROM users WHERE role = 'maintenance' AND isBlocked = 0");
+                    const [maintUsers] = await pool.query("SELECT email, language FROM users WHERE role = 'maintenance' AND isBlocked = 0");
                     maintUsers.forEach(u => {
-                        if (u.email) recipients.add(u.email);
+                        if (u.email) recipients.set(u.email, u.language || 'cs');
                     });
                 }
 
-                // Insert into queue
-                for (const email of recipients) {
+                // Insert into queue PER USER (because of translation)
+                for (const [email, lang] of recipients.entries()) {
+                    const emailData = {
+                        title: template.title,
+                        description: template.description,
+                        techName: template.tech_name,
+                        date: targetDateStr
+                    };
+                    
+                    const { subject, body } = getMaintenanceEmail(lang, emailData);
+
                     await pool.execute(
                         'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                        [email, emailSubject, emailBody]
+                        [email, subject, body]
                     );
                 }
 

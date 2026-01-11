@@ -93,7 +93,10 @@ export const RequestsTable = ({
                 if (req.authorId !== currentUser.id) return false;
             }
 
-            if (fTitle && !req.title.toLowerCase().includes(fTitle.toLowerCase())) return false;
+            if (fTitle) {
+                const localizedTitle = getLocalized(req.title, lang);
+                if (!localizedTitle.toLowerCase().includes(fTitle.toLowerCase())) return false;
+            }
             if (fTechIds.length > 0 && !fTechIds.includes(req.techId)) return false;
 
             if (fDateResFrom || fDateResTo) {
@@ -132,7 +135,7 @@ export const RequestsTable = ({
 
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, lang]);
 
     // -- Pagination Logic --
     const totalItems = filteredRequests.length;
@@ -311,7 +314,7 @@ export const RequestsTable = ({
                                                 </button>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 font-medium text-slate-800">{r.title}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-800">{getLocalized(r.title, lang)}</td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">{getLocalized(tech?.name, lang) || '-'}</td>
                                         <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                                             <div>{new Date(r.createdDate).toLocaleDateString()}</div>

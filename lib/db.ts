@@ -6,72 +6,95 @@ const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
 export const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
-// Use mock if not on production domain, unless overridden by local state in App.tsx (we read state via props in components usually)
-// But for direct db calls, we use this default.
 const isMockEnv = !isProductionDomain; 
+
+// --- Internal Fetch Helper with Refresh Logic ---
+const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
+    let token = localStorage.getItem('auth_token');
+    if (!token) throw new Error('API Error: No access token found. Please login again.');
+
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        ...(options.headers || {})
+    };
+
+    let res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+        ...options,
+        headers
+    });
+
+    // If Access Token is expired (403 or 401), try to refresh
+    if (res.status === 403 || res.status === 401) {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+            try {
+                console.log("Access token expired, attempting refresh...");
+                const refreshRes = await fetch(`${PROD_API_URL}/api/auth/refresh`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken })
+                });
+
+                if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    const newAccessToken = data.accessToken;
+                    
+                    // Save new token
+                    localStorage.setItem('auth_token', newAccessToken);
+                    
+                    // Retry original request
+                    headers['Authorization'] = `Bearer ${newAccessToken}`;
+                    res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+                        ...options,
+                        headers
+                    });
+                } else {
+                    // Refresh failed (e.g. 24h expired), throw original error to trigger logout
+                    console.error("Refresh token expired or invalid.");
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('refresh_token');
+                    // Optional: trigger a window event or just let the app catch the error
+                }
+            } catch (refreshErr) {
+                console.error("Error during token refresh:", refreshErr);
+            }
+        }
+    }
+
+    if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorBody}`);
+    }
+    
+    return res.json();
+};
 
 // --- API Helper ---
 export const api = {
     baseUrl: PROD_API_URL,
     
     get: async (endpoint: string) => {
-        const token = localStorage.getItem('auth_token');
-        if (!token) throw new Error('API Error: No access token found. Please login again.');
-        
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
-        return res.json();
+        return fetchWithAuth(endpoint, { method: 'GET' });
     },
 
     post: async (endpoint: string, body: any) => {
-        const token = localStorage.getItem('auth_token');
-        if (!token) throw new Error('API Error: No access token found. Please login again.');
-
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+        return fetchWithAuth(endpoint, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-        if (!res.ok) {
-            const errorBody = await res.text();
-            throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorBody}`);
-        }
-        return res.json();
     },
     
     put: async (endpoint: string, body: any) => {
-        const token = localStorage.getItem('auth_token');
-        if (!token) throw new Error('API Error: No access token found. Please login again.');
-
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'PUT',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+        return fetchWithAuth(endpoint, { 
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
-        return res.json();
     },
 
     delete: async (endpoint: string) => {
-        const token = localStorage.getItem('auth_token');
-        if (!token) throw new Error('API Error: No access token found. Please login again.');
-
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'DELETE',
-            headers: { 
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
-        return res.json();
+        return fetchWithAuth(endpoint, { method: 'DELETE' });
     }
 };
 
@@ -80,7 +103,7 @@ const uid = () => Math.random().toString(36).substr(2, 9);
 
 const seedData = () => {
   if (localStorage.getItem('tmp_users')) return;
-  // ... (Existing seed logic truncated for brevity, same as before)
+  // ... (Existing seed logic)
   const locId = uid();
   const wpId = uid();
   const userId = uid();

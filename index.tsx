@@ -13,8 +13,8 @@ import { AssetsPage } from './pages/Assets';
 import { RequestsPage } from './pages/RequestsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { CalendarPage } from './pages/CalendarPage';
-import { seedData, db } from './lib/db'; // Removed api import, defined locally or used direct fetch
-import { User } from './lib/types';
+import { seedData, db } from './lib/db'; 
+import { User, Lang } from './lib/types';
 import { useI18n } from './lib/i18n';
 import { KeyRound, Mail, AlertTriangle, CheckCircle, Loader, Database, Server, Lock, User as UserIcon } from 'lucide-react';
 
@@ -28,8 +28,10 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Explicitly declare state as a class property
-  state: ErrorBoundaryState = { hasError: false, error: null };
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -68,17 +70,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 const PROD_DOMAIN = 'fhbmain.impossible.cz';
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
-// RUNTIME DETECTION:
 const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
 const shouldForceMock = !isProductionDomain;
 
 const App = () => {
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
   
-  // Initialize state based on runtime domain check
   const [useMockData, setUseMockData] = useState(shouldForceMock);
 
-  // Initialize Mock Data if enabled
   useEffect(() => {
     if (useMockData) {
         seedData();
@@ -95,7 +94,6 @@ const App = () => {
   // Auth States
   const [authView, setAuthView] = useState<'login' | 'forgot' | 'reset' | 'link-sent'>('login');
   
-  // Login Inputs
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
@@ -107,23 +105,68 @@ const App = () => {
   const [generatedLink, setGeneratedLink] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // --- Session Restoration (Fix for logout on refresh) ---
+  // --- Session Restoration & Auto-Logout Logic ---
+  const handleLogout = () => {
+      setUser(null);
+      setLoginEmail('');
+      setLoginPassword('');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('auth_login_time');
+  };
+
   useEffect(() => {
       const storedToken = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
+      const storedLoginTime = localStorage.getItem('auth_login_time');
       
       if (storedToken && storedUser) {
+          // Check 24h timeout
+          if (storedLoginTime) {
+              const loginTime = parseInt(storedLoginTime, 10);
+              const now = Date.now();
+              const hoursElapsed = (now - loginTime) / (1000 * 60 * 60);
+              
+              if (hoursElapsed >= 24) {
+                  console.warn("Session expired (24h limit). Logging out.");
+                  handleLogout();
+                  return;
+              }
+          }
+
           try {
               const parsedUser = JSON.parse(storedUser);
               setUser(parsedUser);
               console.log('Session restored for:', parsedUser.email);
           } catch (e) {
               console.error('Failed to restore session:', e);
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('auth_user');
+              handleLogout();
           }
       }
   }, []);
+
+  // Timer for Auto-Logout (check every minute)
+  useEffect(() => {
+      if (!user) return;
+
+      const interval = setInterval(() => {
+          const storedLoginTime = localStorage.getItem('auth_login_time');
+          if (storedLoginTime) {
+              const loginTime = parseInt(storedLoginTime, 10);
+              const now = Date.now();
+              const hoursElapsed = (now - loginTime) / (1000 * 60 * 60);
+              
+              if (hoursElapsed >= 24) {
+                  console.warn("Auto-logout triggered (24h limit).");
+                  handleLogout();
+                  alert("Vaše relace vypršela (24 hodin). Přihlašte se prosím znovu.");
+              }
+          }
+      }, 60000); // Check every minute
+
+      return () => clearInterval(interval);
+  }, [user]);
 
   // Check URL for Reset Token
   useEffect(() => {
@@ -140,7 +183,6 @@ const App = () => {
                 setAuthError(t('auth.token_invalid'));
             }
         } else {
-             // In production we just show reset view and validate on submit
              setAuthView('reset'); 
         }
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -153,7 +195,7 @@ const App = () => {
     setIsLoggingIn(true);
 
     if (!loginEmail || !loginPassword) {
-        setAuthError("Zadejte email a heslo.");
+        setAuthError(t('auth.enter_email'));
         setIsLoggingIn(false);
         return;
     }
@@ -172,8 +214,10 @@ const App = () => {
                 if (found.password && found.password !== loginPassword && loginPassword !== 'password') {
                      setAuthError("Neplatné heslo (Demo: použijte 'password').");
                 } else {
+                    const now = Date.now().toString();
                     localStorage.setItem('auth_token', 'mock-token-' + found.id);
-                    localStorage.setItem('auth_user', JSON.stringify(found)); // Store User for persistence
+                    localStorage.setItem('auth_user', JSON.stringify(found));
+                    localStorage.setItem('auth_login_time', now);
                     setUser(found);
                     setPage('dashboard');
                 }
@@ -198,8 +242,15 @@ const App = () => {
 
             if (response.ok) {
                 const data = await response.json();
+                const now = Date.now().toString();
+                
                 localStorage.setItem('auth_token', data.token);
-                localStorage.setItem('auth_user', JSON.stringify(data.user)); // Store User for persistence
+                if (data.refreshToken) {
+                    localStorage.setItem('refresh_token', data.refreshToken);
+                }
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
+                localStorage.setItem('auth_login_time', now);
+                
                 setUser(data.user);
                 setPage('dashboard');
             } else {
@@ -229,7 +280,6 @@ const App = () => {
   const handleSendLink = async () => {
       setAuthError(null);
       
-      // Email Validation Regex
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(resetEmail)) {
           setAuthError("Zadejte platný email (např. jmeno@firma.cz).");
@@ -248,16 +298,15 @@ const App = () => {
       } else {
           try {
               setIsLoggingIn(true);
-              // Use DIRECT FETCH instead of api helper because user is not logged in (no token)
               const res = await fetch(`${PROD_API_URL}/api/auth/forgot-password`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email: resetEmail })
+                  body: JSON.stringify({ email: resetEmail, lang: lang }) // Send current language
               });
               
               if (res.ok) {
                   setAuthView('link-sent');
-                  setGeneratedLink('Odkaz byl odeslán na váš email.'); 
+                  setGeneratedLink(t('auth.link_sent_title')); 
               } else {
                   throw new Error('Server error');
               }
@@ -286,7 +335,6 @@ const App = () => {
       } else {
            try {
                setIsLoggingIn(true);
-               // Use DIRECT FETCH for public endpoint
                const res = await fetch(`${PROD_API_URL}/api/auth/reset-password`, {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json' },
@@ -315,24 +363,28 @@ const App = () => {
       setPageParams(params || {});
   }
 
-  const handleLogout = () => {
-      setUser(null);
-      setLoginEmail('');
-      setLoginPassword('');
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user'); // Clear stored user
+  const handleLangChange = (l: Lang) => {
+      setLang(l);
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-          <h1 className="text-2xl font-bold mb-2 text-slate-800">{t('app.name')}</h1>
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 relative">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center relative">
+          
+          {/* Language Switcher */}
+          <div className="absolute top-4 right-4 flex space-x-1">
+             <button onClick={() => handleLangChange('cs')} className={`text-xs px-2 py-1 rounded transition-colors ${lang === 'cs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>CZ</button>
+             <button onClick={() => handleLangChange('en')} className={`text-xs px-2 py-1 rounded transition-colors ${lang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>EN</button>
+             <button onClick={() => handleLangChange('uk')} className={`text-xs px-2 py-1 rounded transition-colors ${lang === 'uk' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>UA</button>
+          </div>
+
+          <h1 className="text-2xl font-bold mb-2 text-slate-800 mt-2">{t('app.name')}</h1>
           
           <div className="mb-6 flex justify-center">
               <span className={`text-xs px-2 py-1 rounded font-mono flex items-center gap-1 ${useMockData ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
                   {useMockData ? <Database className="w-3 h-3"/> : <Server className="w-3 h-3"/>}
-                  {useMockData ? 'MOCK DATA (Local)' : 'PRODUCTION API'}
+                  {useMockData ? t('auth.local_data') : 'PRODUCTION API'}
               </span>
           </div>
 
@@ -367,7 +419,7 @@ const App = () => {
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Heslo</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('auth.password')}</label>
                         <div className="relative">
                             <input 
                                 type="password" 
@@ -386,7 +438,7 @@ const App = () => {
                         disabled={isLoggingIn} 
                         className="w-full py-2.5 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 flex justify-center items-center transition-colors shadow-sm"
                     >
-                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : 'Přihlásit se'}
+                        {isLoggingIn ? <Loader className="animate-spin w-5 h-5"/> : t('auth.login')}
                     </button>
                 </form>
 
@@ -402,11 +454,11 @@ const App = () => {
                 {/* DEMO HELPERS - Only Visible in Mock Mode */}
                 {useMockData && (
                     <div className="mt-6 pt-4 border-t border-slate-100">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Demo účty (klikni pro vyplnění)</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">{t('auth.demo_accounts')}</p>
                         <div className="flex justify-center gap-2 text-xs">
                             <button onClick={() => demoFill('admin@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Admin</button>
-                            <button onClick={() => demoFill('maint@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Údržba</button>
-                            <button onClick={() => demoFill('op@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Obsluha</button>
+                            <button onClick={() => demoFill('maint@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Maint</button>
+                            <button onClick={() => demoFill('op@tech.com')} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600">Op</button>
                         </div>
                     </div>
                 )}
@@ -421,7 +473,7 @@ const App = () => {
                                 checked={useMockData} 
                                 onChange={(e) => setUseMockData(e.target.checked)} 
                             />
-                            <span>Lokální data (Mock)</span>
+                            <span>{t('auth.local_data')}</span>
                         </label>
                     </div>
                 )}

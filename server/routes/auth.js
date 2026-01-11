@@ -5,11 +5,13 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import pool from '../db.js';
 import dotenv from 'dotenv';
+import { getPasswordResetEmail } from '../templates/email.js';
 
 dotenv.config();
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -24,8 +26,6 @@ router.post('/login', async (req, res) => {
     }
 
     // 2. Check password
-    // Note: In a real app, passwords in DB must be hashed. 
-    // This supports both hashed (production) and plain text (legacy/demo) for smooth transition.
     const isMatch = await bcrypt.compare(password, user.password || '') || password === user.password;
 
     if (!isMatch) {
@@ -36,16 +36,24 @@ router.post('/login', async (req, res) => {
         return res.status(403).json({ error: 'User account is blocked' });
     }
 
-    // 3. Generate Token
-    const token = jwt.sign(
+    // 3. Generate Tokens
+    // Access Token: Short lived (e.g. 15 minutes)
+    const accessToken = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
       JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '15m' } 
+    );
+
+    // Refresh Token: Long lived (e.g. 24 hours) - this dictates the auto-logout limit on inactivity logic
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      JWT_REFRESH_SECRET,
+      { expiresIn: '24h' }
     );
 
     // Return token and user info (excluding password)
     const { password: _, ...userWithoutPass } = user;
-    res.json({ token, user: userWithoutPass });
+    res.json({ token: accessToken, refreshToken, user: userWithoutPass });
 
   } catch (err) {
     console.error(err);
@@ -53,9 +61,40 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Refresh Token Endpoint
+router.post('/refresh', async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) return res.status(401).json({ error: 'Refresh Token required' });
+
+    try {
+        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+        
+        // Check if user still exists/is not blocked
+        const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [decoded.id]);
+        const user = rows[0];
+
+        if (!user || user.isBlocked) {
+            return res.status(403).json({ error: 'User invalid or blocked' });
+        }
+
+        // Issue new Access Token
+        const accessToken = jwt.sign(
+            { id: user.id, role: user.role, email: user.email },
+            JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+
+        res.json({ accessToken });
+
+    } catch (err) {
+        return res.status(403).json({ error: 'Invalid Refresh Token' });
+    }
+});
+
 // Request Password Reset
 router.post('/forgot-password', async (req, res) => {
-    const { email } = req.body;
+    const { email, lang } = req.body;
     
     try {
         const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
@@ -75,14 +114,13 @@ router.post('/forgot-password', async (req, res) => {
         const origin = req.headers.origin || 'https://fhbmain.impossible.cz';
         const resetLink = `${origin}?resetToken=${token}`;
 
+        // Get localized email content
+        const { subject, body } = getPasswordResetEmail(lang || 'cs', resetLink);
+
         // Add to email queue
         await pool.query(
             'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-            [
-                email, 
-                'Obnova hesla - FHB Maintain', 
-                `Dobrý den,<br/><br/>požádali jste o obnovu hesla. Klikněte na následující odkaz pro nastavení nového hesla:<br/><br/><a href="${resetLink}">${resetLink}</a><br/><br/>Odkaz je platný 1 hodinu.`
-            ]
+            [email, subject, body]
         );
 
         res.json({ message: 'Email sent' });
@@ -129,13 +167,6 @@ router.post('/reset-password', async (req, res) => {
 
 // Authenticated Password Change
 router.post('/change-password', async (req, res) => {
-    // Note: Assuming authenticateToken middleware is used in index.js for this route group
-    // But since auth.js is public group, we might need manual check or move this route.
-    // However, the router structure in index.js puts /api/auth as public. 
-    // We will do a manual DB check here for simplicity or rely on passed ID if we trust the caller (bad practice).
-    // BETTER: Client sends this request to a protected route.
-    // For now, let's verify the user exists and old password matches.
-    
     const { userId, oldPassword, newPassword } = req.body;
     
     if (!userId || !oldPassword || !newPassword) {

@@ -5,6 +5,7 @@ import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
 import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, FileCheck, History as HistoryIcon, UserPlus } from 'lucide-react';
 import { CancelModal } from './modals/CancelModal';
+import { getLocalized } from '../../lib/helpers';
 
 interface RequestDetailProps {
     request: Request;
@@ -39,7 +40,7 @@ export const RequestDetail = ({
     renderPrioBadge,
     refresh
 }: RequestDetailProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
     
@@ -135,7 +136,7 @@ export const RequestDetail = ({
                     <div className="md:col-span-2 space-y-6">
                         <div>
                             <div className="flex items-center gap-3 mb-2">
-                                <h2 className="text-2xl font-bold text-slate-800">{request.title}</h2>
+                                <h2 className="text-2xl font-bold text-slate-800">{getLocalized(request.title, lang)}</h2>
                                 {renderStatusBadge(request.state)}
                                 {renderPrioBadge(request.priority)}
                             </div>
@@ -151,7 +152,7 @@ export const RequestDetail = ({
                         
                         <div className="bg-slate-50 p-4 rounded border border-slate-100">
                             <h4 className="font-bold text-sm text-slate-700 mb-2">{t('form.description')}</h4>
-                            <p className="text-slate-600 whitespace-pre-wrap">{request.description}</p>
+                            <p className="text-slate-600 whitespace-pre-wrap">{getLocalized(request.description, lang)}</p>
                         </div>
 
                         {request.cancellationReason && (
@@ -214,7 +215,7 @@ export const RequestDetail = ({
                             <h4 className="font-bold border-b pb-2">Informace</h4>
                             <div>
                                 <span className="block text-slate-500 text-xs">Technologie</span>
-                                <span className="font-medium">{technologies.find(t => t.id === request.techId)?.name}</span>
+                                <span className="font-medium">{getLocalized(technologies.find(t => t.id === request.techId)?.name, lang)}</span>
                             </div>
                             <div>
                                 <span className="block text-slate-500 text-xs">Autor</span>

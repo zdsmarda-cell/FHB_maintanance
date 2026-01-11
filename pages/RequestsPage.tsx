@@ -13,6 +13,7 @@ import { UnassignModal } from '../components/requests/modals/UnassignModal';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
 import { Plus, Printer, Loader, FilterX } from 'lucide-react';
 import { generateWorkListPDF } from '../lib/pdf';
+import { getLocalized, prepareMultilingual } from '../lib/helpers';
 
 interface RequestsPageProps {
     user: User;
@@ -133,8 +134,11 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
                 if (req.authorId !== currentUser.id) return false;
             }
 
-            // 2. Title Filter (Text)
-            if (fTitle && !req.title.toLowerCase().includes(fTitle.toLowerCase())) return false;
+            // 2. Title Filter (Text) - Localized check
+            if (fTitle) {
+                const localizedTitle = getLocalized(req.title, lang);
+                if (!localizedTitle.toLowerCase().includes(fTitle.toLowerCase())) return false;
+            }
 
             // 3. Tech Filter (Multi)
             if (fTechIds.length > 0 && !fTechIds.includes(req.techId)) return false;
@@ -185,7 +189,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
 
             return true;
         });
-    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId, fPriorities]);
+    }, [requests, currentUser, technologies, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fApproved, fMaintenanceId, fPriorities, lang]);
 
 
     // Modals
@@ -234,16 +238,23 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
     };
 
     const handleRowClick = (req: Request) => { setSelectedRequest(req); setView('detail'); };
+    
     const handleEditClick = (req: Request) => {
         setSelectedRequest(req);
         setRequestForm({
-            title: req.title, techId: req.techId, description: req.description, priority: req.priority,
-            estimatedCost: req.estimatedCost || 0, photoUrls: req.photoUrls || [], assignedSupplierId: req.assignedSupplierId || 'internal',
+            title: getLocalized(req.title, lang), // Decode title for editing
+            techId: req.techId, 
+            description: getLocalized(req.description, lang), // Decode description for editing
+            priority: req.priority,
+            estimatedCost: req.estimatedCost || 0, 
+            photoUrls: req.photoUrls || [], 
+            assignedSupplierId: req.assignedSupplierId || 'internal',
             plannedResolutionDate: req.plannedResolutionDate || '',
             estimatedTime: req.estimatedTime
         });
         setView('edit');
     };
+    
     const handleBack = () => { setSelectedRequest(null); setView('list'); refresh(); };
     const handleCreate = () => { setRequestForm({ title: '', techId: '', description: '', priority: 'basic', estimatedCost: undefined, photoUrls: [], assignedSupplierId: 'internal' }); setView('create'); };
 
@@ -260,9 +271,20 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         if (!validateForm(requestForm)) return;
         setLoading(true);
         try {
+            // Translate Content
+            const translatedTitle = await prepareMultilingual(requestForm.title);
+            const translatedDesc = await prepareMultilingual(requestForm.description);
+
             const token = localStorage.getItem('auth_token');
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
-            const payload = { ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0, authorId: currentUser.id };
+            
+            const payload = { 
+                ...requestForm, 
+                title: translatedTitle,
+                description: translatedDesc,
+                estimatedCost: requestForm.estimatedCost ?? 0, 
+                authorId: currentUser.id 
+            };
 
             if (isMock) {
                 db.requests.add({ ...payload, state: 'new' } as any);
@@ -287,9 +309,19 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
         if (!selectedRequest) return;
         setLoading(true);
         try {
+            // Translate Content
+            const translatedTitle = await prepareMultilingual(requestForm.title);
+            const translatedDesc = await prepareMultilingual(requestForm.description);
+
             const token = localStorage.getItem('auth_token');
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
-            const payload = { ...requestForm, estimatedCost: requestForm.estimatedCost ?? 0 };
+            
+            const payload = { 
+                ...requestForm, 
+                title: translatedTitle,
+                description: translatedDesc,
+                estimatedCost: requestForm.estimatedCost ?? 0 
+            };
 
             if (isMock) {
                 db.requests.update(selectedRequest.id, payload);
@@ -714,7 +746,7 @@ export const RequestsPage = ({ user: initialUser, initialFilters }: RequestsPage
             {statusModal.isOpen && (
                 <Modal title="Změna stavu" onClose={() => setStatusModal({ isOpen: false, req: null })}>
                     <div className="space-y-4">
-                        <p className="text-sm text-slate-600">Vyberte nový stav: <strong>{statusModal.req?.title}</strong></p>
+                        <p className="text-sm text-slate-600">Vyberte nový stav: <strong>{getLocalized(statusModal.req?.title, lang)}</strong></p>
                         <select className="w-full border p-2 rounded" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
                             <option value="new">{t('status.new')}</option>
                             <option value="assigned">{t('status.assigned')}</option>
