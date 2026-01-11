@@ -467,9 +467,9 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                 {/* Second row of filters for visibility if needed, or inline above */}
                 <div className="mt-2 flex justify-end">
                      <select className="p-1.5 border rounded text-sm" value={filterVisible} onChange={e => setFilterVisible(e.target.value as any)}>
-                        <option value="all">Viditelnost: {t('common.all')}</option>
-                        <option value="true">Viditelnost: {t('common.yes')}</option>
-                        <option value="false">Viditelnost: {t('common.no')}</option>
+                        <option value="all">{t('filter.visibility_all')}</option>
+                        <option value="true">{t('filter.visibility_yes')}</option>
+                        <option value="false">{t('filter.visibility_no')}</option>
                     </select>
                 </div>
             </div>

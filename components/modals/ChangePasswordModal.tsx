@@ -23,15 +23,15 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
     const handleSubmit = async () => {
         setError(null);
         if (!oldPassword || !newPassword || !confirmPassword) {
-            setError("Všechna pole jsou povinná.");
+            setError(t('msg.fields_required'));
             return;
         }
         if (newPassword !== confirmPassword) {
-            setError("Nová hesla se neshodují.");
+            setError(t('msg.passwords_mismatch'));
             return;
         }
         if (newPassword.length < 4) {
-            setError("Nové heslo musí mít alespoň 4 znaky.");
+            setError(t('msg.password_short'));
             return;
         }
 
@@ -44,7 +44,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
                 // Mock simulation
                 await new Promise(r => setTimeout(r, 800));
                 const result = db.auth.changePassword(userId, oldPassword, newPassword);
-                if (!result) throw new Error("Staré heslo není správné.");
+                if (!result) throw new Error(t('msg.password_change_failed'));
             } else {
                 await api.post('/auth/change-password', {
                     userId,
@@ -62,7 +62,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
             }, 1500);
         } catch (e: any) {
             console.error(e);
-            setError(e.message || "Nepodařilo se změnit heslo. Zkontrolujte původní heslo.");
+            setError(e.message || t('msg.password_change_failed'));
         } finally {
             setLoading(false);
         }
@@ -71,11 +71,11 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
     if (!isOpen) return null;
 
     return (
-        <Modal title="Změna hesla" onClose={onClose}>
+        <Modal title={t('modal.change_password')} onClose={onClose}>
             {success ? (
                 <div className="flex flex-col items-center justify-center p-6 text-green-600">
                     <CheckCircle className="w-12 h-12 mb-2" />
-                    <p className="font-bold">Heslo bylo úspěšně změněno.</p>
+                    <p className="font-bold">{t('msg.password_changed')}</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -86,7 +86,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
                         </div>
                     )}
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Staré heslo</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.old_password')}</label>
                         <div className="relative">
                             <input 
                                 type="password" 
@@ -98,7 +98,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Nové heslo</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.new_password')}</label>
                         <div className="relative">
                             <input 
                                 type="password" 
@@ -110,7 +110,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Potvrzení nového hesla</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.confirm_password')}</label>
                         <div className="relative">
                             <input 
                                 type="password" 
@@ -131,7 +131,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, userId }: ChangePasswordM
                             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
                         >
                             {loading && <Loader className="animate-spin w-4 h-4 mr-2" />}
-                            Změnit heslo
+                            {t('action.change_password')}
                         </button>
                     </div>
                 </div>

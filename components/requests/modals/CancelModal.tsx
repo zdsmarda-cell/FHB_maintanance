@@ -17,8 +17,8 @@ export const CancelModal = ({ isOpen, onClose, onConfirm, reason, setReason, err
     if (!isOpen) return null;
 
     return (
-        <Modal title="Storno požadavku" onClose={onClose}>
-            <p className="text-sm text-slate-600 mb-2">Uveďte důvod zrušení požadavku:</p>
+        <Modal title={t('modal.cancel_request_title')} onClose={onClose}>
+            <p className="text-sm text-slate-600 mb-2">{t('modal.cancel_request_prompt')}</p>
             <textarea 
                 className={`w-full border p-2 rounded ${error ? 'border-red-500' : ''}`}
                 rows={3} 
@@ -28,7 +28,7 @@ export const CancelModal = ({ isOpen, onClose, onConfirm, reason, setReason, err
             {error && <span className="text-xs text-red-500">{error}</span>}
             <div className="flex justify-end gap-2 mt-4">
                 <button onClick={onClose} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">{t('common.cancel')}</button>
-                <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Stornovat</button>
+                <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">{t('action.confirm_cancel')}</button>
             </div>
         </Modal>
     );

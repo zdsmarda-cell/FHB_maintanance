@@ -95,6 +95,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.approval_limit_exceeded': 'Nemáte dostatečné oprávnění pro schválení této částky.',
     'msg.must_be_approved_short': 'Požadavek musí být schválen před vyřešením.',
     'msg.no_comments': 'Žádné komentáře',
+    'msg.password_changed': 'Heslo bylo úspěšně změněno.',
+    'msg.fields_required': 'Všechna pole jsou povinná.',
+    'msg.passwords_mismatch': 'Nová hesla se neshodují.',
+    'msg.password_short': 'Nové heslo musí mít alespoň 4 znaky.',
+    'msg.password_change_failed': 'Nepodařilo se změnit heslo. Zkontrolujte původní heslo.',
 
     'validation.required': 'Toto pole je povinné',
 
@@ -152,6 +157,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.priority': 'Priorita',
     'form.estimated_time': 'Očekávaná pracnost (min)',
     'form.solution': 'Řešení (Dodavatel)',
+    'form.old_password': 'Staré heslo',
+    'form.new_password': 'Nové heslo',
+    'form.confirm_password': 'Potvrzení nového hesla',
 
     'day.0': 'Ne',
     'day.1': 'Po',
@@ -229,6 +237,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.cost': 'Cena',
     'col.time': 'Pracnost',
     'col.supplier': 'Dodavatel',
+    'col.created': 'Vytvořeno',
+    'col.deadline': 'Termín',
+    'col.effort': 'Pracnost',
+    'col.role': 'Role',
 
     'action.created': 'Vytvořeno',
     'action.status_change': 'Změna stavu',
@@ -241,11 +253,21 @@ const translations: Record<Lang, Record<string, string>> = {
     'action.take_over': 'Převzít',
     'action.reassign': 'Přebrat',
     'action.remove_approval': 'Odebrat souhlas',
+    'action.confirm_cancel': 'Stornovat',
+    'action.change_password': 'Změnit heslo',
 
     'label.author': 'Autor',
     'label.source': 'Zdroj',
     'label.auto_maintenance': 'Automatická údržba',
     'placeholder.write_comment': 'Napsat komentář...',
+
+    'modal.cancel_request_title': 'Storno požadavku',
+    'modal.cancel_request_prompt': 'Uveďte důvod zrušení požadavku:',
+    'modal.change_password': 'Změna hesla',
+
+    'filter.visibility_all': 'Viditelnost: Vše',
+    'filter.visibility_yes': 'Viditelnost: Ano',
+    'filter.visibility_no': 'Viditelnost: Ne',
   },
   en: {
     'app.name': 'FHB maintein',
@@ -332,6 +354,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.approval_limit_exceeded': 'You do not have sufficient permission to approve this amount.',
     'msg.must_be_approved_short': 'Must be approved before resolving.',
     'msg.no_comments': 'No comments',
+    'msg.password_changed': 'Password changed successfully.',
+    'msg.fields_required': 'All fields are required.',
+    'msg.passwords_mismatch': 'Passwords do not match.',
+    'msg.password_short': 'New password must be at least 4 chars.',
+    'msg.password_change_failed': 'Failed to change password. Check old password.',
 
     'validation.required': 'This field is required',
 
@@ -389,6 +416,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.priority': 'Priority',
     'form.estimated_time': 'Estimated Time (min)',
     'form.solution': 'Solution (Supplier)',
+    'form.old_password': 'Old Password',
+    'form.new_password': 'New Password',
+    'form.confirm_password': 'Confirm New Password',
 
     'day.0': 'Sun',
     'day.1': 'Mon',
@@ -466,6 +496,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.cost': 'Cost',
     'col.time': 'Time',
     'col.supplier': 'Supplier',
+    'col.created': 'Created',
+    'col.deadline': 'Deadline',
+    'col.effort': 'Effort',
+    'col.role': 'Role',
 
     'action.created': 'Created',
     'action.status_change': 'Status Change',
@@ -478,11 +512,21 @@ const translations: Record<Lang, Record<string, string>> = {
     'action.take_over': 'Take Over',
     'action.reassign': 'Reassign',
     'action.remove_approval': 'Remove Approval',
+    'action.confirm_cancel': 'Confirm Cancel',
+    'action.change_password': 'Change Password',
 
     'label.author': 'Author',
     'label.source': 'Source',
     'label.auto_maintenance': 'Automated Maintenance',
     'placeholder.write_comment': 'Write a comment...',
+
+    'modal.cancel_request_title': 'Cancel Request',
+    'modal.cancel_request_prompt': 'Please state the reason for cancellation:',
+    'modal.change_password': 'Change Password',
+
+    'filter.visibility_all': 'Visibility: All',
+    'filter.visibility_yes': 'Visibility: Yes',
+    'filter.visibility_no': 'Visibility: No',
   },
   uk: {
     'app.name': 'FHB maintein',
@@ -569,6 +613,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.approval_limit_exceeded': 'У вас недостатньо прав для схвалення цієї суми.',
     'msg.must_be_approved_short': 'Необхідно схвалити перед вирішенням.',
     'msg.no_comments': 'Немає коментарів',
+    'msg.password_changed': 'Пароль успішно змінено.',
+    'msg.fields_required': "Всі поля обов'язкові.",
+    'msg.passwords_mismatch': 'Паролі не співпадають.',
+    'msg.password_short': 'Новий пароль повинен мати мінімум 4 символи.',
+    'msg.password_change_failed': 'Не вдалося змінити пароль. Перевірте старий пароль.',
 
     'validation.required': "Це поле є обов'язковим",
 
@@ -626,6 +675,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.priority': 'Пріоритет',
     'form.estimated_time': 'Орієнтовний час (хв)',
     'form.solution': 'Рішення (Постачальник)',
+    'form.old_password': 'Старий пароль',
+    'form.new_password': 'Новий пароль',
+    'form.confirm_password': 'Підтвердження нового паролю',
 
     'day.0': 'Нд',
     'day.1': 'Пн',
@@ -703,6 +755,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.cost': 'Вартість',
     'col.time': 'Час',
     'col.supplier': 'Постачальник',
+    'col.created': 'Створено',
+    'col.deadline': 'Термін',
+    'col.effort': 'Зусилля',
+    'col.role': 'Роль',
 
     'action.created': 'Створено',
     'action.status_change': 'Зміна статусу',
@@ -715,11 +771,21 @@ const translations: Record<Lang, Record<string, string>> = {
     'action.take_over': 'Прийняти',
     'action.reassign': 'Перепризначити',
     'action.remove_approval': 'Скасувати схвалення',
+    'action.confirm_cancel': 'Скасувати запит',
+    'action.change_password': 'Змінити пароль',
 
     'label.author': 'Автор',
     'label.source': 'Джерело',
     'label.auto_maintenance': 'Автоматичне обслуговування',
     'placeholder.write_comment': 'Написати коментар...',
+
+    'modal.cancel_request_title': 'Скасування запиту',
+    'modal.cancel_request_prompt': 'Вкажіть причину скасування запиту:',
+    'modal.change_password': 'Зміна пароля',
+
+    'filter.visibility_all': 'Видимість: Всі',
+    'filter.visibility_yes': 'Видимість: Так',
+    'filter.visibility_no': 'Видимість: Ні',
   }
 };
 

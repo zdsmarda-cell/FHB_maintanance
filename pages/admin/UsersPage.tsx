@@ -145,7 +145,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                             <tr>
                                 <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Jméno</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} /></th>
                                 <th className="px-4 py-3 align-top min-w-[150px]"><div className="mb-1">Email</div><input className="w-full p-1 border rounded font-normal normal-case" placeholder="Hledat..." value={emailFilter} onChange={e => setEmailFilter(e.target.value)} /></th>
-                                <th className="px-4 py-3 align-top">Role</th>
+                                <th className="px-4 py-3 align-top">{t('col.role')}</th>
                                 <th className="px-4 py-3 align-top">Práce</th>
                                 <th className="px-4 py-3 align-top">Limity schvalování</th>
                                 <th className="px-4 py-3 align-top text-center">Stav</th>

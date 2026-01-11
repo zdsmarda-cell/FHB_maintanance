@@ -293,16 +293,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                           <tr>
                               <th className="px-4 py-3 w-8"></th>
                               <th className="px-4 py-3">{t('form.title')}</th>
-                              <th className="px-4 py-3">Technologie</th>
-                              <th className="px-4 py-3 whitespace-nowrap">Vytvořeno</th>
-                              <th className="px-4 py-3 whitespace-nowrap">Termín</th>
-                              <th className="px-4 py-3">Řešitel</th>
-                              <th className="px-4 py-3">Dodavatel</th>
-                              <th className="px-4 py-3 text-center">Cena</th>
-                              <th className="px-4 py-3 text-center">Pracnost</th>
-                              <th className="px-4 py-3 text-center">Stav</th>
-                              <th className="px-4 py-3 text-center">Schválení</th>
-                              <th className="px-4 py-3 text-right">Akce</th>
+                              <th className="px-4 py-3">{t('col.technology')}</th>
+                              <th className="px-4 py-3 whitespace-nowrap">{t('col.created')}</th>
+                              <th className="px-4 py-3 whitespace-nowrap">{t('col.deadline')}</th>
+                              <th className="px-4 py-3">{t('col.solver')}</th>
+                              <th className="px-4 py-3">{t('col.supplier')}</th>
+                              <th className="px-4 py-3 text-center">{t('col.cost')}</th>
+                              <th className="px-4 py-3 text-center">{t('col.effort')}</th>
+                              <th className="px-4 py-3 text-center">{t('common.status')}</th>
+                              <th className="px-4 py-3 text-center">{t('headers.approval')}</th>
+                              <th className="px-4 py-3 text-right">{t('common.actions')}</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-red-100">
