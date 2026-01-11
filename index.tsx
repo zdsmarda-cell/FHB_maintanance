@@ -100,6 +100,7 @@ const App = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // Added confirm password
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
   const [generatedLink, setGeneratedLink] = useState('');
@@ -209,10 +210,10 @@ const App = () => {
             const found = mockUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
 
             if (found && found.isBlocked) {
-                setAuthError("Tento uživatel má zablokovaný přístup.");
+                setAuthError(t('auth.account_blocked'));
             } else if (found) {
                 if (found.password && found.password !== loginPassword && loginPassword !== 'password') {
-                     setAuthError("Neplatné heslo (Demo: použijte 'password').");
+                     setAuthError(t('auth.invalid_credentials'));
                 } else {
                     const now = Date.now().toString();
                     localStorage.setItem('auth_token', 'mock-token-' + found.id);
@@ -222,7 +223,7 @@ const App = () => {
                     setPage('dashboard');
                 }
             } else {
-                setAuthError("Uživatel s tímto emailem neexistuje (Mock).");
+                setAuthError(t('auth.user_not_found'));
             }
 
         } else {
@@ -254,17 +255,17 @@ const App = () => {
                 setUser(data.user);
                 setPage('dashboard');
             } else {
-                if (response.status === 401) setAuthError("Neplatné přihlašovací údaje.");
-                else if (response.status === 403) setAuthError("Přístup zablokován.");
-                else setAuthError(`Chyba serveru (${response.status}).`);
+                if (response.status === 401) setAuthError(t('auth.invalid_credentials'));
+                else if (response.status === 403) setAuthError(t('auth.account_blocked'));
+                else setAuthError(t('auth.server_error'));
             }
         }
     } catch (err: any) {
         console.error('Login error:', err);
         if (err.name === 'AbortError') {
-            setAuthError("Server neodpovídá (Timeout).");
+            setAuthError(t('auth.timeout'));
         } else {
-            setAuthError("Nepodařilo se připojit k serveru. Zkontrolujte připojení.");
+            setAuthError(t('auth.connection_error'));
         }
     } finally {
         setIsLoggingIn(false);
@@ -282,7 +283,7 @@ const App = () => {
       
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(resetEmail)) {
-          setAuthError("Zadejte platný email (např. jmeno@firma.cz).");
+          setAuthError(t('auth.invalid_email_format'));
           return;
       }
 
@@ -293,7 +294,7 @@ const App = () => {
               setGeneratedLink(link);
               setAuthView('link-sent');
           } else {
-              setAuthError('Email v systému neexistuje.'); 
+              setAuthError(t('auth.email_not_found')); 
           }
       } else {
           try {
@@ -306,13 +307,13 @@ const App = () => {
               
               if (res.ok) {
                   setAuthView('link-sent');
-                  setGeneratedLink(t('auth.link_sent_title')); 
+                  setGeneratedLink(t('auth.link_sent_success')); 
               } else {
                   throw new Error('Server error');
               }
           } catch(e) {
               console.error(e);
-              setAuthError("Chyba při odesílání požadavku. Zkuste to prosím později.");
+              setAuthError(t('auth.send_error'));
           } finally {
               setIsLoggingIn(false);
           }
@@ -320,14 +321,20 @@ const App = () => {
   };
 
   const handleResetPassword = async () => {
-      if (!resetToken || !newPassword) return;
+      if (!resetToken || !newPassword || !confirmPassword) return;
       
+      if (newPassword !== confirmPassword) {
+          setAuthError(t('auth.passwords_do_not_match'));
+          return;
+      }
+
       if (useMockData) {
           const success = db.auth.resetPassword(resetToken, newPassword);
           if (success) {
               setAuthSuccess(t('auth.reset_success'));
               setAuthView('login');
               setNewPassword('');
+              setConfirmPassword('');
               setResetToken(null);
           } else {
               setAuthError(t('auth.token_invalid'));
@@ -345,13 +352,14 @@ const App = () => {
                    setAuthSuccess(t('auth.reset_success'));
                    setAuthView('login');
                    setNewPassword('');
+                   setConfirmPassword('');
                    setResetToken(null);
                } else {
                    const errData = await res.json();
-                   setAuthError(errData.error || "Chyba při obnově hesla.");
+                   setAuthError(errData.error || t('auth.reset_error'));
                }
            } catch(e: any) {
-               setAuthError("Neplatný nebo expirovaný odkaz, nebo chyba serveru.");
+               setAuthError(t('auth.token_invalid'));
            } finally {
                setIsLoggingIn(false);
            }
@@ -537,9 +545,16 @@ const App = () => {
                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('auth.new_password')}</label>
                     <input 
                         type="password" 
-                        className="w-full border p-2 rounded" 
+                        className="w-full border p-2 rounded mb-2" 
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
+                    />
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('auth.confirm_password')}</label>
+                    <input 
+                        type="password" 
+                        className="w-full border p-2 rounded" 
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
                     />
                 </div>
                 <button onClick={handleResetPassword} disabled={isLoggingIn} className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mb-3 flex justify-center">

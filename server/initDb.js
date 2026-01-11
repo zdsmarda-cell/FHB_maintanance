@@ -220,6 +220,12 @@ const migrations = [
         up: [
             `ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'cs'`
         ]
+    },
+    {
+        name: '012_expand_request_title',
+        up: [
+            `ALTER TABLE requests MODIFY title TEXT`
+        ]
     }
 ];
 

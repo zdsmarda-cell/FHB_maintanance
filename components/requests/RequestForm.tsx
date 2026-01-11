@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Euro, Trash2, Upload, Loader, Clock, Calendar } from 'lucide-react';
@@ -113,19 +112,19 @@ export const RequestForm = ({
                         onChange={e => { setSelLoc(e.target.value); setSelWp(''); }}
                         disabled={isEditMode || availLocs.length <= 1} // Disable if only 1 option
                     >
-                        {availLocs.length > 1 && <option value="">-- {t('form.location')} --</option>}
+                        {availLocs.length > 1 && <option value="">{t('form.select_location')}</option>}
                         {availLocs.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')} *</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
                     <select 
                         className="w-full p-2 rounded border" 
                         value={selWp} 
                         onChange={e => { setSelWp(e.target.value); }}
                         disabled={!selLoc || isEditMode || availWps.length <= 1} // Disable if only 1 option
                     >
-                        {availWps.length > 1 && <option value="">-- {t('form.workplace')} --</option>}
+                        {availWps.length > 1 && <option value="">{t('form.select_workplace')}</option>}
                         {availWps.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                     </select>
                 </div>
@@ -139,7 +138,7 @@ export const RequestForm = ({
                     onChange={e => setFormData({...formData, techId: e.target.value})}
                     disabled={isEditMode}
                 >
-                    <option value="">-- Vyberte technologii --</option>
+                    <option value="">{selWp ? t('form.select_tech') : t('form.select_tech_first')}</option>
                     {availTechs.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                 </select>
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
@@ -154,13 +153,13 @@ export const RequestForm = ({
                         value={formData.assignedSupplierId || 'internal'} 
                         onChange={e => setFormData({...formData, assignedSupplierId: e.target.value})}
                     >
-                        <option value="internal">🔧 Interní (Vlastní síly)</option>
+                        <option value="internal">🔧 {t('form.internal_solution')}</option>
                         
                         {defaultSupplier && (
                             <>
                                 <option disabled>──────────</option>
                                 <option value={defaultSupplier.id} className="font-bold bg-blue-50">
-                                    {getLocalized(defaultSupplier.name, lang)} (Výchozí pro technologii)
+                                    {getLocalized(defaultSupplier.name, lang)} {t('form.default_for_tech')}
                                 </option>
                             </>
                         )}
@@ -230,9 +229,9 @@ export const RequestForm = ({
             </div>
             
             <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.title')} (max 20 znaků) *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.title')} (max 50 znaků) *</label>
                 <input 
-                    maxLength={20}
+                    maxLength={50}
                     className={`w-full p-2 rounded border ${errors.title ? 'border-red-500' : ''}`}
                     placeholder={t('form.title')} 
                     value={formData.title} 
