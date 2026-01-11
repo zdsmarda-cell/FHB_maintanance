@@ -151,7 +151,7 @@ export const TechConfigPage = ({ onNavigate }: TechConfigPageProps) => {
         finally { setSaving(false); }
     }
     
-    // Decode for editing
+    // Decode for editing using getLocalized to show readable string instead of JSON
     const startEditType = (t: any) => { setEditingType({...t, name: getLocalized(t.name, lang)}); };
     const startEditState = (s: any) => { setEditingState({...s, name: getLocalized(s.name, lang)}); };
 

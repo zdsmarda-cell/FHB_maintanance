@@ -190,6 +190,7 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
     }
 
     const startEditSup = (s: any) => {
+        // Decode name for editing field
         setEditingSup({ ...s, name: getLocalized(s.name, lang) });
     };
 

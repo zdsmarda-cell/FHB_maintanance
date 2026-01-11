@@ -2,24 +2,30 @@
 import { db, api, isProductionDomain } from './db';
 import { Maintenance } from './types';
 
-// Helper to parse JSON string (e.g., '{"cs":"Sklad","en":"Warehouse"}') and return current lang
-export const getLocalized = (data: string | undefined, lang: string): string => {
+// Helper to parse JSON string (e.g., '{"cs":"Sklad","en":"Warehouse"}') or Object and return current lang
+export const getLocalized = (data: any, lang: string): string => {
     if (!data) return '';
     
-    // Check if it looks like JSON
-    if (data.trim().startsWith('{')) {
+    let parsed = data;
+
+    // If it's a string that looks like JSON, try to parse it
+    if (typeof data === 'string' && data.trim().startsWith('{')) {
         try {
-            const parsed = JSON.parse(data);
-            if (typeof parsed === 'object' && parsed !== null) {
-                // Return requested lang, fallback to CS, fallback to first key, fallback to raw
-                return parsed[lang] || parsed['cs'] || Object.values(parsed)[0] || data;
-            }
+            parsed = JSON.parse(data);
         } catch (e) {
             // Not valid JSON, return as is
             return data;
         }
     }
-    return data;
+
+    // If we have an object (either passed directly or parsed above)
+    if (typeof parsed === 'object' && parsed !== null) {
+        // Return requested lang, fallback to CS, fallback to EN, fallback to first key
+        return parsed[lang] || parsed['cs'] || parsed['en'] || Object.values(parsed)[0] || '';
+    }
+
+    // Fallback for plain strings
+    return String(data);
 };
 
 // Shared Logic for calculating Next Run Date
@@ -106,11 +112,6 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         
         console.log("[Translate] Calling API...");
 
-        // Even in Mock mode, if the user enabled translation in settings, try to call the real API if reachable,
-        // otherwise fallback to mock simulation.
-        // Since we cannot call protected API from mock-token easily without failure, we simulate or skip.
-        // BUT user complained "generally nowhere called". If they are running full backend locally, it should work.
-        
         if (isMock) {
             // Mock Translation Logic on Client for Demo
             // Simulate delay

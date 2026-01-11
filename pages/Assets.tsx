@@ -159,14 +159,14 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                         <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.type')}</label>
                         <select className={`w-full border p-2 rounded ${errors.typeId ? 'border-red-500' : ''}`} value={data.typeId} onChange={e => setData({...data, typeId: e.target.value})}>
                             <option value="">-</option>
-                            {techTypes.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {techTypes.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                         </select>
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.state')}</label>
                         <select className={`w-full border p-2 rounded ${errors.stateId ? 'border-red-500' : ''}`} value={data.stateId} onChange={e => setData({...data, stateId: e.target.value})}>
                             <option value="">-</option>
-                            {techStates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {techStates.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                         </select>
                      </div>
                 </div>
@@ -181,7 +181,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                             onChange={e => { setSelectedLocId(e.target.value); setData({...data, workplaceId: ''}); }}
                         >
                             <option value="">-- {t('common.all')} --</option>
-                            {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                         </select>
                      </div>
                      <div>
@@ -193,7 +193,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                             disabled={!selectedLocId && filteredWorkplaces.length > 20} // Optional UX improvement
                         >
                             <option value="">-</option>
-                            {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                         </select>
                      </div>
                 </div>
@@ -203,7 +203,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                         <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.supplier')}</label>
                         <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                             <option value="">-</option>
-                            {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {suppliers.map((s: any) => <option key={s.id} value={s.id}>{getLocalized(s.name, lang)}</option>)}
                         </select>
                      </div>
                      <div>
@@ -268,7 +268,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
 };
 
 export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n(); // Destructure lang
     const [loading, setLoading] = useState(true);
     const [assets, setAssets] = useState<Technology[]>([]);
     const [techTypes, setTechTypes] = useState<any[]>([]);
@@ -417,6 +417,12 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     if (loading) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
+    // Use getLocalized for Type and State names in Filter MultiSelects
+    const localizedTypes = techTypes.map(t => ({...t, name: getLocalized(t.name, lang)}));
+    const localizedStates = techStates.map(s => ({...s, name: getLocalized(s.name, lang)}));
+    const localizedSuppliers = suppliers.map(s => ({...s, name: getLocalized(s.name, lang)}));
+    const localizedWorkplaces = workplaces.map(w => ({...w, name: getLocalized(w.name, lang)}));
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -434,9 +440,9 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                         <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" />
                         <input className="w-full pl-8 p-1.5 border rounded text-sm" placeholder={t('common.search')} value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
-                    <div><MultiSelect label={t('headers.tech_types')} options={techTypes} selectedIds={filterTypeIds} onChange={setFilterTypeIds} /></div>
-                    <div><MultiSelect label={t('headers.tech_states')} options={techStates} selectedIds={filterStateIds} onChange={setFilterStateIds} /></div>
-                    <div><MultiSelect label={t('form.workplace')} options={workplaces.map(w => ({ id: w.id, name: w.name }))} selectedIds={filterWpIds} onChange={setFilterWpIds} /></div>
+                    <div><MultiSelect label={t('headers.tech_types')} options={localizedTypes} selectedIds={filterTypeIds} onChange={setFilterTypeIds} /></div>
+                    <div><MultiSelect label={t('headers.tech_states')} options={localizedStates} selectedIds={filterStateIds} onChange={setFilterStateIds} /></div>
+                    <div><MultiSelect label={t('form.workplace')} options={localizedWorkplaces} selectedIds={filterWpIds} onChange={setFilterWpIds} /></div>
                     
                     {/* Date Filters */}
                     <div>
@@ -453,7 +459,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                         <div className="flex-1">
                             <select className="w-full p-1.5 border rounded text-sm mt-5" value={filterSupplierId} onChange={e => setFilterSupplierId(e.target.value)}>
                                 <option value="">{t('form.supplier')}: {t('common.all')}</option>
-                                {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {localizedSuppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                         </div>
                     </div>
@@ -512,13 +518,13 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                         <td className="px-4 py-3 text-slate-600">
                                             {asset.installDate ? new Date(asset.installDate).toLocaleDateString() : '-'}
                                         </td>
-                                        <td className="px-4 py-3">{type || '-'}</td>
-                                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border">{state || '-'}</span></td>
+                                        <td className="px-4 py-3">{getLocalized(type, lang) || '-'}</td>
+                                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border">{getLocalized(state, lang) || '-'}</span></td>
                                         <td className="px-4 py-3">
-                                            <div className="font-medium">{wp?.name}</div>
-                                            <div className="text-xs text-slate-500">{loc?.name}</div>
+                                            <div className="font-medium">{getLocalized(wp?.name, lang)}</div>
+                                            <div className="text-xs text-slate-500">{getLocalized(loc?.name, lang)}</div>
                                         </td>
-                                        <td className="px-4 py-3 text-slate-600">{sup?.name || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600">{getLocalized(sup?.name, lang) || '-'}</td>
                                         <td className="px-4 py-3 text-center">
                                             {asset.isVisible ? <Eye className="w-4 h-4 text-green-500 mx-auto" /> : <EyeOff className="w-4 h-4 text-slate-400 mx-auto" />}
                                         </td>

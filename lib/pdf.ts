@@ -2,6 +2,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Request, User, Technology, Supplier } from './types';
+import { getLocalized } from './helpers';
 
 // Helper to load fonts for diacritics support
 const loadFonts = async (doc: jsPDF) => {
@@ -100,8 +101,8 @@ export const generateWorkListPDF = async (
         if (weightA !== weightB) return weightB - weightA; // Descending weight
 
         // Tech Name Sort
-        const techA = technologies.find(t => t.id === a.techId)?.name || '';
-        const techB = technologies.find(t => t.id === b.techId)?.name || '';
+        const techA = getLocalized(technologies.find(t => t.id === a.techId)?.name, lang);
+        const techB = getLocalized(technologies.find(t => t.id === b.techId)?.name, lang);
         return techA.localeCompare(techB);
     });
 
@@ -124,14 +125,15 @@ export const generateWorkListPDF = async (
     // Helper to generate Row Data
     const generateRow = (r: Request) => {
         const tech = technologies.find(t => t.id === r.techId);
+        const techName = getLocalized(tech?.name, lang) || 'Neznámá';
         
         let supplierName = 'Interní';
         if (r.assignedSupplierId === 'internal') {
             supplierName = 'Interní';
         } else if (r.assignedSupplierId) {
-            supplierName = suppliers.find(s => s.id === r.assignedSupplierId)?.name || 'Neznámý';
+            supplierName = getLocalized(suppliers.find(s => s.id === r.assignedSupplierId)?.name, lang) || 'Neznámý';
         } else if (tech?.supplierId) {
-            supplierName = suppliers.find(s => s.id === tech.supplierId)?.name || 'Neznámý';
+            supplierName = getLocalized(suppliers.find(s => s.id === tech.supplierId)?.name, lang) || 'Neznámý';
         }
         
         const solverName = r.solverId ? users.find(u => u.id === r.solverId)?.name || '-' : '-';
@@ -142,7 +144,7 @@ export const generateWorkListPDF = async (
 
         return [
             { content: r.title, styles: { fontStyle: 'bold' } },
-            (tech?.name || 'Neznámá') + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
+            techName + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
             { content: r.description || '', styles: { cellWidth: 60 } }, 
             solverName,
             plannedDate,

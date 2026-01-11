@@ -4,6 +4,7 @@ import { Request, User, Workplace, Technology, Supplier } from '../../lib/types'
 import { useI18n } from '../../lib/i18n';
 import { CheckCircle2, Eye, Edit, Wrench, UserPlus, Ban, Trash2, Pencil, UserCog, X, RotateCcw, Clock, Euro, Image as ImageIcon } from 'lucide-react';
 import { Pagination, MultiSelect } from '../Shared';
+import { getLocalized } from '../../lib/helpers';
 
 interface RequestsTableProps {
     requests: Request[];
@@ -45,7 +46,7 @@ export const RequestsTable = ({
     onItemsPerPageChange,
     filterState
 }: RequestsTableProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
 
     // Destructure controlled state
     const {
@@ -200,13 +201,13 @@ export const RequestsTable = ({
         return `${h}:${m.toString().padStart(2, '0')}`;
     }
 
-    // Prepare Options for MultiSelects
-    const techOptions = technologies.map(t => ({ id: t.id, name: t.name }));
+    // Prepare Options for MultiSelects using getLocalized
+    const techOptions = technologies.map(t => ({ id: t.id, name: getLocalized(t.name, lang) }));
     const userOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
     const supplierOptions = [
         { id: 'internal', name: 'Interní' },
         { id: 'external', name: 'Externí (Všichni)' },
-        ...suppliers.map(s => ({ id: s.id, name: s.name }))
+        ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
@@ -297,8 +298,8 @@ export const RequestsTable = ({
                                 let supplierName = '-';
                                 let isInternal = false;
                                 if (r.assignedSupplierId === 'internal') { isInternal = true; }
-                                else if (r.assignedSupplierId) { supplierName = suppliers.find(s => s.id === r.assignedSupplierId)?.name || '?'; }
-                                else { if (tech?.supplierId) { supplierName = suppliers.find(s => s.id === tech.supplierId)?.name || '-'; } else { isInternal = true; } }
+                                else if (r.assignedSupplierId) { supplierName = getLocalized(suppliers.find(s => s.id === r.assignedSupplierId)?.name, lang) || '?'; }
+                                else { if (tech?.supplierId) { supplierName = getLocalized(suppliers.find(s => s.id === tech.supplierId)?.name, lang) || '-'; } else { isInternal = true; } }
                                 const hasPhotos = r.photoUrls && r.photoUrls.length > 0;
 
                                 return (
@@ -311,7 +312,7 @@ export const RequestsTable = ({
                                             )}
                                         </td>
                                         <td className="px-4 py-3 font-medium text-slate-800">{r.title}</td>
-                                        <td className="px-4 py-3 text-slate-600 text-xs">{tech?.name || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600 text-xs">{getLocalized(tech?.name, lang) || '-'}</td>
                                         <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                                             <div>{new Date(r.createdDate).toLocaleDateString()}</div>
                                             <div className="text-[10px] text-slate-400">{new Date(r.createdDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>

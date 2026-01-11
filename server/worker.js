@@ -92,11 +92,17 @@ const generateMaintenanceRequests = async () => {
             // Logic: "Save to nearest allowed day"
             let targetDate = new Date(nextDueDate);
             let safetyCounter = 0;
-            const allowedDays = template.allowed_days || []; // JSON array [0, 1, 2...]
+            
+            // Safe parsing of allowed_days
+            const allowedDaysRaw = template.allowed_days;
+            const allowedDays = Array.isArray(allowedDaysRaw) 
+                ? allowedDaysRaw 
+                : (typeof allowedDaysRaw === 'string' ? JSON.parse(allowedDaysRaw) : []);
 
             while (safetyCounter < 30) {
                  const currentDayOfWeek = targetDate.getDay(); // 0 = Sun
-                 if (allowedDays.includes(currentDayOfWeek)) {
+                 // Only check allowed days if the array is not empty (empty implies allowed or legacy data)
+                 if (allowedDays.length === 0 || allowedDays.includes(currentDayOfWeek)) {
                      break; 
                  }
                  targetDate.setDate(targetDate.getDate() + 1);
@@ -135,12 +141,18 @@ const generateMaintenanceRequests = async () => {
 
             // 2. Try Create Request
             try {
-                const responsibleIds = template.responsible_person_ids || [];
+                // Safe parsing of responsible_person_ids
+                const responsibleIdsRaw = template.responsible_person_ids;
+                const responsibleIds = Array.isArray(responsibleIdsRaw) 
+                    ? responsibleIdsRaw 
+                    : (typeof responsibleIdsRaw === 'string' ? JSON.parse(responsibleIdsRaw) : []);
+
                 const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
                 const state = solverId ? 'assigned' : 'new';
                 const authorId = 'system'; 
-                const requestId = crypto.randomUUID();
+                const requestId = crypto.randomUUID(); // GENERATE ID MANUALLY
 
+                // INSERT query MUST include 'id'
                 await pool.execute(
                     `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,

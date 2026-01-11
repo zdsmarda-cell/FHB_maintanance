@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { calculateNextMaintenanceDate } from '../lib/helpers';
+import { calculateNextMaintenanceDate, getLocalized } from '../lib/helpers';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
 import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Modal, ConfirmModal } from '../components/Shared';
@@ -13,7 +13,7 @@ interface MaintenancePageProps {
 }
 
 export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
     
     // --- Data States ---
     const [loading, setLoading] = useState(true);
@@ -197,7 +197,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         const tech = technologies.find(t => t.id === m.techId);
         
         // --- FILTERS ---
-        if (filters.techName && !tech?.name.toLowerCase().includes(filters.techName.toLowerCase())) return false;
+        if (filters.techName && !getLocalized(tech?.name, lang).toLowerCase().includes(filters.techName.toLowerCase())) return false;
         if (filters.serialNumber && !tech?.serialNumber?.toLowerCase().includes(filters.serialNumber.toLowerCase())) return false;
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
         if (filters.responsiblePersonId) { if (!m.responsiblePersonIds?.includes(filters.responsiblePersonId)) return false; }
@@ -319,7 +319,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-800">{selectedTemplate.title}</h2>
-                                    <div className="text-slate-500 mt-1">{tech?.name || 'Neznámá technologie'}</div>
+                                    <div className="text-slate-500 mt-1">{getLocalized(tech?.name, lang) || 'Neznámá technologie'}</div>
                                 </div>
                                 {renderActiveBadge(selectedTemplate.isActive)}
                             </div>
@@ -327,7 +327,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-6">
                                 <div><span className="text-slate-500 block">{t('form.interval')}</span> {selectedTemplate.interval} {t('common.days')}</div>
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
-                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? supplier.name : <span className="text-slate-400 italic">Interní řešení</span>}</div>
+                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">Interní řešení</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
                                 <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate ? new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString() : '-'}</div>
                                 <div>
@@ -397,7 +397,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                              <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
                              <select className="w-full p-1.5 border rounded" value={filters.supplierId} onChange={e => setFilters({...filters, supplierId: e.target.value})}>
                                 <option value="">{t('common.all')}</option>
-                                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {suppliers.map(s => <option key={s.id} value={s.id}>{getLocalized(s.name, lang)}</option>)}
                              </select>
                         </div>
                     </div>
@@ -433,7 +433,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer group">
-                                            <td className="px-4 py-3 font-medium whitespace-nowrap">{tech?.name || 'Neznámá technologie'}</td>
+                                            <td className="px-4 py-3 font-medium whitespace-nowrap">{getLocalized(tech?.name, lang) || 'Neznámá technologie'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
                                             <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">
@@ -452,7 +452,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{supplier?.name || '-'}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap">{supplier ? getLocalized(supplier.name, lang) : '-'}</td>
                                             <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>
                                             <td className="px-4 py-3 text-right">
                                                 {user.role !== 'operator' && (
@@ -511,6 +511,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     setSelectedWpId={setSelectedWpId}
                     errors={errors}
                     t={t}
+                    lang={lang}
                     locations={locations}
                     workplaces={workplaces}
                     technologies={technologies}
@@ -622,7 +623,7 @@ const HistoryModal = ({ template, logs, loading, onClose }: any) => {
 // Refactored Modal for better readability (Same as before)
 const MaintModal = ({ 
     isOpen, onClose, data, setData, isEdit, onSave, 
-    selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t,
+    selectedLocId, setSelectedLocId, selectedWpId, setSelectedWpId, errors, t, lang,
     locations, workplaces, technologies, suppliers, users
 }: any) => {
     
@@ -647,7 +648,7 @@ const MaintModal = ({
                                 onChange={e => { setSelectedLocId(e.target.value); setSelectedWpId(''); setData({...data, techId: ''}); }}
                             >
                                 <option value="">-- Vyberte lokalitu --</option>
-                                {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                             </select>
                         </div>
                         {selectedLocId && (
@@ -659,7 +660,7 @@ const MaintModal = ({
                                     onChange={e => { setSelectedWpId(e.target.value); setData({...data, techId: ''}); }}
                                 >
                                     <option value="">-- Vyberte pracoviště --</option>
-                                    {workplaces.filter((w: any) => w.locationId === selectedLocId).map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                    {workplaces.filter((w: any) => w.locationId === selectedLocId).map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                                 </select>
                             </div>
                         )}
@@ -674,7 +675,7 @@ const MaintModal = ({
                                 disabled={!selectedWpId}
                             >
                                 <option value="">{selectedWpId ? "-- Vyberte technologii --" : "-- Nejdříve vyberte pracoviště --"}</option>
-                                {selectedWpId && technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {selectedWpId && technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                             </select>
                             {errors.techId && <span className="text-xs text-red-500 font-bold">{errors.techId}</span>}
                         </div>
@@ -691,7 +692,7 @@ const MaintModal = ({
                     <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')}</label>
                     <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
                     <option value="">-- Interní řešení --</option>
-                    {suppliers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {suppliers.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                     </select>
                     {errors.supplierId && <span className="text-xs text-red-500">{errors.supplierId}</span>}
             </div>

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Euro, Trash2, Upload, Loader, Clock, Calendar } from 'lucide-react';
 import { db } from '../../lib/db';
+import { getLocalized } from '../../lib/helpers';
 
 interface RequestFormProps {
     formData: any;
@@ -31,7 +32,7 @@ export const RequestForm = ({
     isEditMode,
     isUploading
 }: RequestFormProps) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n();
     
     // Dropdown handlers for cascading selection
     const [selLoc, setSelLoc] = useState('');
@@ -95,10 +96,10 @@ export const RequestForm = ({
         // Filter and Sort others
         const others = allSuppliers
             .filter(s => s.id !== defSup?.id)
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => getLocalized(a.name, lang).localeCompare(getLocalized(b.name, lang)));
 
         return { defaultSupplier: defSup, otherSuppliers: others };
-    }, [formData.techId, technologies]);
+    }, [formData.techId, technologies, lang]);
 
 
     return (
@@ -113,7 +114,7 @@ export const RequestForm = ({
                         disabled={isEditMode || availLocs.length <= 1} // Disable if only 1 option
                     >
                         {availLocs.length > 1 && <option value="">-- {t('form.location')} --</option>}
-                        {availLocs.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        {availLocs.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                     </select>
                 </div>
                 <div>
@@ -125,7 +126,7 @@ export const RequestForm = ({
                         disabled={!selLoc || isEditMode || availWps.length <= 1} // Disable if only 1 option
                     >
                         {availWps.length > 1 && <option value="">-- {t('form.workplace')} --</option>}
-                        {availWps.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        {availWps.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                     </select>
                 </div>
              </div>
@@ -139,7 +140,7 @@ export const RequestForm = ({
                     disabled={isEditMode}
                 >
                     <option value="">-- Vyberte technologii --</option>
-                    {availTechs.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {availTechs.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                 </select>
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
              </div>
@@ -159,14 +160,14 @@ export const RequestForm = ({
                             <>
                                 <option disabled>──────────</option>
                                 <option value={defaultSupplier.id} className="font-bold bg-blue-50">
-                                    {defaultSupplier.name} (Výchozí pro technologii)
+                                    {getLocalized(defaultSupplier.name, lang)} (Výchozí pro technologii)
                                 </option>
                             </>
                         )}
                         
                         <option disabled>──────────</option>
                         {otherSuppliers.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
+                            <option key={s.id} value={s.id}>{getLocalized(s.name, lang)}</option>
                         ))}
                     </select>
                     <p className="text-xs text-slate-400 mt-1">Zvolte, zda bude problém řešen interně nebo externím dodavatelem.</p>
