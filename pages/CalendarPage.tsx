@@ -135,10 +135,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
         return `${h}:${m.toString().padStart(2, '0')}`;
     }
 
-    const monthNames = [
-        "Leden", "Únor", "Březen", "Duben", "Květen", "Červen", 
-        "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"
-    ];
+    const monthName = t(`month.${month}`);
 
     const handleDayClick = (dateStr: string, type: 'internal' | 'external') => {
         onNavigate('requests', {
@@ -158,7 +155,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
         await generateWorkListPDF(
             dailyRequests, 
             userObj, 
-            `Denní plán: ${dateStr}`, 
+            `${t('common.date')}: ${new Date(dateStr).toLocaleDateString()}`, 
             t, 
             lang,
             technologies,
@@ -174,14 +171,14 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded shadow-sm border border-slate-200">
                 <div className="flex flex-col gap-2">
                     <h2 className="text-xl font-bold text-slate-800">
-                        Kalendář pracnosti - {monthNames[month]} {year}
+                        {t('header.calendar')} - {monthName} {year}
                     </h2>
                     
                     {/* Admin User Selector */}
                     {user.role === 'admin' && (
                         <div className="flex items-center gap-2 text-sm">
                             <UserIcon className="w-4 h-4 text-slate-500" />
-                            <span className="text-slate-500">Zobrazit pro:</span>
+                            <span className="text-slate-500">{t('label.view_for')}:</span>
                             <select 
                                 className="border rounded p-1 text-slate-800 font-medium bg-slate-50"
                                 value={selectedSolverId}
@@ -197,7 +194,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
 
                 <div className="flex gap-2">
                     <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded border"><ChevronLeft className="w-5 h-5"/></button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-2 text-sm hover:bg-slate-100 rounded border">Dnes</button>
+                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-2 text-sm hover:bg-slate-100 rounded border">{t('action.today')}</button>
                     <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded border"><ChevronRight className="w-5 h-5"/></button>
                 </div>
             </div>
@@ -205,7 +202,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
             <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
                 {/* Header */}
                 <div className="grid grid-cols-7 bg-slate-50 border-b text-center py-2 text-sm font-semibold text-slate-600">
-                    <div>Po</div><div>Út</div><div>St</div><div>Čt</div><div>Pá</div><div>So</div><div>Ne</div>
+                    <div>{t('day.1')}</div><div>{t('day.2')}</div><div>{t('day.3')}</div><div>{t('day.4')}</div><div>{t('day.5')}</div><div>{t('day.6')}</div><div>{t('day.0')}</div>
                 </div>
                 
                 {/* Grid */}
@@ -236,7 +233,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
                                         <button 
                                             onClick={(e) => handleExportDay(e, dateStr)} 
                                             className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 transition-opacity"
-                                            title="Tisk denního plánu"
+                                            title={t('tooltip.print_day')}
                                         >
                                             <Printer className="w-3 h-3" />
                                         </button>
@@ -249,7 +246,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
                                             <div 
                                                 onClick={(e) => { e.stopPropagation(); handleDayClick(dateStr, 'internal'); }}
                                                 className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded border border-blue-200 cursor-pointer hover:bg-blue-200 transition-colors"
-                                                title="Interní úkoly"
+                                                title={t('label.internal_tasks')}
                                             >
                                                 <div className="flex justify-between items-center mb-0.5">
                                                     <span className="font-bold flex items-center"><Wrench className="w-3 h-3 mr-1"/> {data.internalCount}</span>
@@ -263,7 +260,7 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
                                             <div 
                                                 onClick={(e) => { e.stopPropagation(); handleDayClick(dateStr, 'external'); }}
                                                 className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded border border-amber-200 cursor-pointer hover:bg-amber-200 transition-colors"
-                                                title="Externí úkoly"
+                                                title={t('label.external_tasks')}
                                             >
                                                 <div className="flex justify-between items-center mb-0.5">
                                                     <span className="font-bold flex items-center"><Truck className="w-3 h-3 mr-1"/> {data.externalCount}</span>
@@ -282,9 +279,9 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
             </div>
             
             <div className="text-xs text-slate-500 p-2 flex gap-4">
-                <span>* Zobrazují se aktivní úkoly pro vybraného uživatele.</span>
-                <span className="flex items-center"><div className="w-3 h-3 bg-blue-100 border border-blue-200 rounded mr-1"></div> Interní</span>
-                <span className="flex items-center"><div className="w-3 h-3 bg-amber-100 border border-amber-200 rounded mr-1"></div> Externí</span>
+                <span>{t('msg.calendar_legend')}</span>
+                <span className="flex items-center"><div className="w-3 h-3 bg-blue-100 border border-blue-200 rounded mr-1"></div> {t('label.internal_tasks')}</span>
+                <span className="flex items-center"><div className="w-3 h-3 bg-amber-100 border border-amber-200 rounded mr-1"></div> {t('label.external_tasks')}</span>
             </div>
         </div>
     );

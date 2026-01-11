@@ -2,16 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { db, api, isProductionDomain } from '../../lib/db';
 import { Edit, Trash, Plus, Loader, Box, Search, X } from 'lucide-react';
-import { Address, Supplier } from '../../lib/types';
+import { Address, Supplier, User } from '../../lib/types';
 import { AddressInput, Modal, ConfirmModal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
 import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 interface SuppliersPageProps {
     onNavigate?: (page: string, params?: any) => void;
+    user?: User; // Optional to not break existing calls immediately, but needed for role check
 }
 
-export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
+export const SuppliersPage = ({ onNavigate, user }: SuppliersPageProps) => {
     const { t, lang } = useI18n();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -29,13 +30,16 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
     const [confirmDelete, setConfirmDelete] = useState<{show: boolean, type: 'supplier'|'contact', id: string, supId?: string}>({ show: false, type: 'supplier', id: '' });
     
     const emptyAddress: Address = { street: '', number: '', zip: '', city: '', country: 'SK' };
-    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
+    const [newSup, setNewSup] = useState({ name: '', address: emptyAddress, isVisible: true, ic: '', dic: '', email: '', phone: '', description: '' });
     const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', position: '' });
     
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
 
     const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+    
+    // Access Check: Only Admin can add/edit
+    const canEdit = user?.role === 'admin';
 
     // Fetch Data
     const refresh = async () => {
@@ -83,12 +87,12 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
 
     const validateForm = (data: any) => {
         const newErrors: Record<string, string> = {};
-        if (!data.name || data.name.trim().length < 2) newErrors.name = "Název musí mít alespoň 2 znaky.";
+        if (!data.name || data.name.trim().length < 2) newErrors.name = t('val.name_length');
         if (!data.phone) newErrors.phone = t('validation.required');
         if (!data.email) newErrors.email = t('validation.required');
-        if (!data.address.street) newErrors.street = "Ulice je povinná.";
-        if (!data.address.city) newErrors.city = "Město je povinné.";
-        if (!data.address.zip) newErrors.zip = "PSČ je povinné.";
+        if (!data.address.street) newErrors.street = t('val.street_req');
+        if (!data.address.city) newErrors.city = t('val.city_req');
+        if (!data.address.zip) newErrors.zip = t('val.zip_req');
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -102,7 +106,7 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
 
             if(isMock) db.suppliers.add(payload);
             else await api.post('/suppliers', payload);
-            setNewSup({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
+            setNewSup({ name: '', address: emptyAddress, isVisible: true, ic: '', dic: '', email: '', phone: '', description: '' });
             setIsCreateOpen(false);
             refresh();
         } catch(e) { console.error(e); }
@@ -127,7 +131,7 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
     
     const openCreateModal = () => {
         setErrors({});
-        setNewSup({ name: '', address: emptyAddress, ic: '', dic: '', email: '', phone: '', description: '' });
+        setNewSup({ name: '', address: emptyAddress, isVisible: true, ic: '', dic: '', email: '', phone: '', description: '' });
         setIsCreateOpen(true);
     };
 
@@ -216,9 +220,12 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
                         )}
                     </div>
                 </div>
-                <button onClick={openCreateModal} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
-                    <Plus className="w-4 h-4 mr-2" /> {t('headers.new_supplier')}
-                </button>
+                {/* Only Admin can add */}
+                {canEdit && (
+                    <button onClick={openCreateModal} className="bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700 flex items-center">
+                        <Plus className="w-4 h-4 mr-2" /> {t('headers.new_supplier')}
+                    </button>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -243,7 +250,7 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => toggleContacts(s.id)} className="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors">{t('headers.contacts')}</button>
-                                    <button onClick={() => { setErrors({}); startEditSup(s); }} className="text-blue-600 p-1 hover:bg-blue-50 rounded"><Edit className="w-4 h-4"/></button>
+                                    {canEdit && <button onClick={() => { setErrors({}); startEditSup(s); }} className="text-blue-600 p-1 hover:bg-blue-50 rounded"><Edit className="w-4 h-4"/></button>}
                                 </div>
                             </div>
                             {viewContactsFor === s.id && (
@@ -255,19 +262,23 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
                                                 <span className="font-medium">{c.name}</span> <span className="text-slate-400">({c.position})</span>
                                                 <div className="text-xs text-slate-400">{c.email}, {c.phone}</div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setContactErrors({}); setEditingContact(c); }} className="text-blue-600"><Edit className="w-3 h-3"/></button>
-                                                <button onClick={() => setConfirmDelete({ show: true, type: 'contact', id: c.id, supId: s.id })} className="text-red-500"><Trash className="w-3 h-3"/></button>
-                                            </div>
+                                            {canEdit && (
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => { setContactErrors({}); setEditingContact(c); }} className="text-blue-600"><Edit className="w-3 h-3"/></button>
+                                                    <button onClick={() => setConfirmDelete({ show: true, type: 'contact', id: c.id, supId: s.id })} className="text-red-500"><Trash className="w-3 h-3"/></button>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
-                                    <div className="grid grid-cols-5 gap-2 mt-2 items-start">
-                                        <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
-                                        <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
-                                        <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
-                                        <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
-                                        <button onClick={() => addContact(s.id)} className="bg-blue-600 text-white rounded text-sm py-1">{t('common.add')}</button>
-                                    </div>
+                                    {canEdit && (
+                                        <div className="grid grid-cols-5 gap-2 mt-2 items-start">
+                                            <input placeholder={t('form.user_name')} className={`border p-1 text-sm rounded w-full ${contactErrors.name ? 'border-red-500' : ''}`} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
+                                            <input placeholder={t('form.position')} className={`border p-1 text-sm rounded w-full ${contactErrors.position ? 'border-red-500' : ''}`} value={newContact.position} onChange={e => setNewContact({...newContact, position: e.target.value})} />
+                                            <input placeholder={t('form.email')} className={`border p-1 text-sm rounded w-full ${contactErrors.email ? 'border-red-500' : ''}`} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
+                                            <input placeholder={t('form.phone')} className={`border p-1 text-sm rounded w-full ${contactErrors.phone ? 'border-red-500' : ''}`} value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
+                                            <button onClick={() => addContact(s.id)} className="bg-blue-600 text-white rounded text-sm py-1">{t('common.add')}</button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -315,7 +326,7 @@ export const SuppliersPage = ({ onNavigate }: SuppliersPageProps) => {
             )}
 
             {editingContact && (
-                <Modal title="Upravit Kontakt" onClose={() => setEditingContact(null)}>
+                <Modal title={t('common.edit')} onClose={() => setEditingContact(null)}>
                     <div className="space-y-3">
                         <input className="w-full border p-2 rounded" value={editingContact.name} onChange={e => setEditingContact({...editingContact, name: e.target.value})} />
                         <input className="w-full border p-2 rounded" value={editingContact.position} onChange={e => setEditingContact({...editingContact, position: e.target.value})} />

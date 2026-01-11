@@ -50,17 +50,17 @@ export const AssignModal = ({
     const isValid = assignSolverId && assignDate;
 
     return (
-        <Modal title={isAlreadyAssigned ? "Změnit řešitele / Termín" : "Přiřazení / Plánování"} onClose={onClose}>
+        <Modal title={isAlreadyAssigned ? t('modal.assign_title_edit') : t('modal.assign_title_new')} onClose={onClose}>
             <div className="space-y-4">
                 <div>
-                    <p className="text-sm text-slate-600 mb-1">Přiřadit řešitele:</p>
+                    <p className="text-sm text-slate-600 mb-1">{t('form.assign_solver')}:</p>
                     {isAdmin ? (
                         <select 
                             className="w-full border p-2 rounded" 
                             value={assignSolverId} 
                             onChange={e => setAssignSolverId(e.target.value)}
                         >
-                            <option value="">-- Vyberte --</option>
+                            <option value="">{t('option.choose')}</option>
                             {candidates.map(u => (
                                     <option key={u.id} value={u.id}>{u.name} ({t(`role.${u.role}`)})</option>
                                 ))
@@ -68,13 +68,13 @@ export const AssignModal = ({
                         </select>
                     ) : (
                         <div className="w-full border p-2 rounded bg-slate-100 text-slate-600">
-                            {currentUser.name} (Vlastní přiřazení)
+                            {currentUser.name} {t('label.self_assign')}
                         </div>
                     )}
-                    {!isAdmin && <p className="text-xs text-slate-400 mt-1">Jako údržbář můžete úkoly přebírat pouze na sebe.</p>}
+                    {!isAdmin && <p className="text-xs text-slate-400 mt-1">{t('msg.maintenance_self_assign_only')}</p>}
                 </div>
                 <div>
-                    <p className="text-sm text-slate-600 mb-1">Očekávané datum vyřešení (povinné) *:</p>
+                    <p className="text-sm text-slate-600 mb-1">{t('form.resolution_date_required')}:</p>
                     <input 
                         type="date" 
                         className={`w-full border p-2 rounded ${!assignDate ? 'border-amber-300' : ''}`}
@@ -86,7 +86,7 @@ export const AssignModal = ({
             </div>
             
             <div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mt-4 mb-4">
-                Požadavek bude označen jako "V řešení".
+                {t('msg.req_will_be_in_progress')}
             </div>
 
             <div className="flex justify-between gap-2 mt-6">
@@ -96,7 +96,7 @@ export const AssignModal = ({
                             onClick={onRemove}
                             className="px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 flex items-center text-sm"
                         >
-                            <UserMinus className="w-4 h-4 mr-1" /> Odebrat řešitele
+                            <UserMinus className="w-4 h-4 mr-1" /> {t('action.remove_solver')}
                         </button>
                     )}
                 </div>
@@ -107,7 +107,7 @@ export const AssignModal = ({
                         disabled={!isValid} 
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isAlreadyAssigned ? 'Uložit změny' : 'Převzít / Přiřadit'}
+                        {isAlreadyAssigned ? t('action.save_changes') : t('action.assign')}
                     </button>
                 </div>
             </div>

@@ -80,7 +80,7 @@ export const generateWorkListPDF = async (
     // --- Header ---
     doc.setFontSize(18);
     doc.setFont("Roboto", "bold");
-    doc.text("FHB Maintain - List pracnosti", 14, 20);
+    doc.text(t('pdf.title_worklist'), 14, 20);
     
     doc.setFontSize(10);
     doc.setFont("Roboto", "normal");
@@ -127,9 +127,9 @@ export const generateWorkListPDF = async (
         const tech = technologies.find(t => t.id === r.techId);
         const techName = getLocalized(tech?.name, lang) || 'Neznámá';
         
-        let supplierName = 'Interní';
+        let supplierName = t('form.internal_solution');
         if (r.assignedSupplierId === 'internal') {
-            supplierName = 'Interní';
+            supplierName = t('form.internal_solution');
         } else if (r.assignedSupplierId) {
             supplierName = getLocalized(suppliers.find(s => s.id === r.assignedSupplierId)?.name, lang) || 'Neznámý';
         } else if (tech?.supplierId) {
@@ -165,7 +165,7 @@ export const generateWorkListPDF = async (
         if (internalRequests.length > 0) {
             // Add Separator Row
             tableBody.push([{ 
-                content: 'EXTERNÍ DODAVATELÉ', 
+                content: t('pdf.ext_suppliers'), 
                 colSpan: 9, 
                 styles: { fillColor: [220, 220, 220], textColor: [50, 50, 50], fontStyle: 'bold', halign: 'center', minCellHeight: 8 } 
             }]);
@@ -176,14 +176,14 @@ export const generateWorkListPDF = async (
     // --- Main Table ---
     const columns = [
         t('form.title'), 
-        'Technologie', 
+        t('pdf.col_tech'), 
         t('form.description'), 
-        'Řešitel', 
-        'Termín',
-        'Priorita', 
-        'Čas', 
-        'Cena',
-        'Řešení'
+        t('pdf.col_solver'), 
+        t('pdf.col_deadline'),
+        t('pdf.col_prio'), 
+        t('pdf.col_time'), 
+        t('pdf.col_cost'),
+        t('pdf.col_solution')
     ];
 
     autoTable(doc, {
@@ -234,12 +234,12 @@ export const generateWorkListPDF = async (
 
     autoTable(doc, {
         startY: (doc as any).lastAutoTable.finalY + 10,
-        head: [['Souhrn', 'Počet', 'Celkový čas', 'Celková cena']],
+        head: [[t('pdf.summary'), t('pdf.count'), t('pdf.total_time'), t('pdf.total_cost')]],
         body: [
-            ['Interní požadavky', internalTotals.count, formatTimeHHMM(internalTotals.time), formatCurrency(internalTotals.cost)],
-            ['Externí dodavatelé', externalTotals.count, formatTimeHHMM(externalTotals.time), formatCurrency(externalTotals.cost)],
+            [t('pdf.internal_reqs'), internalTotals.count, formatTimeHHMM(internalTotals.time), formatCurrency(internalTotals.cost)],
+            [t('pdf.ext_suppliers_row'), externalTotals.count, formatTimeHHMM(externalTotals.time), formatCurrency(externalTotals.cost)],
             [
-                { content: 'CELKEM', styles: { fontStyle: 'bold' } }, 
+                { content: t('pdf.total'), styles: { fontStyle: 'bold' } }, 
                 { content: totalCount, styles: { fontStyle: 'bold' } }, 
                 { content: formatTimeHHMM(totalTime), styles: { fontStyle: 'bold' } },
                 { content: formatCurrency(totalCost), styles: { fontStyle: 'bold' } }

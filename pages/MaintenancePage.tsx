@@ -255,7 +255,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     // --- VALIDATION LOGIC ---
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        if (!maintForm.techId) newErrors.techId = "Technologie je povinná (vyberte pracoviště)";
+        if (!maintForm.techId) newErrors.techId = t('validation.required');
         if (!maintForm.title) newErrors.title = t('validation.required');
         if (!maintForm.interval || maintForm.interval < 1) newErrors.interval = t('validation.required');
         if (!maintForm.allowedDays || maintForm.allowedDays.length === 0) newErrors.allowedDays = t('validation.required');
@@ -327,8 +327,8 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-6">
                                 <div><span className="text-slate-500 block">{t('form.interval')}</span> {selectedTemplate.interval} {t('common.days')}</div>
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
-                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">Interní řešení</span>}</div>
-                                <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">Nepřiřazeno</span>}</div>
+                                <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">{t('form.internal_solution')}</span>}</div>
+                                <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">{t('option.unassigned')}</span>}</div>
                                 <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate ? new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString() : '-'}</div>
                                 <div>
                                     <span className="text-slate-500 block">Příští generování</span>
@@ -647,7 +647,7 @@ const MaintModal = ({
                                 value={selectedLocId} 
                                 onChange={e => { setSelectedLocId(e.target.value); setSelectedWpId(''); setData({...data, techId: ''}); }}
                             >
-                                <option value="">-- Vyberte lokalitu --</option>
+                                <option value="">{t('option.select_location')}</option>
                                 {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
                             </select>
                         </div>
@@ -659,7 +659,7 @@ const MaintModal = ({
                                     value={selectedWpId} 
                                     onChange={e => { setSelectedWpId(e.target.value); setData({...data, techId: ''}); }}
                                 >
-                                    <option value="">-- Vyberte pracoviště --</option>
+                                    <option value="">{t('option.select_wp')}</option>
                                     {workplaces.filter((w: any) => w.locationId === selectedLocId).map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                                 </select>
                             </div>
@@ -667,14 +667,14 @@ const MaintModal = ({
                         
                         {/* Always show technology dropdown, but disabled or empty if no workplace */}
                         <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1">Technologie *</label>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.technology')} *</label>
                             <select 
                                 className={`w-full border p-2 rounded ${errors.techId ? 'border-red-500' : ''} ${!selectedWpId ? 'bg-slate-100' : ''}`}
                                 value={data.techId} 
                                 onChange={e => setData({...data, techId: e.target.value})}
                                 disabled={!selectedWpId}
                             >
-                                <option value="">{selectedWpId ? "-- Vyberte technologii --" : "-- Nejdříve vyberte pracoviště --"}</option>
+                                <option value="">{selectedWpId ? t('option.select_tech') : t('option.select_wp_first')}</option>
                                 {selectedWpId && technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                             </select>
                             {errors.techId && <span className="text-xs text-red-500 font-bold">{errors.techId}</span>}
@@ -691,7 +691,7 @@ const MaintModal = ({
             <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.supplier')}</label>
                     <select className={`w-full border p-2 rounded ${errors.supplierId ? 'border-red-500' : ''}`} value={data.supplierId} onChange={e => setData({...data, supplierId: e.target.value})}>
-                    <option value="">-- Interní řešení --</option>
+                    <option value="">{t('option.internal_solution')}</option>
                     {suppliers.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                     </select>
                     {errors.supplierId && <span className="text-xs text-red-500">{errors.supplierId}</span>}
@@ -731,7 +731,7 @@ const MaintModal = ({
             <div className="col-span-2 mt-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={data.isActive} onChange={e => setData({...data, isActive: e.target.checked})} />
-                    <span className="text-sm font-medium">Šablona je aktivní</span>
+                    <span className="text-sm font-medium">{t('label.template_active')}</span>
                 </label>
             </div>
             
@@ -746,7 +746,7 @@ const MaintModal = ({
                                 responsiblePersonIds: e.target.value ? [e.target.value] : [] 
                             })}
                         >
-                            <option value="">-- Nepřiřazeno --</option>
+                            <option value="">{t('option.unassigned')}</option>
                             {users
                                 .filter((u: any) => (u.role === 'admin' || u.role === 'maintenance') && !u.isBlocked)
                                 .map((u: any) => (

@@ -177,7 +177,7 @@ export const RequestsTable = ({
                     onClick={(e) => { if (isLocked || !onApprovalClick) return; e.stopPropagation(); onApprovalClick(req); }}
                     className={`px-2 py-1 rounded text-xs font-bold border flex items-center justify-center gap-1 ${isLocked ? 'bg-green-50 text-green-700 border-green-100 cursor-default opacity-70' : 'bg-green-100 text-green-800 border-green-200 cursor-pointer hover:bg-green-200'}`}
                 >
-                    <CheckCircle2 className="w-3 h-3" /> Schváleno
+                    <CheckCircle2 className="w-3 h-3" /> {t('form.is_approved')}
                 </span>
             );
         }
@@ -187,7 +187,7 @@ export const RequestsTable = ({
                 onClick={(e) => { if (!onApprovalClick) return; e.stopPropagation(); onApprovalClick(req); }}
                 className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer hover:bg-amber-200 flex items-center justify-center gap-1"
             >
-               Ke schválení
+               {t('msg.waiting_for_approval')}
             </span>
         );
     }
@@ -211,7 +211,7 @@ export const RequestsTable = ({
     const techOptions = technologies.map(t => ({ id: t.id, name: getLocalized(t.name, lang) }));
     const userOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
     const supplierOptions = [
-        { id: 'internal', name: 'Interní' },
+        { id: 'internal', name: t('form.internal_solution') },
         { id: 'external', name: 'Externí (Všichni)' },
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
@@ -227,8 +227,8 @@ export const RequestsTable = ({
                             <th className="px-4 py-2 font-semibold w-10"></th>
                             <th className="px-4 py-2 font-semibold min-w-[150px]">{t('form.title')}</th>
                             <th className="px-4 py-2 font-semibold min-w-[150px]">{t('col.technology')}</th>
-                            <th className="px-4 py-2 font-semibold whitespace-nowrap">Vytvořeno</th>
-                            <th className="px-4 py-2 font-semibold whitespace-nowrap">Termín vyřízení</th>
+                            <th className="px-4 py-2 font-semibold whitespace-nowrap">{t('action.created')}</th>
+                            <th className="px-4 py-2 font-semibold whitespace-nowrap">{t('col.deadline')}</th>
                             <th className="px-4 py-2 font-semibold min-w-[100px]">{t('form.priority')}</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">{t('col.solver')}</th>
                             <th className="px-4 py-2 font-semibold min-w-[130px]">{t('col.supplier')}</th>
@@ -241,21 +241,21 @@ export const RequestsTable = ({
                         <tr className="bg-slate-100 border-b border-slate-200">
                             <th className="px-2 py-2 text-center">
                                 {/* Toggle for "My Requests" - Primarily for Operators */}
-                                <div className="flex items-center justify-center" title="Zobrazit pouze moje">
+                                <div className="flex items-center justify-center" title={t('filter.only_mine')}>
                                     <input 
                                         type="checkbox" 
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         checked={fAuthorId === currentUser.id}
                                         onChange={(e) => setFAuthorId(e.target.checked ? currentUser.id : '')}
                                     />
-                                    <span className="ml-1 text-[10px] text-slate-500 whitespace-nowrap">Jen moje</span>
+                                    <span className="ml-1 text-[10px] text-slate-500 whitespace-nowrap">{t('filter.only_mine')}</span>
                                 </div>
                             </th>
                             <th className="px-2 py-2">
                                 <div className="relative">
                                     <input 
                                         className="w-full border rounded p-1 text-xs font-normal pr-6" 
-                                        placeholder="Hledat..." 
+                                        placeholder={t('common.search')} 
                                         value={fTitle} 
                                         onChange={e => setFTitle(e.target.value)} 
                                     />
@@ -296,7 +296,7 @@ export const RequestsTable = ({
                                     <button 
                                         onClick={handleClearAllFilters}
                                         className="text-xs text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 bg-white border px-2 py-1 rounded shadow-sm"
-                                        title="Vyčistit filtr"
+                                        title={t('common.clear_filter')}
                                     >
                                         <RotateCcw className="w-3 h-3" /> Reset
                                     </button>
@@ -347,7 +347,7 @@ export const RequestsTable = ({
                                                                     <button 
                                                                         onClick={(e) => { e.stopPropagation(); onAssignSelf && onAssignSelf(r); }} 
                                                                         className="text-slate-400 hover:text-blue-600"
-                                                                        title="Upravit řešitele/datum"
+                                                                        title={t('modal.assign_title_edit')}
                                                                     >
                                                                         <UserCog className="w-4 h-4" />
                                                                     </button>
@@ -357,13 +357,13 @@ export const RequestsTable = ({
                                                     )}
                                                 </div>
                                             ) : ((isAuthorized && r.state === 'new' && onAssignSelf) ? (
-                                                <button onClick={(e) => { e.stopPropagation(); onAssignSelf(r); }} className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors" title="Převzít požadavek">
-                                                    <UserPlus className="w-3 h-3 mr-1" /> Převzít
+                                                <button onClick={(e) => { e.stopPropagation(); onAssignSelf(r); }} className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors" title={t('action.take_over')}>
+                                                    <UserPlus className="w-3 h-3 mr-1" /> {t('action.take_over')}
                                                 </button>
                                             ) : '-')}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">
-                                            {isInternal ? <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"><Wrench className="w-3 h-3 mr-1" /> Interní</span> : <span>{supplierName}</span>}
+                                            {isInternal ? <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"><Wrench className="w-3 h-3 mr-1" /> {t('form.internal_solution')}</span> : <span>{supplierName}</span>}
                                         </td>
                                         <td className="px-4 py-3 text-center text-xs font-mono">
                                             {r.estimatedCost ? <span className="flex items-center justify-center gap-1"><Euro className="w-3 h-3 text-slate-400"/> {r.estimatedCost}</span> : '-'}
