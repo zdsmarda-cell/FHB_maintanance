@@ -1,5 +1,7 @@
 
 import pool from '../db.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const APP_URL = process.env.APP_URL || 'https://fhbmain.impossible.cz';
 
@@ -15,7 +17,8 @@ const i18n = {
         my_assigned: "Moje přiřazené požadavky po termínu",
         unassigned: "Nepřiřazené požadavky po termínu (ve vaší působnosti)",
         report_title: "FHB Maintain - Report po termínu",
-        open_app: "Otevřít aplikaci"
+        open_app: "Otevřít aplikaci",
+        generated: "Vygenerováno"
     },
     en: {
         title: "Overdue Requests Overview",
@@ -28,7 +31,8 @@ const i18n = {
         my_assigned: "My Overdue Requests",
         unassigned: "Unassigned Overdue Requests (In your scope)",
         report_title: "FHB Maintain - Overdue Report",
-        open_app: "Open Application"
+        open_app: "Open Application",
+        generated: "Generated"
     },
     uk: {
         title: "Огляд прострочених запитів",
@@ -41,11 +45,44 @@ const i18n = {
         my_assigned: "Мої прострочені запити",
         unassigned: "Непризначені прострочені запити (у вашій компетенції)",
         report_title: "FHB Maintain - Звіт про прострочення",
-        open_app: "Відкрити додаток"
+        open_app: "Відкрити додаток",
+        generated: "Згенеровано"
     }
 };
 
 const getStrings = (lang) => i18n[lang] || i18n['cs'];
+
+// Helper to parse localized string
+const getLocalized = (data, lang) => {
+    if (!data) return '';
+    try {
+        if (typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
+            const parsed = JSON.parse(data);
+            return parsed[lang] || parsed['cs'] || parsed['en'] || Object.values(parsed)[0] || data;
+        }
+        return data;
+    } catch (e) {
+        return data;
+    }
+};
+
+// Helper to load font for PDF generation in Node environment
+const loadPdfFont = async (doc) => {
+    try {
+        // We use Roboto because standard PDF fonts do not support UTF-8 (CZ/UK chars)
+        const response = await fetch("https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf");
+        if (!response.ok) throw new Error("Failed to fetch font");
+        
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+        
+        doc.addFileToVFS("Roboto-Regular.ttf", base64);
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+        doc.setFont("Roboto");
+    } catch (e) {
+        console.warn("[WORKER] Failed to load font for PDF, diacritics may be broken:", e.message);
+    }
+};
 
 const generateHtmlTable = (requests, title, s) => {
     if (requests.length === 0) return '';
@@ -67,14 +104,74 @@ const generateHtmlTable = (requests, title, s) => {
     return html;
 };
 
+// Generate valid PDF Buffer using jsPDF
+const generatePdfAttachment = async (myAssigned, myUnassigned, user, s, dateStr) => {
+    const doc = new jsPDF();
+    
+    // Load font for Czech/Ukrainian characters
+    await loadPdfFont(doc);
+
+    // Header
+    doc.setFontSize(18);
+    doc.text(s.report_title, 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`${s.generated}: ${dateStr}`, 14, 28);
+    doc.text(`User: ${user.name}`, 14, 33);
+
+    let finalY = 40;
+
+    // Helper for table body
+    const mapRows = (rows) => rows.map(r => [
+        new Date(r.planned_resolution_date).toLocaleDateString(s === i18n['en'] ? 'en-US' : 'cs-CZ'),
+        r.tech_name || '-',
+        r.title || '-', // Title is already localized in the caller
+        r.priority
+    ]);
+
+    // Table 1: Assigned
+    if (myAssigned.length > 0) {
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.text(s.my_assigned, 14, finalY);
+        
+        autoTable(doc, {
+            startY: finalY + 5,
+            head: [[s.date, s.tech, s.req_title, s.prio]],
+            body: mapRows(myAssigned),
+            styles: { font: "Roboto", fontSize: 10 },
+            headStyles: { fillColor: [66, 66, 66] }
+        });
+        finalY = doc.lastAutoTable.finalY + 15;
+    }
+
+    // Table 2: Unassigned
+    if (myUnassigned.length > 0) {
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.text(s.unassigned, 14, finalY);
+        
+        autoTable(doc, {
+            startY: finalY + 5,
+            head: [[s.date, s.tech, s.req_title, s.prio]],
+            body: mapRows(myUnassigned),
+            styles: { font: "Roboto", fontSize: 10 },
+            headStyles: { fillColor: [220, 53, 69] } // Red header for urgent/unassigned
+        });
+    }
+
+    // Return as Base64 string
+    const arrayBuffer = doc.output('arraybuffer');
+    return Buffer.from(arrayBuffer).toString('base64');
+};
+
 export const checkDailyOverdue = async () => {
     console.log('[WORKER] Starting Daily Overdue Check...');
     try {
         // 1. Fetch Overdue Requests
         const today = new Date().toISOString().split('T')[0];
         
-        // Fetch requests that are active AND planned date < today
-        // Also join with tech/workplace to determine permissions
         const [overdueRequests] = await pool.query(`
             SELECT 
                 r.id, r.title, r.priority, r.planned_resolution_date, r.solver_id,
@@ -92,7 +189,7 @@ export const checkDailyOverdue = async () => {
             return;
         }
 
-        // 2. Fetch Users (Admins and Maintenance) WITH Language
+        // 2. Fetch Users
         const [users] = await pool.query(`
             SELECT id, name, email, role, language, assignedLocationIds, assignedWorkplaceIds 
             FROM users 
@@ -104,20 +201,30 @@ export const checkDailyOverdue = async () => {
             const lang = user.language || 'cs';
             const s = getStrings(lang);
 
+            // Pre-process requests to Localized strings (Fixes "title is JSON" issue)
+            const localizeReq = (r) => ({
+                ...r,
+                title: getLocalized(r.title, lang),
+                tech_name: getLocalized(r.tech_name, lang)
+            });
+
             // A. Requests assigned directly to this user
-            const myAssigned = overdueRequests.filter(r => r.solver_id === user.id);
+            const myAssigned = overdueRequests
+                .filter(r => r.solver_id === user.id)
+                .map(localizeReq);
 
             // B. Unassigned requests that this user can see
-            const myUnassigned = overdueRequests.filter(r => {
-                if (r.solver_id) return false; // Already assigned (handled in A or by someone else)
-                
-                if (user.role === 'admin') return true; // Admin sees all unassigned
+            const myUnassigned = overdueRequests
+                .filter(r => {
+                    if (r.solver_id) return false; // Already assigned
+                    if (user.role === 'admin') return true; // Admin sees all unassigned
 
-                const locs = typeof user.assignedLocationIds === 'string' ? JSON.parse(user.assignedLocationIds) : (user.assignedLocationIds || []);
-                const wps = typeof user.assignedWorkplaceIds === 'string' ? JSON.parse(user.assignedWorkplaceIds) : (user.assignedWorkplaceIds || []);
+                    const locs = typeof user.assignedLocationIds === 'string' ? JSON.parse(user.assignedLocationIds) : (user.assignedLocationIds || []);
+                    const wps = typeof user.assignedWorkplaceIds === 'string' ? JSON.parse(user.assignedWorkplaceIds) : (user.assignedWorkplaceIds || []);
 
-                return locs.includes(r.loc_id) || wps.includes(r.wp_id);
-            });
+                    return locs.includes(r.loc_id) || wps.includes(r.wp_id);
+                })
+                .map(localizeReq);
 
             // If user has relevant info, send email
             if (myAssigned.length > 0 || myUnassigned.length > 0) {
@@ -136,24 +243,13 @@ export const checkDailyOverdue = async () => {
 
                 emailBody += `<p style="margin-top:20px"><a href="${APP_URL}">${s.open_app}</a></p>`;
 
-                // Generate "PDF" attachment (Mocked as text representation for safety/speed)
-                const pdfContent = `
-${s.report_title}
-${s.date}: ${today}
-User: ${user.name}
-
---- ${s.my_assigned.toUpperCase()} ---
-${myAssigned.map(r => `[${r.planned_resolution_date}] ${r.tech_name} - ${r.title}`).join('\n')}
-
---- ${s.unassigned.toUpperCase()} ---
-${myUnassigned.map(r => `[${r.planned_resolution_date}] ${r.tech_name} - ${r.title}`).join('\n')}
-                `;
+                // Generate REAL PDF Attachment
+                const base64Content = await generatePdfAttachment(myAssigned, myUnassigned, user, s, today);
                 
-                const base64Pdf = Buffer.from(pdfContent).toString('base64');
                 const attachments = JSON.stringify([
                     {
-                        filename: `report_overdue_${today}.pdf`, // Mocking ext
-                        content: base64Pdf,
+                        filename: `report_overdue_${today}.pdf`,
+                        content: base64Content,
                         encoding: 'base64'
                     }
                 ]);
@@ -164,7 +260,7 @@ ${myUnassigned.map(r => `[${r.planned_resolution_date}] ${r.tech_name} - ${r.tit
                     [user.email, `FHB maintain - ${s.title}`, emailBody, attachments]
                 );
                 
-                console.log(`[WORKER] Queued overdue report for ${user.email} (${lang})`);
+                console.log(`[WORKER] Queued overdue PDF report for ${user.email} (${lang})`);
             }
         }
 
