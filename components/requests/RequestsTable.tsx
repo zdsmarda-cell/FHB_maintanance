@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology, Supplier, Workplace } from '../../lib/types';
@@ -93,6 +94,7 @@ export const RequestsTable = ({
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
     const supplierOptions = [
         { id: 'internal', name: t('form.internal_solution') },
+        { id: 'external', name: `${t('label.external_tasks')} (${t('common.all')})` }, // Added "External" group option
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 

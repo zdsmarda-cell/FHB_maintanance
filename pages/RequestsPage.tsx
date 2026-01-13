@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
@@ -164,15 +165,14 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             }
             if (fTechIds.length > 0 && !fTechIds.includes(req.techId)) return false;
 
+            // Updated Date Logic: Use string comparison (YYYY-MM-DD) to fix timezone/off-by-one errors
             if (fDateResFrom || fDateResTo) {
                 if (!req.plannedResolutionDate) return false;
-                const resDate = new Date(req.plannedResolutionDate).getTime();
-                if (fDateResFrom) {
-                    if (resDate < new Date(fDateResFrom).setHours(0,0,0,0)) return false;
-                }
-                if (fDateResTo) {
-                    if (resDate > new Date(fDateResTo).setHours(23,59,59,999)) return false;
-                }
+                // Convert DB date (potentially UTC ISO) to Local YYYY-MM-DD string
+                const reqDateStr = new Date(req.plannedResolutionDate).toLocaleDateString('en-CA');
+                
+                if (fDateResFrom && reqDateStr < fDateResFrom) return false;
+                if (fDateResTo && reqDateStr > fDateResTo) return false;
             }
 
             if (fSolverIds.length > 0) {

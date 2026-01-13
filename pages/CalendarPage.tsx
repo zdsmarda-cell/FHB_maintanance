@@ -97,8 +97,9 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
     const requestsByDate: Record<string, DayData> = {};
 
     solverRequests.forEach(r => {
-        // Ensure date format is YYYY-MM-DD
-        const d = r.plannedResolutionDate!.split('T')[0];
+        // Ensure date format is YYYY-MM-DD using Local Time to prevent off-by-one errors from UTC
+        // 'en-CA' locale consistently outputs YYYY-MM-DD
+        const d = new Date(r.plannedResolutionDate!).toLocaleDateString('en-CA');
         
         if (!requestsByDate[d]) {
             requestsByDate[d] = { internalCount: 0, internalEffort: 0, externalCount: 0, externalEffort: 0 };
@@ -148,7 +149,8 @@ export const CalendarPage = ({ user, onNavigate }: CalendarPageProps) => {
     // PDF Export
     const handleExportDay = async (e: React.MouseEvent, dateStr: string) => {
         e.stopPropagation();
-        const dailyRequests = solverRequests.filter(r => r.plannedResolutionDate?.split('T')[0] === dateStr);
+        // Use local date string comparison
+        const dailyRequests = solverRequests.filter(r => new Date(r.plannedResolutionDate!).toLocaleDateString('en-CA') === dateStr);
         // Construct a User object to pass to PDF generator
         const userObj = adminUsers.find(u => u.id === selectedSolverId) || user;
         
