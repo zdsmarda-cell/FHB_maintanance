@@ -22,6 +22,14 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Helper to format Date to YYYY-MM-DD using LOCAL time values to avoid UTC shift issues at 00:01
+const toLocalSqlDate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 const processEmailQueue = async () => {
   try {
     const [rows] = await pool.query('SELECT * FROM email_queue WHERE sent_at IS NULL AND attempts < 3 LIMIT 10');
@@ -107,7 +115,7 @@ const generateMaintenanceRequests = async () => {
             // If the calculated target date is in the past (e.g. worker didn't run yesterday),
             // do NOT generate a request for yesterday. Move the target to TODAY.
             if (targetDate < today) {
-                console.log(`[MAINT] Template "${template.title}" is overdue (Target was ${targetDate.toISOString().split('T')[0]}). Fast-forwarding to Today.`);
+                console.log(`[MAINT] Template "${template.title}" is overdue (Target was ${toLocalSqlDate(targetDate)}). Fast-forwarding to Today.`);
                 targetDate = new Date(today);
             }
 
@@ -135,7 +143,8 @@ const generateMaintenanceRequests = async () => {
             // Note: If targetDate === today, we PROCEED.
             if (targetDate > today) continue;
             
-            const targetDateStr = targetDate.toISOString().split('T')[0];
+            // Format for SQL (YYYY-MM-DD) using LOCAL time values
+            const targetDateStr = toLocalSqlDate(targetDate);
             
             // 5. Idempotency Check:
             // Check if we already created a request for this maintenance ID on this specific Target Date
@@ -178,6 +187,7 @@ const generateMaintenanceRequests = async () => {
                 const requestId = crypto.randomUUID();
 
                 // Create Request
+                // Note: The planned_resolution_date corresponds to targetDateStr which is usually TODAY
                 await pool.execute(
                     `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
@@ -254,6 +264,7 @@ export const startWorker = () => {
         processEmailQueue();
 
         // Daily Job at 00:01 (Maintenance Generation + Overdue Checks)
+        // Checks if hours is 0 AND minutes is 1. To prevent double run in the same minute, we track `lastDailyRun`.
         const currentDay = now.getDate();
         if (now.getHours() === 0 && now.getMinutes() === 1) {
             if (lastDailyRun !== currentDay) {
