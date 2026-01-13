@@ -21,6 +21,13 @@ interface RequestsPageProps {
     initialFilters?: any;
 }
 
+export type SortDirection = 'asc' | 'desc' | null;
+
+export interface SortConfig {
+    key: string | null;
+    direction: SortDirection;
+}
+
 export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const { t, lang } = useI18n();
     const [loading, setLoading] = useState(false);
@@ -39,6 +46,9 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     
+    // Sorting State
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
+
     // Action Modals State
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [assignTargetReq, setAssignTargetReq] = useState<Request | null>(null);
@@ -149,6 +159,16 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     useEffect(() => { loadData(); }, []);
 
     // --- Actions ---
+
+    const handleSort = (key: string) => {
+        setSortConfig(current => {
+            if (current.key === key) {
+                if (current.direction === 'desc') return { key, direction: 'asc' };
+                if (current.direction === 'asc') return { key: null, direction: null };
+            }
+            return { key, direction: 'desc' }; // Default first click is Descending
+        });
+    };
 
     // 1. Create / Edit Handlers
     const handleOpenCreate = () => {
@@ -415,9 +435,10 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         generateWorkListPDF(filteredRequests, user, 'Filtered List', t, lang, technologies, suppliers, users);
     };
 
-    // --- Filtering Logic ---
+    // --- Filtering & Sorting Logic ---
     const filteredRequests = useMemo(() => {
-        return requests.filter(r => {
+        // 1. Filter
+        const result = requests.filter(r => {
             if (fTitle && !getLocalized(r.title, lang).toLowerCase().includes(fTitle.toLowerCase())) return false;
             
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
@@ -470,14 +491,69 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
             return true;
         });
-    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, lang, technologies]);
+
+        // 2. Sort
+        if (sortConfig.key && sortConfig.direction) {
+            result.sort((a, b) => {
+                let valA: any = '';
+                let valB: any = '';
+
+                switch (sortConfig.key) {
+                    case 'createdDate':
+                        valA = new Date(a.createdDate).getTime();
+                        valB = new Date(b.createdDate).getTime();
+                        break;
+                    case 'title':
+                        valA = getLocalized(a.title, lang).toLowerCase();
+                        valB = getLocalized(b.title, lang).toLowerCase();
+                        break;
+                    case 'techId': // Sort by Tech Name
+                        valA = getLocalized(technologies.find(t => t.id === a.techId)?.name, lang).toLowerCase() || '';
+                        valB = getLocalized(technologies.find(t => t.id === b.techId)?.name, lang).toLowerCase() || '';
+                        break;
+                    case 'plannedResolutionDate':
+                        valA = a.plannedResolutionDate ? new Date(a.plannedResolutionDate).getTime() : 0;
+                        valB = b.plannedResolutionDate ? new Date(b.plannedResolutionDate).getTime() : 0;
+                        break;
+                    case 'solverId': // Sort by Solver Name
+                        valA = users.find(u => u.id === a.solverId)?.name.toLowerCase() || '';
+                        valB = users.find(u => u.id === b.solverId)?.name.toLowerCase() || '';
+                        break;
+                    case 'estimatedCost':
+                        valA = a.estimatedCost || 0;
+                        valB = b.estimatedCost || 0;
+                        break;
+                    case 'estimatedTime':
+                        valA = a.estimatedTime || 0;
+                        valB = b.estimatedTime || 0;
+                        break;
+                    case 'state':
+                        valA = t(`status.${a.state}`).toLowerCase();
+                        valB = t(`status.${b.state}`).toLowerCase();
+                        break;
+                    case 'isApproved':
+                        valA = a.isApproved ? 1 : 0;
+                        valB = b.isApproved ? 1 : 0;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return result;
+    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, lang, technologies, users, sortConfig]);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
-    // Reset pagination when filters change
-    useEffect(() => { setCurrentPage(1); }, [filteredRequests.length]);
+    // Reset pagination when filters or sort change
+    useEffect(() => { setCurrentPage(1); }, [filteredRequests.length, sortConfig]);
 
     if (loading && requests.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
@@ -542,6 +618,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         fMaintenanceId, setFMaintenanceId
                     }}
                     showFilters={showFilters}
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
                 />
             </div>
 

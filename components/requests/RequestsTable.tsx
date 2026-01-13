@@ -4,7 +4,8 @@ import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology, Supplier, Workplace } from '../../lib/types';
 import { getLocalized } from '../../lib/helpers';
 import { MultiSelect, Pagination } from '../Shared';
-import { Search, CheckCircle, Clock, Euro, X, Eye, Edit, Ban, UserPlus, AlertTriangle } from 'lucide-react';
+import { Search, CheckCircle, Clock, Euro, X, Eye, Edit, Ban, UserPlus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { SortConfig } from '../../pages/RequestsPage'; // Import type from parent
 
 interface RequestsTableProps {
     requests: Request[]; // Already filtered
@@ -18,20 +19,23 @@ interface RequestsTableProps {
     onCancel: (req: Request) => void;
     onTakeOver: (req: Request) => void;
     onApproval: (req: Request) => void;
-    onStatusChange: (req: Request) => void; // New Prop
+    onStatusChange: (req: Request) => void; 
     currentPage: number;
     itemsPerPage: number;
     onPageChange: (page: number) => void;
     onItemsPerPageChange: (limit: number) => void;
     filterState: any; 
     showFilters: boolean;
+    sortConfig: SortConfig; // New Prop
+    onSort: (key: string) => void; // New Prop
 }
 
 export const RequestsTable = ({ 
     requests, currentUser, technologies, suppliers, users, workplaces,
     onDetail, onEdit, onCancel, onTakeOver, onApproval, onStatusChange,
     currentPage, itemsPerPage, onPageChange, onItemsPerPageChange,
-    filterState, showFilters
+    filterState, showFilters,
+    sortConfig, onSort
 }: RequestsTableProps) => {
     const { t, lang } = useI18n();
     
@@ -89,6 +93,26 @@ export const RequestsTable = ({
         setFPriorities([]);
         setFApproved('all');
         if (setFMaintenanceId) setFMaintenanceId(null);
+    };
+
+    // Helper for Sortable Headers
+    const SortableHeader = ({ label, sortKey, align = 'left' }: { label: string, sortKey: string, align?: string }) => {
+        const isActive = sortConfig.key === sortKey;
+        return (
+            <th 
+                className={`px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-${align}`}
+                onClick={() => onSort(sortKey)}
+            >
+                <div className={`flex items-center gap-1 ${align === 'center' ? 'justify-center' : (align === 'right' ? 'justify-end' : 'justify-start')}`}>
+                    {label}
+                    {isActive ? (
+                        sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
+                    ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100" />
+                    )}
+                </div>
+            </th>
+        );
     };
 
     // Options for Filters
@@ -161,17 +185,17 @@ export const RequestsTable = ({
 
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b group">
                         <tr>
-                            <th className="px-4 py-3 whitespace-nowrap">{t('col.created')}</th>
-                            <th className="px-4 py-3">{t('form.title')}</th>
-                            <th className="px-4 py-3">{t('col.technology')}</th>
-                            <th className="px-4 py-3">{t('col.deadline')}</th>
-                            <th className="px-4 py-3">{t('col.solver')}</th>
-                            <th className="px-4 py-3 text-center">{t('col.cost')}</th>
-                            <th className="px-4 py-3 text-center">{t('col.time')}</th>
-                            <th className="px-4 py-3 text-center">{t('common.status')}</th>
-                            <th className="px-4 py-3 text-center">{t('headers.approval')}</th>
+                            <SortableHeader label={t('col.created')} sortKey="createdDate" />
+                            <SortableHeader label={t('form.title')} sortKey="title" />
+                            <SortableHeader label={t('col.technology')} sortKey="techId" />
+                            <SortableHeader label={t('col.deadline')} sortKey="plannedResolutionDate" />
+                            <SortableHeader label={t('col.solver')} sortKey="solverId" />
+                            <SortableHeader label={t('col.cost')} sortKey="estimatedCost" align="center" />
+                            <SortableHeader label={t('col.time')} sortKey="estimatedTime" align="center" />
+                            <SortableHeader label={t('common.status')} sortKey="state" align="center" />
+                            <SortableHeader label={t('headers.approval')} sortKey="isApproved" align="center" />
                             <th className="px-4 py-3 text-right">{t('common.actions')}</th>
                         </tr>
                     </thead>
