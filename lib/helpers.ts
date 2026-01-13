@@ -41,17 +41,25 @@ export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
     baseDate.setHours(0,0,0,0);
 
     // Theoretical next date based purely on interval
-    const nextDate = new Date(baseDate);
-    nextDate.setDate(baseDate.getDate() + m.interval);
+    let targetDate = new Date(baseDate);
+    targetDate.setDate(baseDate.getDate() + m.interval);
+
+    // VISUAL CATCH-UP LOGIC:
+    // If the theoretical date is in the past (worker hasn't run yet), 
+    // the UI should show "Today" (or next allowed day from Today), 
+    // reflecting what the worker WILL do on next run.
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    if (targetDate < today) {
+        targetDate = new Date(today);
+    }
 
     // Check allowed days logic (skip weekends etc.)
-    let targetDate = new Date(nextDate);
     let safetyCounter = 0;
     const allowedDays = m.allowedDays || [];
 
-    // If no specific days allowed (empty array), usually implies all days are allowed or legacy data
-    // If logic dictates specific days must be set, we assume default 1-5 if empty, 
-    // but here we just return targetDate if array is empty to be safe.
+    // If no specific days allowed (empty array), assume all are valid.
     if (allowedDays.length === 0) return targetDate;
 
     while (safetyCounter < 30) {

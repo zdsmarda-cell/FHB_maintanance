@@ -34,35 +34,26 @@ const processEmailQueue = async () => {
       try {
         console.log(`[MAILER] Sending to ${email.to_address}: ${email.subject}`);
         
-        // Smart Body Handling:
-        // New system stores Raw HTML (contains spaces, tags).
-        // Legacy/Other systems might store Base64 (no spaces, blocks of text).
-        // Logic: If it contains spaces or starts with '<', treat as Raw HTML. Else try decode.
-        
         let bodyToSend = email.body;
         
-        // Check for Legacy Base64: No spaces AND doesn't start with typical HTML tag
+        // Check for Legacy Base64
         if (bodyToSend && !bodyToSend.includes(' ') && !bodyToSend.trim().startsWith('<')) {
             try {
                 const decoded = Buffer.from(bodyToSend, 'base64').toString('utf-8');
-                // Use decoded only if it looks like valid HTML/Text
                 if (decoded.includes('<') || decoded.includes(' ')) {
                     bodyToSend = decoded;
                 }
-            } catch (e) {
-                // If decode fails, assume it was just a plain string without spaces
-            }
+            } catch (e) { }
         }
 
         const mailOptions = {
           from: process.env.EMAIL_FROM || '"FHB Maintain" <noreply@fhb.sk>',
           to: email.to_address,
           subject: email.subject,
-          html: bodyToSend, // Send correct body
+          html: bodyToSend,
           attachments: []
         };
 
-        // Handle Attachments (JSON array of { filename, content, encoding })
         if (email.attachments) {
             try {
                 const parsedAttachments = JSON.parse(email.attachments);
@@ -104,69 +95,78 @@ const generateMaintenanceRequests = async () => {
         today.setHours(0,0,0,0);
 
         for (const template of templates) {
-            // Determine the base date to calculate next due date
+            // Determine the base date (Last Generated OR Created At)
             const lastGenerated = template.last_generated_at ? new Date(template.last_generated_at) : new Date(template.created_at);
             lastGenerated.setHours(0,0,0,0);
 
-            // Calculate theoretical due date
-            const nextDueDate = new Date(lastGenerated);
-            nextDueDate.setDate(lastGenerated.getDate() + template.interval_days);
+            // 1. Calculate Theoretical Next Date
+            let targetDate = new Date(lastGenerated);
+            targetDate.setDate(lastGenerated.getDate() + template.interval_days);
 
-            if (nextDueDate > today) continue;
+            // 2. Catch-up Logic:
+            // If the calculated target date is in the past (e.g. worker didn't run yesterday),
+            // do NOT generate a request for yesterday. Move the target to TODAY.
+            if (targetDate < today) {
+                console.log(`[MAINT] Template "${template.title}" is overdue (Target was ${targetDate.toISOString().split('T')[0]}). Fast-forwarding to Today.`);
+                targetDate = new Date(today);
+            }
 
-            // Logic: "Save to nearest allowed day"
-            let targetDate = new Date(nextDueDate);
+            // 3. Allowed Days Logic (Skip weekends/specific days)
             let safetyCounter = 0;
-            
-            // Safe parsing of allowed_days
             const allowedDaysRaw = template.allowed_days;
             const allowedDays = Array.isArray(allowedDaysRaw) 
                 ? allowedDaysRaw 
                 : (typeof allowedDaysRaw === 'string' ? JSON.parse(allowedDaysRaw) : []);
 
-            while (safetyCounter < 30) {
-                 const currentDayOfWeek = targetDate.getDay(); // 0 = Sun
-                 // Only check allowed days if the array is not empty (empty implies allowed or legacy data)
-                 if (allowedDays.length === 0 || allowedDays.includes(currentDayOfWeek)) {
-                     break; 
-                 }
-                 targetDate.setDate(targetDate.getDate() + 1);
-                 safetyCounter++;
+            // If allowedDays is specified, advance targetDate until it lands on an allowed day
+            if (allowedDays.length > 0) {
+                while (safetyCounter < 60) { // Max check to prevent infinite loop
+                     const currentDayOfWeek = targetDate.getDay(); // 0 = Sun
+                     if (allowedDays.includes(currentDayOfWeek)) {
+                         break; // Valid day found
+                     }
+                     targetDate.setDate(targetDate.getDate() + 1); // Move to next day
+                     safetyCounter++;
+                }
             }
 
+            // 4. Future Check:
+            // If after adjustments the date is in the future, wait.
+            // Note: If targetDate === today, we PROCEED.
             if (targetDate > today) continue;
             
             const targetDateStr = targetDate.toISOString().split('T')[0];
             
-            // Check existence in REQUESTS (Legacy check, primarily relies on maintenance_logs now but kept for idempotency)
+            // 5. Idempotency Check:
+            // Check if we already created a request for this maintenance ID on this specific Target Date
+            // This prevents duplicate generation if the worker runs multiple times a day
             const [existing] = await pool.query(
                 'SELECT id FROM requests WHERE maintenance_id = ? AND planned_resolution_date = ?',
                 [template.id, targetDateStr]
             );
 
             if (existing.length > 0) {
-                // Update maintenance record to move window forward if stuck
+                // Self-Healing: If DB thinks last_generated is old, but a request EXISTS for today, update the pointer.
                 if (!template.last_generated_at || new Date(template.last_generated_at) < targetDate) {
+                     console.log(`[MAINT] Correcting last_generated_at pointer for "${template.title}" to ${targetDateStr}`);
                      await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
                 }
-                continue;
+                continue; // Skip generation
             }
 
-            // --- NEW LOGGING LOGIC ---
+            // --- GENERATION EXECUTION ---
             
-            console.log(`[MAINT] Processing template ${template.title} for ${targetDateStr}`);
+            console.log(`[MAINT] Generating request for "${template.title}" due on ${targetDateStr}`);
             const logId = crypto.randomUUID();
             
-            // 1. Create Log Entry (Pending)
+            // Log Start
             await pool.execute(
                 `INSERT INTO maintenance_logs (id, maintenance_id, status, template_snapshot, created_at) 
                  VALUES (?, ?, 'pending', ?, ?)`,
-                [logId, template.id, JSON.stringify(template), targetDateStr] // using targetDateStr as created_at reference for the "plan"
+                [logId, template.id, JSON.stringify(template), targetDateStr]
             );
 
-            // 2. Try Create Request
             try {
-                // Safe parsing of responsible_person_ids
                 const responsibleIdsRaw = template.responsible_person_ids;
                 const responsibleIds = Array.isArray(responsibleIdsRaw) 
                     ? responsibleIdsRaw 
@@ -175,41 +175,39 @@ const generateMaintenanceRequests = async () => {
                 const solverId = responsibleIds.length > 0 ? responsibleIds[0] : null;
                 const state = solverId ? 'assigned' : 'new';
                 const authorId = 'system'; 
-                const requestId = crypto.randomUUID(); // GENERATE ID MANUALLY
+                const requestId = crypto.randomUUID();
 
-                // INSERT query MUST include 'id'
+                // Create Request
                 await pool.execute(
                     `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
                     [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
                 );
 
-                // 3. Success: Update Log & Maintenance
+                // Update Success State
                 await pool.execute(
                     `UPDATE maintenance_logs SET status = 'success', executed_at = NOW(), request_id = ? WHERE id = ?`,
                     [requestId, logId]
                 );
+                
+                // IMPORTANT: Move the maintenance pointer to the generated date
                 await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [targetDateStr, template.id]);
 
-                // 4. Send Email (Real Recipients with Localization)
-                // Determine recipients map: Email -> Language
+                // Send Emails
                 const recipients = new Map(); // email -> language
 
                 if (solverId) {
-                    // Send to assigned responsible person
                     const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [solverId]);
                     if (users.length > 0 && users[0].email) {
                         recipients.set(users[0].email, users[0].language || 'cs');
                     }
                 } else {
-                    // No responsible person set -> Send to ALL maintenance staff
                     const [maintUsers] = await pool.query("SELECT email, language FROM users WHERE role = 'maintenance' AND isBlocked = 0");
                     maintUsers.forEach(u => {
                         if (u.email) recipients.set(u.email, u.language || 'cs');
                     });
                 }
 
-                // Insert into queue PER USER (because of translation)
                 for (const [email, lang] of recipients.entries()) {
                     const emailData = {
                         title: template.title,
@@ -217,9 +215,7 @@ const generateMaintenanceRequests = async () => {
                         techName: template.tech_name,
                         date: targetDateStr
                     };
-                    
                     const { subject, body } = getMaintenanceEmail(lang, emailData);
-
                     await pool.execute(
                         'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
                         [email, subject, body]
@@ -227,7 +223,6 @@ const generateMaintenanceRequests = async () => {
                 }
 
             } catch (createErr) {
-                // 5. Error: Update Log
                 console.error(`[MAINT] Failed to create request for template ${template.id}`, createErr);
                 await pool.execute(
                     `UPDATE maintenance_logs SET status = 'error', executed_at = NOW(), error_message = ? WHERE id = ?`,

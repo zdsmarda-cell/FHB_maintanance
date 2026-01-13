@@ -174,9 +174,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const newRequestsCount = requests.filter(r => r.state === 'new').length;
   const assignedToMeCount = requests.filter(r => r.solverId === user.id && r.state !== 'solved' && r.state !== 'cancelled').length;
   
+  // Update logic to strictly match "Pending Approval" filter: Active request, Not Approved, Cost > 0
   const toApproveCount = requests.filter(r => {
-      if (r.isApproved || r.state === 'solved' || r.state === 'cancelled') return false;
-      if (user.role === 'admin') return true;
+      // Must be active (not solved/cancelled)
+      if (r.state === 'solved' || r.state === 'cancelled') return false;
+      // Must NOT be approved yet
+      if (r.isApproved) return false;
+      // Must have a cost associated (otherwise approval isn't typically required/flagged)
       return (r.estimatedCost || 0) > 0; 
   }).length;
 
