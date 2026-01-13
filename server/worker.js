@@ -239,27 +239,33 @@ const generateMaintenanceRequests = async () => {
 // --- Scheduler Function ---
 export const startWorker = () => {
     console.log('--- Worker Background Process Started ---');
-    console.log('Jobs: Email (60s), Maintenance Generator (60s), Overdue Checker (Daily 00:01)');
+    console.log('Jobs: Email (60s), Maintenance Generator (Daily 00:01), Overdue Checker (Daily 00:01)');
 
-    // Initial Run on Startup
+    // Initial Run on Startup (Only Email Queue)
     processEmailQueue();
-    generateMaintenanceRequests();
+    // Maintenance Generator removed from startup to prevent double run on restarts, strictly follows 00:01 schedule
 
-    let lastOverdueCheck = null;
+    let lastDailyRun = null;
 
     setInterval(() => {
         const now = new Date();
         
         // Regular jobs (every minute)
         processEmailQueue();
-        generateMaintenanceRequests();
 
-        // Daily Job at 00:01
+        // Daily Job at 00:01 (Maintenance Generation + Overdue Checks)
         const currentDay = now.getDate();
         if (now.getHours() === 0 && now.getMinutes() === 1) {
-            if (lastOverdueCheck !== currentDay) {
+            if (lastDailyRun !== currentDay) {
+                console.log(`[WORKER] Starting Daily Jobs for day: ${currentDay}`);
+                
+                // 1. Generate new maintenance requests
+                generateMaintenanceRequests();
+                
+                // 2. Check for overdue requests
                 checkDailyOverdue();
-                lastOverdueCheck = currentDay;
+                
+                lastDailyRun = currentDay;
             }
         }
 

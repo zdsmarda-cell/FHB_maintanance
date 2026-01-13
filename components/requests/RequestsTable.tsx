@@ -225,17 +225,19 @@ export const RequestsTable = ({
                                         
                                         {/* Approval Column */}
                                         <td className="px-4 py-3 text-center">
-                                            <button 
-                                                onClick={() => onApproval(req)}
-                                                disabled={!approvalEnabled}
-                                                className={`p-1 rounded transition-colors ${approvalEnabled ? 'hover:bg-slate-100 cursor-pointer' : 'cursor-default opacity-80'}`}
-                                                title={approvalEnabled ? "Změnit stav schválení" : "Nemáte oprávnění nebo je požadavek uzavřen"}
-                                            >
-                                                {req.isApproved 
-                                                    ? <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                                                    : ((req.estimatedCost || 0) > 0 ? <div className="w-2.5 h-2.5 rounded-full bg-amber-400 mx-auto ring-2 ring-amber-100" title="Čeká na schválení" /> : <span className="text-slate-300">-</span>)
-                                                }
-                                            </button>
+                                            {(req.isApproved || (req.estimatedCost || 0) > 0) ? (
+                                                <button 
+                                                    onClick={() => onApproval(req)}
+                                                    disabled={!approvalEnabled}
+                                                    className={`p-1 rounded transition-colors ${approvalEnabled ? 'hover:bg-slate-100 cursor-pointer' : 'cursor-default opacity-80'}`}
+                                                    title={approvalEnabled ? "Změnit stav schválení" : "Nemáte oprávnění nebo je požadavek uzavřen"}
+                                                >
+                                                    {req.isApproved 
+                                                        ? <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                                                        : <div className="w-2.5 h-2.5 rounded-full bg-amber-400 mx-auto ring-2 ring-amber-100" title="Čeká na schválení" />
+                                                    }
+                                                </button>
+                                            ) : null}
                                         </td>
 
                                         {/* Actions Column */}
