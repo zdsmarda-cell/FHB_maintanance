@@ -319,14 +319,19 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         const wp = workplaces.find(w => w.id === tech?.workplaceId);
         const locId = wp?.locationId;
         
-        // Strict Check: User MUST have a limit for this location
-        // AND the limit must be greater than or equal to the cost.
+        // CRITICAL FIX: Use the fresh user data from the 'users' state array (loaded from API)
+        // instead of the potentially stale 'user' prop (from session storage).
+        // This ensures recent limit updates in Admin panel are respected immediately without relogin.
+        const freshUser = users.find(u => u.id === user.id) || user;
+
         let limit = 0;
-        if (locId && user.approvalLimits && user.approvalLimits[locId] !== undefined) {
-            limit = Number(user.approvalLimits[locId]);
+        if (locId && freshUser.approvalLimits && freshUser.approvalLimits[locId] !== undefined) {
+            limit = Number(freshUser.approvalLimits[locId]);
         }
         
         const cost = Number(req.estimatedCost) || 0;
+        
+        // Strict Logic: Even Admins must have sufficient limit set for the location
         const hasLimit = cost <= limit;
 
         setApprovalTargetReq(req);
@@ -336,8 +341,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     const handleApprovalConfirm = async (approved: boolean) => {
         if (!approvalTargetReq) return;
-        // Double check limit before action? UI prevents it via ApprovalModal state, 
-        // but backend should also verify. For FE we rely on Modal state.
+        
+        // Re-validate just in case, though Modal UI should block it
         if (!approvalHasLimit) {
             setAlertMsg(t('msg.approval_limit_exceeded'));
             setApprovalModalOpen(false);
@@ -391,8 +396,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 note: updates.cancellationReason || ''
             };
             
-            // We need to fetch current history to append, or let backend handle it?
-            // Current backend endpoint handles simple updates. Let's send history array update.
             const req = requests.find(r => r.id === id);
             const currentHistory = req ? req.history : [];
             const newHistory = [...currentHistory, historyEntry];
@@ -417,8 +420,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (fDateResTo && (!r.plannedResolutionDate || r.plannedResolutionDate > fDateResTo)) return false;
             
             if (fSolverIds.length > 0) {
-                // If filtering for "Unassigned" (you might add a specific ID for that or handle empty solverId)
-                // Assuming fSolverIds contains user IDs.
                 if (!r.solverId || !fSolverIds.includes(r.solverId)) return false;
             }
 
@@ -433,21 +434,12 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 const effectiveSupplierId = r.assignedSupplierId || 
                     technologies.find(t => t.id === r.techId)?.supplierId || 'internal';
                 
-                // Special "External" group logic
                 if (fSupplierIds.includes('external')) {
-                    // Match if it is NOT internal
                     if (effectiveSupplierId !== 'internal') {
-                        // Keep it (unless specific suppliers are also selected and it doesn't match them? 
-                        // Simplified: If 'external' is selected, show all externals. If specific supplier selected, show that.)
-                        // For MultiSelect, usually OR logic within the same category.
-                        // If we have [external, sup1], we show (isExternal OR isSup1).
-                        // Since sup1 is external, this is redundant but safe.
                         return true; 
                     }
-                    // If it is internal, check if 'internal' is also in the filter list
                     if (!fSupplierIds.includes('internal')) return false;
                 } else {
-                    // Normal check
                     if (!fSupplierIds.includes(effectiveSupplierId)) return false;
                 }
             }

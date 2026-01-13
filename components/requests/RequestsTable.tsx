@@ -223,7 +223,7 @@ export const RequestsTable = ({
                                             </div>
                                         </td>
                                         
-                                        {/* Approval Column */}
+                                        {/* Approval Column - Show only if approved OR cost > 0 */}
                                         <td className="px-4 py-3 text-center">
                                             {(req.isApproved || (req.estimatedCost || 0) > 0) ? (
                                                 <button 
