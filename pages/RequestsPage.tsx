@@ -68,8 +68,13 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     // Filter State
     const [fTitle, setFTitle] = useState('');
     const [fTechIds, setFTechIds] = useState<string[]>([]);
+    // Resolution Date Filters
     const [fDateResFrom, setFDateResFrom] = useState('');
     const [fDateResTo, setFDateResTo] = useState('');
+    // Created Date Filters
+    const [fDateCreatedFrom, setFDateCreatedFrom] = useState('');
+    const [fDateCreatedTo, setFDateCreatedTo] = useState('');
+    
     const [fSolverIds, setFSolverIds] = useState<string[]>([]);
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
@@ -97,6 +102,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 setFSupplierIds([initialFilters.supplierId]);
             }
             if (initialFilters.date) {
+                // If generic date is passed, apply to resolution date by default
                 setFDateResFrom(initialFilters.date);
                 setFDateResTo(initialFilters.date);
             }
@@ -416,9 +422,14 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
+            // Resolution Date
             if (fDateResFrom && (!r.plannedResolutionDate || r.plannedResolutionDate < fDateResFrom)) return false;
             if (fDateResTo && (!r.plannedResolutionDate || r.plannedResolutionDate > fDateResTo)) return false;
             
+            // Created Date
+            if (fDateCreatedFrom && r.createdDate < fDateCreatedFrom) return false;
+            if (fDateCreatedTo && r.createdDate.slice(0, 10) > fDateCreatedTo) return false;
+
             if (fSolverIds.length > 0) {
                 if (!r.solverId || !fSolverIds.includes(r.solverId)) return false;
             }
@@ -459,7 +470,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
             return true;
         });
-    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, lang, technologies]);
+    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, lang, technologies]);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -521,6 +532,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         fTechIds, setFTechIds,
                         fDateResFrom, setFDateResFrom,
                         fDateResTo, setFDateResTo,
+                        fDateCreatedFrom, setFDateCreatedFrom,
+                        fDateCreatedTo, setFDateCreatedTo,
                         fSolverIds, setFSolverIds,
                         fSupplierIds, setFSupplierIds,
                         fStatusIds, setFStatusIds,

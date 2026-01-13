@@ -41,6 +41,8 @@ export const RequestsTable = ({
         fTechIds, setFTechIds,
         fDateResFrom, setFDateResFrom,
         fDateResTo, setFDateResTo,
+        fDateCreatedFrom, setFDateCreatedFrom,
+        fDateCreatedTo, setFDateCreatedTo,
         fSolverIds, setFSolverIds,
         fSupplierIds, setFSupplierIds,
         fStatusIds, setFStatusIds,
@@ -79,6 +81,8 @@ export const RequestsTable = ({
         setFTechIds([]);
         setFDateResFrom('');
         setFDateResTo('');
+        setFDateCreatedFrom('');
+        setFDateCreatedTo('');
         setFSolverIds([]);
         setFSupplierIds([]);
         setFStatusIds([]);
@@ -98,7 +102,7 @@ export const RequestsTable = ({
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 
-    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fSolverIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId;
+    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId;
     
     return (
         <>
@@ -132,6 +136,14 @@ export const RequestsTable = ({
                                 <input type="date" className="w-full p-1.5 border rounded text-xs" value={fDateResTo} onChange={e => setFDateResTo(e.target.value)} />
                             </div>
                         </div>
+                        <div>
+                            <div className="mb-1 text-xs text-slate-500 font-medium">{t('col.created')}</div>
+                            <div className="flex gap-1">
+                                <input type="date" className="w-full p-1.5 border rounded text-xs" value={fDateCreatedFrom} onChange={e => setFDateCreatedFrom(e.target.value)} />
+                                <span className="text-slate-400">-</span>
+                                <input type="date" className="w-full p-1.5 border rounded text-xs" value={fDateCreatedTo} onChange={e => setFDateCreatedTo(e.target.value)} />
+                            </div>
+                        </div>
                         <div><MultiSelect label={t('form.priority')} options={priorityOptions} selectedIds={fPriorities} onChange={setFPriorities} /></div>
                         <div><MultiSelect label={t('form.supplier')} options={supplierOptions} selectedIds={fSupplierIds} onChange={setFSupplierIds} /></div>
                         <div>
@@ -151,6 +163,7 @@ export const RequestsTable = ({
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                         <tr>
+                            <th className="px-4 py-3 whitespace-nowrap">{t('col.created')}</th>
                             <th className="px-4 py-3">{t('form.title')}</th>
                             <th className="px-4 py-3">{t('col.technology')}</th>
                             <th className="px-4 py-3">{t('col.deadline')}</th>
@@ -164,7 +177,7 @@ export const RequestsTable = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {paginatedRequests.length === 0 ? (
-                            <tr><td colSpan={9} className="p-8 text-center text-slate-400">Žádné požadavky</td></tr>
+                            <tr><td colSpan={10} className="p-8 text-center text-slate-400">Žádné požadavky</td></tr>
                         ) : (
                             paginatedRequests.map(req => {
                                 const tech = technologies.find(t => t.id === req.techId);
@@ -186,6 +199,12 @@ export const RequestsTable = ({
 
                                 return (
                                     <tr key={req.id} className={`hover:bg-slate-50 ${isUrgent ? 'bg-red-50/30' : ''}`}>
+                                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                                            {new Date(req.createdDate).toLocaleDateString()}
+                                            <div className="text-xs text-slate-400">
+                                                {new Date(req.createdDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-slate-800">
                                             {isUrgent && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2" title="Urgentní"></span>}
                                             {getLocalized(req.title, lang)}
