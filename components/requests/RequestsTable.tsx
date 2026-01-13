@@ -140,6 +140,7 @@ export const RequestsTable = ({
                                 <option value="all">{t('common.all')}</option>
                                 <option value="yes">{t('common.yes')}</option>
                                 <option value="no">{t('common.no')}</option>
+                                <option value="pending">{t('filter.approval_pending')}</option>
                             </select>
                         </div>
                     </div>

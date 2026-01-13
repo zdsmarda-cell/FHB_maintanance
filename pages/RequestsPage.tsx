@@ -74,7 +74,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
     const [fPriorities, setFPriorities] = useState<string[]>([]);
-    const [fApproved, setFApproved] = useState<'all' | 'yes' | 'no'>('all');
+    const [fApproved, setFApproved] = useState<'all' | 'yes' | 'no' | 'pending'>('all');
     const [fAuthorId, setFAuthorId] = useState('');
     const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null);
     
@@ -97,7 +97,10 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (initialFilters.authorId) setFAuthorId(initialFilters.authorId);
             if (initialFilters.techId) setFTechIds([initialFilters.techId]);
             if (initialFilters.maintenanceId) setFMaintenanceId(initialFilters.maintenanceId);
-            if (initialFilters.mode === 'approval') setFApproved('no');
+            
+            // Map "approval" mode to specific filter "pending"
+            if (initialFilters.mode === 'approval') setFApproved('pending');
+            
             if (initialFilters.date) {
                 setFDateResFrom(initialFilters.date);
                 setFDateResTo(initialFilters.date);
@@ -193,8 +196,15 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
             if (fStatusIds.length > 0 && !fStatusIds.includes(req.state)) return false;
             if (fPriorities && fPriorities.length > 0 && !fPriorities.includes(req.priority)) return false;
+            
+            // Approval Logic
             if (fApproved === 'yes' && !req.isApproved) return false;
             if (fApproved === 'no' && req.isApproved) return false;
+            if (fApproved === 'pending') {
+                // Show requests that are NOT approved AND have estimated cost > 0
+                if (req.isApproved) return false;
+                if ((req.estimatedCost || 0) <= 0) return false;
+            }
 
             return true;
         });

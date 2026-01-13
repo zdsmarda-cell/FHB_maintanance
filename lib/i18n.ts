@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 
 type Lang = 'cs' | 'en' | 'uk';
@@ -227,6 +228,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'filter.visibility_all': 'Vše (Viditelnost)',
     'filter.visibility_yes': 'Pouze viditelné',
     'filter.visibility_no': 'Pouze skryté',
+    'filter.approval_pending': 'Ke schválení',
 
     'dashboard.new_requests': 'Nové požadavky',
     'dashboard.to_solve': 'K řešení (Moje)',
@@ -520,6 +522,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'filter.visibility_all': 'All (Visibility)',
     'filter.visibility_yes': 'Visible Only',
     'filter.visibility_no': 'Hidden Only',
+    'filter.approval_pending': 'To Approve',
 
     'dashboard.new_requests': 'New Requests',
     'dashboard.to_solve': 'To Solve (Mine)',
@@ -813,6 +816,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'filter.visibility_all': 'Всі (Видимість)',
     'filter.visibility_yes': 'Тільки видимі',
     'filter.visibility_no': 'Тільки приховані',
+    'filter.approval_pending': 'На затвердження',
 
     'dashboard.new_requests': 'Нові запити',
     'dashboard.to_solve': 'До вирішення (Мої)',
