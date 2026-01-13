@@ -34,51 +34,70 @@ export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
     if (!m.isActive) return null;
     
     // Helper: Safely parse YYYY-MM-DD or ISO string to Local Midnight Date
-    // This avoids timezone issues where "2023-10-27" (UTC) becomes "2023-10-26" (Local)
+    // This strictly ignores Time and Timezone offsets from the input string
+    // forcing it to be treated as a local calendar date.
     const toLocalMidnight = (dateInput: string | Date | undefined): Date => {
         const now = new Date();
-        if (!dateInput) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const currentYear = now.getFullYear();
+        
+        if (!dateInput) return new Date(currentYear, now.getMonth(), now.getDate());
 
-        let d: Date;
-        if (typeof dateInput === 'string') {
-            // If format is YYYY-MM-DD, parse manually to force local time
-            if (dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                const [y, m, day] = dateInput.split('-').map(Number);
-                return new Date(y, m - 1, day);
-            }
-            d = new Date(dateInput);
-        } else {
-            d = dateInput;
+        let dateStr = '';
+
+        if (dateInput instanceof Date) {
+            // If it's a Date object, convert to YYYY-MM-DD local string first
+            const y = dateInput.getFullYear();
+            const mo = String(dateInput.getMonth() + 1).padStart(2, '0');
+            const d = String(dateInput.getDate()).padStart(2, '0');
+            dateStr = `${y}-${mo}-${d}`;
+        } else if (typeof dateInput === 'string') {
+            // Take only the first 10 chars (YYYY-MM-DD)
+            // This strips 'T14:00:00Z' etc, preventing timezone shifts
+            dateStr = dateInput.substring(0, 10);
         }
 
-        if (isNaN(d.getTime())) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        // Parse strictly as [Year, Month, Day]
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            // new Date(y, m-1, d) creates a date at Local Midnight
+            return new Date(y, m - 1, d);
+        }
+
+        // Fallback
+        return new Date(currentYear, now.getMonth(), now.getDate());
     };
 
     // 1. Determine Base Date (Last Generated OR Created At)
     const baseDate = toLocalMidnight(m.lastGeneratedDate || m.createdAt);
     const today = toLocalMidnight(new Date());
 
-    // 2. Add Interval
-    // Logic: Next = Last + Interval
+    // 2. Add Interval (Ensure interval is treated as number)
+    const interval = Number(m.interval) || 1;
     let targetDate = new Date(baseDate);
-    targetDate.setDate(baseDate.getDate() + m.interval);
+    targetDate.setDate(baseDate.getDate() + interval);
 
     // 3. Catch-up Logic
-    // "Pokud je dane datum starsi jak aktualni, tak pouziji aktualni"
-    // If target is STRICTLY BEFORE today, reset to today.
-    // Example: Target (Yesterday) < Today (Today) -> True -> Reset to Today.
-    // Example: Target (Tomorrow) < Today (Today) -> False -> Keep Tomorrow.
+    // If the calculated target is strictly in the past (< Today), snap to Today.
+    // Example: Target (Yesterday) < Today (Today) -> True -> Target becomes Today.
+    // Example: Target (Tomorrow) < Today (Today) -> False -> Keeps Tomorrow.
     if (targetDate.getTime() < today.getTime()) {
         targetDate = new Date(today);
     }
 
-    // 4. Allowed Days Logic (skip weekends etc.)
+    // 4. Strict Progression Check
+    // If applying catch-up or simple math resulted in a date that is equal to or older than the Last Generated date
+    // (e.g. if run twice same day), force it to move forward.
+    // However, if Catch-up moved it to Today, and Last Generated was Yesterday, we are fine.
+    // Only if Target <= BaseDate do we have a problem (Next scheduled date implies future relative to last execution).
+    if (targetDate.getTime() <= baseDate.getTime()) {
+        targetDate.setDate(targetDate.getDate() + 1);
+    }
+
+    // 5. Allowed Days Logic (skip weekends etc.)
     const allowedDays = m.allowedDays || [];
     if (allowedDays.length > 0) {
         let safetyCounter = 0;
-        // Limit loop to prevent infinite loop in case of bad config (e.g. empty allowed days, though checked above)
+        // Limit loop to prevent infinite loop in case of bad config
         while (safetyCounter < 366) { 
             const day = targetDate.getDay(); // 0 = Sunday, 1 = Monday...
             if (allowedDays.includes(day)) {
@@ -110,7 +129,7 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
             settings = await api.get('/settings');
         }
 
-        // Recursively parse stringified JSON until it is an object (same logic as SettingsPage)
+        // Recursively parse stringified JSON until it is an object
         while (typeof settings === 'string') {
             try {
                 const parsed = JSON.parse(settings);
@@ -124,11 +143,8 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         settings = { enableOnlineTranslation: false };
     }
 
-    console.log("[Translate] Settings:", settings);
-
     if (!settings?.enableOnlineTranslation) {
-        console.log("[Translate] Skipped: Translation disabled.");
-        return text; // Return plain string if translation disabled
+        return text; 
     }
 
     // 2. Call Translation API
@@ -136,11 +152,7 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
         let translations;
         
-        console.log("[Translate] Calling API...");
-
         if (isMock) {
-            // Mock Translation Logic on Client for Demo
-            // Simulate delay
             await new Promise(r => setTimeout(r, 500));
             translations = {
                 cs: text,
@@ -151,7 +163,6 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
             translations = await api.post('/translate', { text });
         }
         
-        console.log("[Translate] Result:", translations);
         return JSON.stringify(translations);
     } catch (e) {
         console.error("[Translate] API Failed, saving raw text:", e);
