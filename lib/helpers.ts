@@ -33,43 +33,61 @@ export const getLocalized = (data: any, lang: string): string => {
 export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
     if (!m.isActive) return null;
     
-    // Determine base date: Last Generated -> Created At -> Now
-    const baseDateStr = m.lastGeneratedDate || m.createdAt;
-    const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
-    
-    // Normalize time to midnight to avoid timezone shift issues during addition
-    baseDate.setHours(0,0,0,0);
+    // Helper: Safely parse YYYY-MM-DD or ISO string to Local Midnight Date
+    // This avoids timezone issues where "2023-10-27" (UTC) becomes "2023-10-26" (Local)
+    const toLocalMidnight = (dateInput: string | Date | undefined): Date => {
+        const now = new Date();
+        if (!dateInput) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Theoretical next date based purely on interval
+        let d: Date;
+        if (typeof dateInput === 'string') {
+            // If format is YYYY-MM-DD, parse manually to force local time
+            if (dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, day] = dateInput.split('-').map(Number);
+                return new Date(y, m - 1, day);
+            }
+            d = new Date(dateInput);
+        } else {
+            d = dateInput;
+        }
+
+        if (isNaN(d.getTime())) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
+
+    // 1. Determine Base Date (Last Generated OR Created At)
+    const baseDate = toLocalMidnight(m.lastGeneratedDate || m.createdAt);
+    const today = toLocalMidnight(new Date());
+
+    // 2. Add Interval
+    // Logic: Next = Last + Interval
     let targetDate = new Date(baseDate);
     targetDate.setDate(baseDate.getDate() + m.interval);
 
-    // VISUAL CATCH-UP LOGIC:
-    // If the theoretical date is in the past (worker hasn't run yet), 
-    // the UI should show "Today" (or next allowed day from Today), 
-    // reflecting what the worker WILL do on next run.
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    if (targetDate < today) {
+    // 3. Catch-up Logic
+    // "Pokud je dane datum starsi jak aktualni, tak pouziji aktualni"
+    // If target is STRICTLY BEFORE today, reset to today.
+    // Example: Target (Yesterday) < Today (Today) -> True -> Reset to Today.
+    // Example: Target (Tomorrow) < Today (Today) -> False -> Keep Tomorrow.
+    if (targetDate.getTime() < today.getTime()) {
         targetDate = new Date(today);
     }
 
-    // Check allowed days logic (skip weekends etc.)
-    let safetyCounter = 0;
+    // 4. Allowed Days Logic (skip weekends etc.)
     const allowedDays = m.allowedDays || [];
-
-    // If no specific days allowed (empty array), assume all are valid.
-    if (allowedDays.length === 0) return targetDate;
-
-    while (safetyCounter < 30) {
-        const day = targetDate.getDay(); // 0 = Sunday, 1 = Monday...
-        if (allowedDays.includes(day)) {
-            return targetDate;
+    if (allowedDays.length > 0) {
+        let safetyCounter = 0;
+        // Limit loop to prevent infinite loop in case of bad config (e.g. empty allowed days, though checked above)
+        while (safetyCounter < 366) { 
+            const day = targetDate.getDay(); // 0 = Sunday, 1 = Monday...
+            if (allowedDays.includes(day)) {
+                return targetDate;
+            }
+            // Try next day
+            targetDate.setDate(targetDate.getDate() + 1);
+            safetyCounter++;
         }
-        // Try next day
-        targetDate.setDate(targetDate.getDate() + 1);
-        safetyCounter++;
     }
     
     return targetDate;
