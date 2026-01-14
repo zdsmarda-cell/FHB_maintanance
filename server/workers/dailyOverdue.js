@@ -1,7 +1,7 @@
 
 import pool from '../db.js';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable'; // Import for side effects (registration)
 
 const APP_URL = process.env.APP_URL || 'https://fhbmain.impossible.cz';
 
@@ -136,7 +136,7 @@ const generatePdfAttachment = async (myAssigned, myUnassigned, user, s, dateStr)
         doc.setTextColor(0);
         doc.text(s.my_assigned, 14, finalY);
         
-        autoTable(doc, {
+        doc.autoTable({
             startY: finalY + 5,
             head: [[s.date, s.tech, s.req_title, s.prio]],
             body: mapRows(myAssigned),
@@ -152,7 +152,7 @@ const generatePdfAttachment = async (myAssigned, myUnassigned, user, s, dateStr)
         doc.setTextColor(0);
         doc.text(s.unassigned, 14, finalY);
         
-        autoTable(doc, {
+        doc.autoTable({
             startY: finalY + 5,
             head: [[s.date, s.tech, s.req_title, s.prio]],
             body: mapRows(myUnassigned),
