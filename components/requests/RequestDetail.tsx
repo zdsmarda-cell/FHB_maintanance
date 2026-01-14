@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
-import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon, Loader } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon, Loader, Edit } from 'lucide-react';
 import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 interface RequestDetailProps {
@@ -14,6 +15,7 @@ interface RequestDetailProps {
     renderStatusBadge: (status: string) => React.ReactNode;
     renderPrioBadge: (prio: string) => React.ReactNode;
     refresh: () => void;
+    onStatusChange?: (req: Request) => void;
 }
 
 export const RequestDetail = ({
@@ -24,13 +26,17 @@ export const RequestDetail = ({
     onGallery,
     renderStatusBadge,
     renderPrioBadge,
-    refresh
+    refresh,
+    onStatusChange
 }: RequestDetailProps) => {
     const { t, lang } = useI18n();
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     
+    // Check permission to change status
+    const canChangeStatus = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
+
     const addComment = async () => {
         if(!commentText.trim()) {
             setCommentError(t('validation.required'));
@@ -70,12 +76,23 @@ export const RequestDetail = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="md:col-span-2 space-y-6">
                         <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <h2 className="text-2xl font-bold text-slate-800">{getLocalized(request.title, lang)}</h2>
-                                {renderStatusBadge(request.state)}
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                <h2 className="text-2xl font-bold text-slate-800 mr-2">{getLocalized(request.title, lang)}</h2>
+                                <div className="flex items-center gap-2">
+                                    {renderStatusBadge(request.state)}
+                                    {canChangeStatus && onStatusChange && (
+                                        <button 
+                                            onClick={() => onStatusChange(request)} 
+                                            className="text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors"
+                                            title={t('headers.status_change')}
+                                        >
+                                            <Edit className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </div>
                                 {renderPrioBadge(request.priority)}
                             </div>
-                            <div className="text-slate-500 text-sm flex gap-4">
+                            <div className="text-slate-500 text-sm flex gap-4 mt-2">
                                     <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {new Date(request.createdDate).toLocaleString()}</span>
                                     <span className="flex items-center"><Euro className="w-3 h-3 mr-1" /> {request.estimatedCost || 0}</span>
                                     <span className={`flex items-center px-2 py-0.5 rounded text-xs font-medium ${request.isApproved ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>

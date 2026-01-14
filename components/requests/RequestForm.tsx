@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Euro, Trash2, Upload, Loader, Clock, Calendar } from 'lucide-react';
-import { db } from '../../lib/db';
 import { getLocalized } from '../../lib/helpers';
 
 interface RequestFormProps {
@@ -13,6 +12,7 @@ interface RequestFormProps {
     locations: any[];
     workplaces: any[];
     technologies: any[];
+    suppliers: any[]; // Added suppliers prop
     handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     removePhoto: (index: number) => void;
     isEditMode: boolean;
@@ -27,6 +27,7 @@ export const RequestForm = ({
     locations, 
     workplaces, 
     technologies,
+    suppliers, // Destructure suppliers
     handleImageUpload,
     removePhoto,
     isEditMode,
@@ -97,7 +98,8 @@ export const RequestForm = ({
 
     // --- Dynamic Supplier Logic ---
     const { defaultSupplier, otherSuppliers } = useMemo(() => {
-        const allSuppliers = db.suppliers.list();
+        // Use props.suppliers instead of db.suppliers.list()
+        const allSuppliers = suppliers || []; 
         let defSup = null;
         
         // Find default supplier for selected technology
@@ -114,7 +116,7 @@ export const RequestForm = ({
             .sort((a, b) => getLocalized(a.name, lang).localeCompare(getLocalized(b.name, lang)));
 
         return { defaultSupplier: defSup, otherSuppliers: others };
-    }, [formData.techId, technologies, lang]);
+    }, [formData.techId, technologies, suppliers, lang]);
 
 
     return (

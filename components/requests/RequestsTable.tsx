@@ -214,9 +214,6 @@ export const RequestsTable = ({
                                 const canEdit = currentUser.role !== 'operator' || currentUser.id === req.authorId;
                                 const isFinal = req.state === 'solved' || req.state === 'cancelled';
                                 
-                                // Status change permission
-                                const canChangeStatus = (currentUser.role === 'admin' || currentUser.role === 'maintenance');
-
                                 // Approval Enabled: Just check if user has ROLE to approve and request is not final.
                                 // We do NOT check limit here anymore for disabled state, that logic moves to modal.
                                 const approvalEnabled = canApprove && !isFinal;
@@ -260,10 +257,9 @@ export const RequestsTable = ({
                                         <td className="px-4 py-3 text-center text-xs">
                                             {req.estimatedTime ? <span className="flex items-center justify-center"><Clock className="w-3 h-3 text-slate-400 mr-1"/>{formatTime(req.estimatedTime)}</span> : '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-center" onClick={() => canChangeStatus && onStatusChange(req)}>
-                                            <div className={canChangeStatus ? "cursor-pointer hover:opacity-80" : ""}>
-                                                {renderStatusBadge(req.state)}
-                                            </div>
+                                        <td className="px-4 py-3 text-center">
+                                            {/* Status Badge is now static, changes moved to Detail */}
+                                            {renderStatusBadge(req.state)}
                                         </td>
                                         
                                         {/* Approval Column - Show only if approved OR cost > 0 */}

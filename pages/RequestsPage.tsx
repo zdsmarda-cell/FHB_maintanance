@@ -402,6 +402,10 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         try {
             await updateRequest(statusTargetReq.id, updates, 'status_change');
             setStatusModalOpen(false);
+            // Also update selectedRequest if detail is open so it reflects the change immediately
+            if (selectedRequest && selectedRequest.id === statusTargetReq.id) {
+                setSelectedRequest({ ...selectedRequest, state: newStatus as any });
+            }
             loadData();
         } catch(e) { console.error(e); setLoading(false); }
     };
@@ -443,13 +447,16 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
-            // Resolution Date
-            if (fDateResFrom && (!r.plannedResolutionDate || r.plannedResolutionDate < fDateResFrom)) return false;
-            if (fDateResTo && (!r.plannedResolutionDate || r.plannedResolutionDate > fDateResTo)) return false;
+            // Resolution Date Filter Logic
+            // Ensure we compare just the date part (YYYY-MM-DD) to avoid time shifting issues
+            const rDate = r.plannedResolutionDate ? r.plannedResolutionDate.slice(0, 10) : '';
+            if (fDateResFrom && (!rDate || rDate < fDateResFrom)) return false;
+            if (fDateResTo && (!rDate || rDate > fDateResTo)) return false;
             
-            // Created Date
-            if (fDateCreatedFrom && r.createdDate < fDateCreatedFrom) return false;
-            if (fDateCreatedTo && r.createdDate.slice(0, 10) > fDateCreatedTo) return false;
+            // Created Date Filter Logic
+            const rCreated = r.createdDate.slice(0, 10);
+            if (fDateCreatedFrom && rCreated < fDateCreatedFrom) return false;
+            if (fDateCreatedTo && rCreated > fDateCreatedTo) return false;
 
             if (fSolverIds.length > 0) {
                 if (!r.solverId || !fSolverIds.includes(r.solverId)) return false;
@@ -634,6 +641,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         locations={locations}
                         workplaces={workplaces}
                         technologies={technologies}
+                        suppliers={suppliers} // Pass real suppliers list to component
                         handleImageUpload={handleImageUpload}
                         removePhoto={removePhoto}
                         isEditMode={isEditMode}
@@ -660,6 +668,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                             renderStatusBadge={(s) => <span className="font-bold uppercase">{s}</span>}
                             renderPrioBadge={(p) => <span className="font-bold uppercase">{p}</span>}
                             refresh={loadData}
+                            onStatusChange={openStatusModal} // Pass modal trigger to Detail view
                         />
                     </div>
                 </Modal>
