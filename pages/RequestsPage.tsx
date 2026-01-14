@@ -439,6 +439,19 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         generateWorkListPDF(filteredRequests, user, 'Filtered List', t, lang, technologies, suppliers, users);
     };
 
+    // Helper to get YYYY-MM-DD in local time from an ISO string or Date object
+    // This prevents "off by one day" issues when database returns UTC (e.g. 23:00 prev day)
+    const getLocalDateString = (dateInput: string | undefined) => {
+        if (!dateInput) return '';
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return '';
+        
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // --- Filtering & Sorting Logic ---
     const filteredRequests = useMemo(() => {
         // 1. Filter
@@ -448,15 +461,16 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
             // Resolution Date Filter Logic
-            // Ensure we compare just the date part (YYYY-MM-DD) to avoid time shifting issues
-            const rDate = r.plannedResolutionDate ? r.plannedResolutionDate.slice(0, 10) : '';
-            if (fDateResFrom && (!rDate || rDate < fDateResFrom)) return false;
-            if (fDateResTo && (!rDate || rDate > fDateResTo)) return false;
+            // Use local time conversion to handle timezone shifts (e.g. 00:01 Local = 23:01 UTC Prev Day)
+            // This ensures "2023-10-25" input matches "2023-10-25" local date even if stored as UTC previous day.
+            const rDateLocal = getLocalDateString(r.plannedResolutionDate);
+            if (fDateResFrom && (!rDateLocal || rDateLocal < fDateResFrom)) return false;
+            if (fDateResTo && (!rDateLocal || rDateLocal > fDateResTo)) return false;
             
             // Created Date Filter Logic
-            const rCreated = r.createdDate.slice(0, 10);
-            if (fDateCreatedFrom && rCreated < fDateCreatedFrom) return false;
-            if (fDateCreatedTo && rCreated > fDateCreatedTo) return false;
+            const rCreatedLocal = getLocalDateString(r.createdDate);
+            if (fDateCreatedFrom && rCreatedLocal < fDateCreatedFrom) return false;
+            if (fDateCreatedTo && rCreatedLocal > fDateCreatedTo) return false;
 
             if (fSolverIds.length > 0) {
                 if (!r.solverId || !fSolverIds.includes(r.solverId)) return false;
