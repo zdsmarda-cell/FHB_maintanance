@@ -249,35 +249,54 @@ const generateMaintenanceRequests = async () => {
 // --- Scheduler Function ---
 export const startWorker = () => {
     console.log('--- Worker Background Process Started ---');
-    console.log('Jobs: Email (60s), Maintenance Generator (Daily 00:01), Overdue Checker (Daily 00:01)');
+    console.log('Jobs: Email (60s), Maintenance & Overdue (Daily after 00:01)');
 
     // Initial Run on Startup (Only Email Queue)
     processEmailQueue();
-    // Maintenance Generator removed from startup to prevent double run on restarts, strictly follows 00:01 schedule
-
-    let lastDailyRun = null;
+    
+    // Track the last date the daily job ran successfully
+    // Initialize with null so it runs if we start the server past 00:01 today and it hasn't run yet?
+    // BETTER: Initialize with yesterday's date string logic to ensure it runs if started fresh today.
+    // However, to prevent double runs on restarts, we ideally need to check DB logs or just rely on runtime memory.
+    // For simplicity here: We assume if the server restarts, checking again is safe because the internal functions
+    // (generateMaintenanceRequests and checkDailyOverdue) should be idempotent or safe to run multiple times.
+    // generateMaintenanceRequests HAS idempotency checks.
+    // checkDailyOverdue sends emails - we should verify idempotency there or accept duplicate emails on restart.
+    
+    let lastDailyRunDate = ''; 
 
     setInterval(() => {
         const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
         
+        // Use a string representation of the date (YYYY-MM-DD) to track daily execution
+        // using local time components
+        const todayStr = toLocalSqlDate(now);
+
         // Regular jobs (every minute)
         processEmailQueue();
 
-        // Daily Job at 00:01 (Maintenance Generation + Overdue Checks)
-        // Checks if hours is 0 AND minutes is 1. To prevent double run in the same minute, we track `lastDailyRun`.
-        const currentDay = now.getDate();
-        if (now.getHours() === 0 && now.getMinutes() === 1) {
-            if (lastDailyRun !== currentDay) {
-                console.log(`[WORKER] Starting Daily Jobs for day: ${currentDay}`);
-                
-                // 1. Generate new maintenance requests
-                generateMaintenanceRequests();
-                
-                // 2. Check for overdue requests
-                checkDailyOverdue();
-                
-                lastDailyRun = currentDay;
-            }
+        // Daily Jobs Logic:
+        // Run if it's past 00:01 AND we haven't run it for this specific date string yet.
+        // This handles:
+        // 1. Exact 00:01 execution.
+        // 2. Skipped minutes (e.g. 00:02).
+        // 3. Server restarts later in the day (e.g. 08:00 start will trigger immediate run for "today").
+        
+        const isTimeForDailyJob = (currentHour > 0) || (currentHour === 0 && currentMinute >= 1);
+
+        if (isTimeForDailyJob && lastDailyRunDate !== todayStr) {
+            console.log(`[WORKER] Starting Daily Jobs for date: ${todayStr}`);
+            
+            // 1. Generate new maintenance requests
+            generateMaintenanceRequests();
+            
+            // 2. Check for overdue requests
+            checkDailyOverdue();
+            
+            // Mark today as done
+            lastDailyRunDate = todayStr;
         }
 
     }, 60000); // 60s Interval

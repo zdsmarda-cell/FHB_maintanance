@@ -170,7 +170,12 @@ export const checkDailyOverdue = async () => {
     console.log('[WORKER] Starting Daily Overdue Check...');
     try {
         // 1. Fetch Overdue Requests
-        const today = new Date().toISOString().split('T')[0];
+        // Use local time date components to construct YYYY-MM-DD
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const today = `${y}-${m}-${d}`;
         
         const [overdueRequests] = await pool.query(`
             SELECT 
