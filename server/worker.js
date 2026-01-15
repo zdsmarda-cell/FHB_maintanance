@@ -254,49 +254,62 @@ export const startWorker = () => {
     // Initial Run on Startup (Only Email Queue)
     processEmailQueue();
     
-    // Track the last date the daily job ran successfully
-    // Initialize with null so it runs if we start the server past 00:01 today and it hasn't run yet?
-    // BETTER: Initialize with yesterday's date string logic to ensure it runs if started fresh today.
-    // However, to prevent double runs on restarts, we ideally need to check DB logs or just rely on runtime memory.
-    // For simplicity here: We assume if the server restarts, checking again is safe because the internal functions
-    // (generateMaintenanceRequests and checkDailyOverdue) should be idempotent or safe to run multiple times.
-    // generateMaintenanceRequests HAS idempotency checks.
-    // checkDailyOverdue sends emails - we should verify idempotency there or accept duplicate emails on restart.
+    // We use the database to track the last daily run to persist state across restarts
     
-    let lastDailyRunDate = ''; 
-
-    setInterval(() => {
+    setInterval(async () => {
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
         
         // Use a string representation of the date (YYYY-MM-DD) to track daily execution
-        // using local time components
         const todayStr = toLocalSqlDate(now);
 
         // Regular jobs (every minute)
-        processEmailQueue();
+        await processEmailQueue();
 
         // Daily Jobs Logic:
-        // Run if it's past 00:01 AND we haven't run it for this specific date string yet.
-        // This handles:
-        // 1. Exact 00:01 execution.
-        // 2. Skipped minutes (e.g. 00:02).
-        // 3. Server restarts later in the day (e.g. 08:00 start will trigger immediate run for "today").
-        
+        // Run if it's past 00:01.
         const isTimeForDailyJob = (currentHour > 0) || (currentHour === 0 && currentMinute >= 1);
 
-        if (isTimeForDailyJob && lastDailyRunDate !== todayStr) {
-            console.log(`[WORKER] Starting Daily Jobs for date: ${todayStr}`);
-            
-            // 1. Generate new maintenance requests
-            generateMaintenanceRequests();
-            
-            // 2. Check for overdue requests
-            checkDailyOverdue();
-            
-            // Mark today as done
-            lastDailyRunDate = todayStr;
+        if (isTimeForDailyJob) {
+            try {
+                // Check DB for last execution
+                const [rows] = await pool.query(
+                    "SELECT setting_value FROM app_settings WHERE setting_key = 'daily_job_run'"
+                );
+                
+                let lastRunDate = null;
+                if (rows.length > 0 && rows[0].setting_value) {
+                    try {
+                        const val = typeof rows[0].setting_value === 'string' 
+                            ? JSON.parse(rows[0].setting_value) 
+                            : rows[0].setting_value;
+                        lastRunDate = val.date;
+                    } catch (e) { /* ignore parse error */ }
+                }
+
+                // If run has not happened today, execute it
+                if (lastRunDate !== todayStr) {
+                    console.log(`[WORKER] Starting Daily Jobs for date: ${todayStr}`);
+                    
+                    // 1. Generate new maintenance requests
+                    await generateMaintenanceRequests();
+                    
+                    // 2. Check for overdue requests
+                    await checkDailyOverdue();
+                    
+                    // Mark today as done in DB
+                    // Note: We use JSON.stringify because app_settings expects JSON
+                    await pool.query(
+                        "INSERT INTO app_settings (setting_key, setting_value) VALUES ('daily_job_run', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
+                        [JSON.stringify({ date: todayStr }), JSON.stringify({ date: todayStr })]
+                    );
+                    
+                    console.log(`[WORKER] Daily Jobs marked as done for ${todayStr}`);
+                }
+            } catch (err) {
+                console.error("[WORKER] Error checking/running daily jobs:", err);
+            }
         }
 
     }, 60000); // 60s Interval

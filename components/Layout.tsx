@@ -5,6 +5,7 @@ import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, G
 import { User, Lang } from '../lib/types';
 import { ChangePasswordModal } from './modals/ChangePasswordModal';
 import { api, isProductionDomain } from '../lib/db';
+import { ReloadPrompt } from './ReloadPrompt'; // NEW
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -111,6 +112,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
+      {/* PWA Reload Prompt */}
+      <ReloadPrompt />
+
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-slate-900 text-white h-16 flex items-center justify-between px-4 z-40 shadow-md">
           <div className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">

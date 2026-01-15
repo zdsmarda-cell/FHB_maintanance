@@ -42,6 +42,10 @@
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
     "@types/node": "^20.11.24",
-    "@types/express": "^4.17.21"
+    "@types/express": "^4.17.21",
+    "vite-plugin-pwa": "^0.19.2",
+    "workbox-precaching": "^7.0.0",
+    "workbox-core": "^7.0.0",
+    "workbox-routing": "^7.0.0"
   }
 }
