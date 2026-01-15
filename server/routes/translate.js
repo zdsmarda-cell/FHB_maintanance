@@ -4,6 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 
 const router = express.Router();
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 router.post('/', async (req, res) => {
     const { text } = req.body;
     
@@ -23,24 +25,47 @@ router.post('/', async (req, res) => {
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const model = 'gemini-3-flash-preview';
         
-        // Use gemini-3-flash-preview as recommended
-        // We structure contents as parts to safely separate instruction from user input
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: {
-                parts: [
-                    { text: 'Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.' },
-                    { text: text }
-                ]
-            },
-            config: {
-                responseMimeType: "application/json",
-                // Removed strict responseSchema to prevent "Empty response" errors on simple inputs
-            }
-        });
+        let response;
+        let attempt = 0;
+        const maxRetries = 3;
 
-        const jsonStr = response.text;
+        while (attempt < maxRetries) {
+            try {
+                response = await ai.models.generateContent({
+                    model: model,
+                    contents: {
+                        parts: [
+                            { text: 'Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.' },
+                            { text: text }
+                        ]
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                    }
+                });
+                break; // Success, exit loop
+            } catch (apiError) {
+                attempt++;
+                // Check for 503 (Overloaded) or 429 (Too Many Requests) in error message or status
+                const isOverloaded = 
+                    (apiError.status === 503) || 
+                    (apiError.status === 429) ||
+                    (apiError.message && (apiError.message.includes('503') || apiError.message.includes('overloaded')));
+
+                if (isOverloaded && attempt < maxRetries) {
+                    const delay = 1000 * Math.pow(2, attempt - 1); // 1000ms, 2000ms
+                    console.warn(`Translation API overloaded/busy. Retrying in ${delay}ms (Attempt ${attempt}/${maxRetries})...`);
+                    await sleep(delay);
+                    continue;
+                }
+                
+                throw apiError; // Fatal error or max retries reached
+            }
+        }
+
+        const jsonStr = response?.text;
         
         if (jsonStr) {
             const translations = JSON.parse(jsonStr);
