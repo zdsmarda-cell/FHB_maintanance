@@ -20,7 +20,7 @@ const i18n = {
         report_title: "FHB Maintain - Report po termínu",
         open_app: "Otevřít aplikaci",
         generated: "Vygenerováno",
-        push_msg: "Máte požadavky po termínu! Zkontrolujte email nebo aplikaci."
+        push_msg_prefix: "Počet požadavků po termínu: "
     },
     en: {
         title: "Overdue Requests Overview",
@@ -35,7 +35,7 @@ const i18n = {
         report_title: "FHB Maintain - Overdue Report",
         open_app: "Open Application",
         generated: "Generated",
-        push_msg: "You have overdue requests! Check email or app."
+        push_msg_prefix: "Overdue requests count: "
     },
     uk: {
         title: "Огляд прострочених запитів",
@@ -50,7 +50,7 @@ const i18n = {
         report_title: "FHB Maintain - Звіт про прострочення",
         open_app: "Відкрити додаток",
         generated: "Згенеровано",
-        push_msg: "У вас є прострочені запити! Перевірте електронну пошту або додаток."
+        push_msg_prefix: "Кількість прострочених запитів: "
     }
 };
 
@@ -84,7 +84,7 @@ const loadPdfFont = async (doc) => {
         doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
         doc.setFont("Roboto");
     } catch (e) {
-        console.warn("[WORKER] Failed to load font for PDF, diacritics may be broken:", e.message);
+        console.warn("[WORKER] Failed to load font for PDF, diacritics may not render correctly:", e.message);
     }
 };
 
@@ -231,7 +231,9 @@ export const checkDailyOverdue = async () => {
                 })
                 .map(localizeReq);
 
-            if (myAssigned.length > 0 || myUnassigned.length > 0) {
+            const totalCount = myAssigned.length + myUnassigned.length;
+
+            if (totalCount > 0) {
                 
                 // Email Body
                 let emailBody = `<h2>${s.title}</h2>`;
@@ -258,14 +260,14 @@ export const checkDailyOverdue = async () => {
                     [user.email, `FHB maintain - ${s.title}`, emailBody, attachments]
                 );
                 
-                // PUSH Notification Trigger
+                // PUSH Notification Trigger with count
                 sendPushToUser(user.id, {
                     title: s.title,
-                    body: s.push_msg,
+                    body: `${s.push_msg_prefix} ${totalCount}`,
                     url: '/requests'
                 });
                 
-                console.log(`[WORKER] Queued overdue PDF report & Push for ${user.email}`);
+                console.log(`[WORKER] Queued overdue PDF report & Push for ${user.email} (Count: ${totalCount})`);
             }
         }
 

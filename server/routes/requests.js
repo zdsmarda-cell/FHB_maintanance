@@ -28,6 +28,20 @@ const mapToModel = (r) => ({
     createdDate: r.created_date
 });
 
+// Helper to parse localized string
+const getLocalized = (data, lang) => {
+    if (!data) return '';
+    try {
+        if (typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
+            const parsed = JSON.parse(data);
+            return parsed[lang] || parsed['cs'] || parsed['en'] || Object.values(parsed)[0] || data;
+        }
+        return data;
+    } catch (e) {
+        return data;
+    }
+};
+
 router.get('/', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 1000; // Increased limit for easier filtering on frontend
@@ -98,14 +112,6 @@ router.post('/', async (req, res) => {
         // Only send notification if I am NOT assigning it to myself
         if (solverId !== currentUserId) {
             pushRecipients.add(solverId);
-            // NOTE: Per requirement, NO email for assignment, only Push.
-            // But if it is NEW and assigned immediately, we might want to inform via email? 
-            // The prompt says "Pri prirazeni pozadavku se ma odesilat jen push notifikace".
-            // Since this is POST (Create), it technically is an assignment if solverId is present.
-            // However, usually "Assignment" refers to the PUT action.
-            // For POST (New Request), typically Admins get email. 
-            // If assigned, the solver gets Push. 
-            // Let's stick to the rule: If assigned, notify solver via Push.
         }
     } else {
         // B) Request is unassigned (New) -> Notify all Maintenance staff (who can take over)
@@ -139,10 +145,17 @@ router.post('/', async (req, res) => {
 
     // Send Push Notifications
     for (const userId of pushRecipients) {
+        // We need to fetch the target user's language to localize the push
+        const [users] = await pool.query('SELECT language FROM users WHERE id = ?', [userId]);
+        const lang = users[0]?.language || 'cs';
+        const localizedTitle = getLocalized(title, lang);
+        
+        const pushTitle = lang === 'en' ? `New Request: ${localizedTitle}` : (lang === 'uk' ? `Новий запит: ${localizedTitle}` : `Nový požadavek: ${localizedTitle}`);
+
         sendPushToUser(userId, {
-            title: `Nový požadavek: ${title}`,
+            title: pushTitle,
             body: `${techName} - ${priority}`,
-            url: `/requests` // Link to requests list
+            url: `/requests`
         });
     }
 
@@ -190,30 +203,37 @@ router.put('/:id', async (req, res) => {
 
         await pool.execute(sql, values);
         
+        // Fetch updated request to get correct title and data
+        const [updated] = await pool.query('SELECT * FROM requests WHERE id = ?', [id]);
+        const updatedRequest = updated[0];
+
         // --- Push Logic on Assignment (PUT) ---
         // Requirement: "Pri prirazeni pozadavku se ma odesilat jen push notifikace, nikoliv i email."
+        // And now: Include request name in the push.
         
-        // If solverId was changed AND it wasn't a self-assignment
+        // If solverId was provided in body (meaning it's an assignment change) AND it wasn't a self-assignment
         if (body.solverId && body.solverId !== currentUserId) {
              const [users] = await pool.query('SELECT language FROM users WHERE id = ?', [body.solverId]);
              if (users.length > 0) {
                  const user = users[0];
                  const lang = user.language || 'cs';
-                 const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
                  
-                 // Removed Email Logic Here
+                 const reqTitle = getLocalized(updatedRequest.title, lang);
+                 const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
+                 const msgBody = lang === 'en' 
+                    ? `You have been assigned: ${reqTitle}`
+                    : (lang === 'uk' ? `Вам призначено: ${reqTitle}` : `Byl vám přiřazen požadavek: ${reqTitle}`);
 
                  // Push Notification to Solver
                  sendPushToUser(body.solverId, {
                      title: subject,
-                     body: body.title || 'Aktualizace požadavku',
+                     body: msgBody,
                      url: `/requests`
                  });
              }
         }
 
-        const [updated] = await pool.query('SELECT * FROM requests WHERE id = ?', [id]);
-        res.json(mapToModel(updated[0]));
+        res.json(mapToModel(updatedRequest));
 
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

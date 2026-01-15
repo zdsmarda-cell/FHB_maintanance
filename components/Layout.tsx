@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../lib/i18n';
-import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole, Bell, Smartphone } from 'lucide-react';
+import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole, Bell, Smartphone, BellOff } from 'lucide-react';
 import { User, Lang } from '../lib/types';
 import { ChangePasswordModal } from './modals/ChangePasswordModal';
 import { api, isProductionDomain } from '../lib/db';
@@ -32,6 +32,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const handleNavigate = (page: string) => {
       onNavigate(page);
@@ -59,18 +60,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
       }
   }, [user.language]);
 
-  // Check for SW and Push support
+  // Check for SW and Push support + Auto Sync
   useEffect(() => {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
           setPushSupported(true);
+          
+          // Check if already granted, if so, ensure backend has the sub
+          if (Notification.permission === 'granted') {
+              subscribeToPush(true); // silent sync
+          }
       }
   }, []);
 
-  const subscribeToPush = async () => {
-      if (!pushSupported) return;
+  const subscribeToPush = async (silent = false) => {
       const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
       if (isMock) {
-          alert("Push notifications require Production Backend.");
+          if (!silent) alert("Push notifications require Production Backend.");
           return;
       }
 
@@ -82,7 +87,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
           // 2. Register Service Worker (if not already)
           const registration = await navigator.serviceWorker.ready;
 
-          // 3. Subscribe
+          // 3. Subscribe (or get existing)
           const subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: urlBase64ToUint8Array(key)
@@ -90,11 +95,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
 
           // 4. Send to Backend
           await api.post('/notifications/subscribe', subscription);
-          alert("Notifikace aktivovány!");
+          
+          setIsSubscribed(true);
+          if (!silent) alert("Notifikace aktivovány!");
 
       } catch (e: any) {
           console.error("Push Error:", e);
-          alert("Chyba při aktivaci notifikací: " + e.message);
+          setIsSubscribed(false);
+          if (!silent) alert("Chyba při aktivaci notifikací: " + e.message);
       }
   };
 
@@ -198,8 +206,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
                 <button onClick={() => handleLangChange('uk')} className={`text-xs p-1 rounded ${lang === 'uk' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>UA</button>
              </div>
              {pushSupported && (
-                 <button onClick={subscribeToPush} className="text-slate-400 hover:text-yellow-400" title="Aktivovat notifikace">
-                     <Bell className="w-4 h-4" />
+                 <button 
+                    onClick={() => subscribeToPush(false)} 
+                    className={`${isSubscribed ? 'text-green-500 hover:text-green-400' : 'text-slate-500 hover:text-yellow-400'} transition-colors`} 
+                    title={isSubscribed ? "Notifikace aktivní" : "Aktivovat notifikace"}
+                 >
+                     {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
                  </button>
              )}
              <Globe className="w-4 h-4 text-slate-500" />
