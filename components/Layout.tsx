@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useI18n } from '../lib/i18n';
-import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole } from 'lucide-react';
+import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole, Bell } from 'lucide-react';
 import { User, Lang } from '../lib/types';
 import { ChangePasswordModal } from './modals/ChangePasswordModal';
 import { api, isProductionDomain } from '../lib/db';
@@ -14,10 +14,23 @@ interface LayoutProps {
   onNavigate: (page: string, params?: any) => void;
 }
 
+// Convert VAPID key helper
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPage, onNavigate }) => {
   const { t, setLang, lang } = useI18n();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
 
   const handleNavigate = (page: string) => {
       onNavigate(page);
@@ -39,11 +52,50 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
   };
 
   // Sync initial language from user profile on load (if mismatched)
-  React.useEffect(() => {
+  useEffect(() => {
       if (user.language && user.language !== lang) {
           setLang(user.language as Lang);
       }
   }, [user.language]);
+
+  // Check for SW and Push support
+  useEffect(() => {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+          setPushSupported(true);
+      }
+  }, []);
+
+  const subscribeToPush = async () => {
+      if (!pushSupported) return;
+      const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+      if (isMock) {
+          alert("Push notifications require Production Backend.");
+          return;
+      }
+
+      try {
+          // 1. Get Public Key from Backend
+          const { key } = await api.get('/notifications/vapid-key');
+          if (!key) throw new Error("No VAPID key from server");
+
+          // 2. Register Service Worker (if not already)
+          const registration = await navigator.serviceWorker.ready;
+
+          // 3. Subscribe
+          const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(key)
+          });
+
+          // 4. Send to Backend
+          await api.post('/notifications/subscribe', subscription);
+          alert("Notifikace aktivovány!");
+
+      } catch (e: any) {
+          console.error("Push Error:", e);
+          alert("Chyba při aktivaci notifikací: " + e.message);
+      }
+  };
 
   const MenuLink = ({ page, icon: Icon, label }: { page: string, icon: any, label: string }) => (
     <button
@@ -140,6 +192,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
                 <button onClick={() => handleLangChange('en')} className={`text-xs p-1 rounded ${lang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>EN</button>
                 <button onClick={() => handleLangChange('uk')} className={`text-xs p-1 rounded ${lang === 'uk' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>UA</button>
              </div>
+             {pushSupported && (
+                 <button onClick={subscribeToPush} className="text-slate-400 hover:text-yellow-400" title="Aktivovat notifikace">
+                     <Bell className="w-4 h-4" />
+                 </button>
+             )}
              <Globe className="w-4 h-4 text-slate-500" />
           </div>
           <div className="flex items-center pt-2">

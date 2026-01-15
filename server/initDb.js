@@ -226,6 +226,18 @@ const migrations = [
         up: [
             `ALTER TABLE requests MODIFY title TEXT`
         ]
+    },
+    {
+        name: '013_push_subscriptions',
+        up: [
+            `CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                subscription TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (user_id)
+            )`
+        ]
     }
 ];
 

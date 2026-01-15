@@ -1,7 +1,8 @@
 
 import pool from '../db.js';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable'; // Import for side effects (registration)
+import 'jspdf-autotable';
+import { sendPushToUser } from '../push.js';
 
 const APP_URL = process.env.APP_URL || 'https://fhbmain.impossible.cz';
 
@@ -18,7 +19,8 @@ const i18n = {
         unassigned: "Nepřiřazené požadavky po termínu (ve vaší působnosti)",
         report_title: "FHB Maintain - Report po termínu",
         open_app: "Otevřít aplikaci",
-        generated: "Vygenerováno"
+        generated: "Vygenerováno",
+        push_msg: "Máte požadavky po termínu! Zkontrolujte email nebo aplikaci."
     },
     en: {
         title: "Overdue Requests Overview",
@@ -32,7 +34,8 @@ const i18n = {
         unassigned: "Unassigned Overdue Requests (In your scope)",
         report_title: "FHB Maintain - Overdue Report",
         open_app: "Open Application",
-        generated: "Generated"
+        generated: "Generated",
+        push_msg: "You have overdue requests! Check email or app."
     },
     uk: {
         title: "Огляд прострочених запитів",
@@ -46,7 +49,8 @@ const i18n = {
         unassigned: "Непризначені прострочені запити (у вашій компетенції)",
         report_title: "FHB Maintain - Звіт про прострочення",
         open_app: "Відкрити додаток",
-        generated: "Згенеровано"
+        generated: "Згенеровано",
+        push_msg: "У вас є прострочені запити! Перевірте електронну пошту або додаток."
     }
 };
 
@@ -170,7 +174,6 @@ export const checkDailyOverdue = async () => {
     console.log('[WORKER] Starting Daily Overdue Check...');
     try {
         // 1. Fetch Overdue Requests
-        // Use local time date components to construct YYYY-MM-DD
         const now = new Date();
         const y = now.getFullYear();
         const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -206,23 +209,20 @@ export const checkDailyOverdue = async () => {
             const lang = user.language || 'cs';
             const s = getStrings(lang);
 
-            // Pre-process requests to Localized strings (Fixes "title is JSON" issue)
             const localizeReq = (r) => ({
                 ...r,
                 title: getLocalized(r.title, lang),
                 tech_name: getLocalized(r.tech_name, lang)
             });
 
-            // A. Requests assigned directly to this user
             const myAssigned = overdueRequests
                 .filter(r => r.solver_id === user.id)
                 .map(localizeReq);
 
-            // B. Unassigned requests that this user can see
             const myUnassigned = overdueRequests
                 .filter(r => {
-                    if (r.solver_id) return false; // Already assigned
-                    if (user.role === 'admin') return true; // Admin sees all unassigned
+                    if (r.solver_id) return false; 
+                    if (user.role === 'admin') return true; 
 
                     const locs = typeof user.assignedLocationIds === 'string' ? JSON.parse(user.assignedLocationIds) : (user.assignedLocationIds || []);
                     const wps = typeof user.assignedWorkplaceIds === 'string' ? JSON.parse(user.assignedWorkplaceIds) : (user.assignedWorkplaceIds || []);
@@ -231,26 +231,19 @@ export const checkDailyOverdue = async () => {
                 })
                 .map(localizeReq);
 
-            // If user has relevant info, send email
             if (myAssigned.length > 0 || myUnassigned.length > 0) {
                 
-                // Construct HTML Body with Link
+                // Email Body
                 let emailBody = `<h2>${s.title}</h2>`;
                 emailBody += `<p>${s.greeting} <strong>${user.name}</strong>, ${s.intro}</p>`;
                 
-                if (myAssigned.length > 0) {
-                    emailBody += generateHtmlTable(myAssigned, s.my_assigned, s);
-                }
-                
-                if (myUnassigned.length > 0) {
-                    emailBody += generateHtmlTable(myUnassigned, s.unassigned, s);
-                }
+                if (myAssigned.length > 0) emailBody += generateHtmlTable(myAssigned, s.my_assigned, s);
+                if (myUnassigned.length > 0) emailBody += generateHtmlTable(myUnassigned, s.unassigned, s);
 
                 emailBody += `<p style="margin-top:20px"><a href="${APP_URL}">${s.open_app}</a></p>`;
 
-                // Generate REAL PDF Attachment
+                // PDF
                 const base64Content = await generatePdfAttachment(myAssigned, myUnassigned, user, s, today);
-                
                 const attachments = JSON.stringify([
                     {
                         filename: `report_overdue_${today}.pdf`,
@@ -259,13 +252,20 @@ export const checkDailyOverdue = async () => {
                     }
                 ]);
 
-                // Insert into Email Queue
+                // Email Queue
                 await pool.execute(
                     'INSERT INTO email_queue (to_address, subject, body, attachments) VALUES (?, ?, ?, ?)',
                     [user.email, `FHB maintain - ${s.title}`, emailBody, attachments]
                 );
                 
-                console.log(`[WORKER] Queued overdue PDF report for ${user.email} (${lang})`);
+                // PUSH Notification Trigger
+                sendPushToUser(user.id, {
+                    title: s.title,
+                    body: s.push_msg,
+                    url: '/requests'
+                });
+                
+                console.log(`[WORKER] Queued overdue PDF report & Push for ${user.email}`);
             }
         }
 

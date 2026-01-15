@@ -2,6 +2,7 @@
 import express from 'express';
 import pool from '../db.js';
 import { getNewRequestEmailBody } from '../templates/email.js';
+import { sendPushToUser } from '../push.js'; // Import Push Helper
 
 const router = express.Router();
 
@@ -85,33 +86,36 @@ router.post('/', async (req, res) => {
     const [techRows] = await pool.query('SELECT name FROM technologies WHERE id = ?', [techId]);
     const techName = techRows[0]?.name || '';
 
-    // 2. Email Logic (Real DB Users)
+    // 2. Email & Push Logic (Real DB Users)
     const currentUserId = req.user ? req.user.id : authorId; // Logic relies on authenticated user via middleware
     
-    // Map to store Email -> Language
+    // Map to store Email -> Language and Push IDs
     const recipientsMap = new Map(); // Map<email, language>
+    const pushRecipients = new Set(); // Set<userId>
 
     if (solverId) {
         // A) Request is assigned immediately
-        // Only send email if I am NOT assigning it to myself
+        // Only send notification if I am NOT assigning it to myself
         if (solverId !== currentUserId) {
+            pushRecipients.add(solverId);
             const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [solverId]);
             if (users.length > 0 && users[0].email) {
                 recipientsMap.set(users[0].email, users[0].language || 'cs');
             }
         }
     } else {
-        // B) Request is unassigned (New) -> Notify all Maintenance staff
+        // B) Request is unassigned (New) -> Notify all Maintenance staff (who can take over)
         // Exclude the author if they are maintenance to prevent spamming themselves
         const [maintUsers] = await pool.query("SELECT email, id, language FROM users WHERE role = 'maintenance' AND isBlocked = 0");
         maintUsers.forEach(u => {
-            if (u.id !== currentUserId && u.email) {
-                recipientsMap.set(u.email, u.language || 'cs');
+            if (u.id !== currentUserId) {
+                if (u.email) recipientsMap.set(u.email, u.language || 'cs');
+                pushRecipients.add(u.id);
             }
         });
     }
 
-    // Iterate over recipients and generate localized emails
+    // Send Emails
     for (const [email, lang] of recipientsMap.entries()) {
         const emailData = {
             title: title || 'Bez názvu',
@@ -127,6 +131,15 @@ router.post('/', async (req, res) => {
             'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
             [email, subject, body]
         );
+    }
+
+    // Send Push Notifications
+    for (const userId of pushRecipients) {
+        sendPushToUser(userId, {
+            title: `Nový požadavek: ${title}`,
+            body: `${techName} - ${priority}`,
+            url: `/requests` // Link to requests list
+        });
     }
 
     res.json(mapToModel(newRequest[0]));
@@ -173,12 +186,13 @@ router.put('/:id', async (req, res) => {
 
         await pool.execute(sql, values);
         
-        // --- Email Logic on Assignment (PUT) ---
+        // --- Email & Push Logic on Assignment (PUT) ---
         // If solverId was changed AND it wasn't a self-assignment
         if (body.solverId && body.solverId !== currentUserId) {
              const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [body.solverId]);
-             if (users.length > 0 && users[0].email) {
-                 const lang = users[0].language || 'cs';
+             if (users.length > 0) {
+                 const user = users[0];
+                 const lang = user.language || 'cs';
                  const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
                  const emailBody = lang === 'en' 
                     ? `A request has been assigned to you.\n\nCheck FHB Maintein.` 
@@ -186,10 +200,19 @@ router.put('/:id', async (req, res) => {
                         ? `Вам призначено запит.\n\nПеревірте FHB Maintein.` 
                         : `Byl vám přiřazen požadavek.\n\nZkontrolujte systém FHB Maintein.`);
 
-                 await pool.execute(
-                    'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                    [users[0].email, subject, emailBody]
-                 );
+                 if (user.email) {
+                     await pool.execute(
+                        'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
+                        [user.email, subject, emailBody]
+                     );
+                 }
+
+                 // Push Notification to Solver
+                 sendPushToUser(body.solverId, {
+                     title: subject,
+                     body: body.title || 'Aktualizace požadavku',
+                     url: `/requests`
+                 });
              }
         }
 
