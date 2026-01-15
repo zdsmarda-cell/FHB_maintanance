@@ -1,9 +1,17 @@
 
 import React from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+// import { useRegisterSW } from 'virtual:pwa-register/react'; // CAUSES ERROR IN PREVIEW
 import { RefreshCw, X } from 'lucide-react';
 
 export const ReloadPrompt = () => {
+  // Mock hook to prevent crash in environments where virtual modules fail
+  const offlineReady = false;
+  const needRefresh = false;
+  const close = () => {};
+  const updateServiceWorker = async (reload: boolean) => {};
+
+  /* 
+  // Original Logic - Disabled to fix Preview Crash
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -21,6 +29,7 @@ export const ReloadPrompt = () => {
     setOfflineReady(false);
     setNeedRefresh(false);
   };
+  */
 
   if (!offlineReady && !needRefresh) return null;
 

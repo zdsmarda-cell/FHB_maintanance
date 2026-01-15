@@ -28,17 +28,29 @@ const mapToModel = (r) => ({
     createdDate: r.created_date
 });
 
-// Helper to parse localized string
+// Robust Helper to parse localized string
 const getLocalized = (data, lang) => {
     if (!data) return '';
     try {
-        if (typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
-            const parsed = JSON.parse(data);
-            return parsed[lang] || parsed['cs'] || parsed['en'] || Object.values(parsed)[0] || data;
+        let parsed = data;
+        // If it's a JSON string, parse it first
+        if (typeof data === 'string' && (data.trim().startsWith('{') || data.trim().startsWith('['))) {
+            try {
+                parsed = JSON.parse(data);
+            } catch (e) {
+                // If parsing fails, use the string as is
+                return data;
+            }
         }
-        return data;
+        
+        // If we have an object/array, try to find the language key
+        if (typeof parsed === 'object' && parsed !== null) {
+            return parsed[lang] || parsed['cs'] || parsed['en'] || Object.values(parsed)[0] || '';
+        }
+        
+        return String(parsed);
     } catch (e) {
-        return data;
+        return String(data);
     }
 };
 
@@ -82,13 +94,16 @@ router.post('/', async (req, res) => {
     const cleanPlannedDate = plannedResolutionDate ? String(plannedResolutionDate).slice(0, 10) : null;
 
     // 1. Create Request
+    // Ensure title is stringified if it's an object coming from frontend
+    const titleToSave = typeof title === 'object' ? JSON.stringify(title) : (title || 'Nový požadavek');
+
     const [result] = await pool.execute(
       `INSERT INTO requests (
         id, tech_id, author_id, description, priority, title, is_approved, history,
         estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id
       ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        techId, authorId, description, priority, title || 'Nový požadavek', false, JSON.stringify(history),
+        techId, authorId, description, priority, titleToSave, false, JSON.stringify(history),
         estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId
       ]
     );
@@ -105,13 +120,15 @@ router.post('/', async (req, res) => {
     
     // Map to store Email -> Language and Push IDs
     const recipientsMap = new Map(); // Map<email, language>
-    const pushRecipients = new Set(); // Set<userId>
+    const pushRecipients = new Map(); // Map<userId, language>
 
     if (solverId) {
         // A) Request is assigned immediately
         // Only send notification if I am NOT assigning it to myself
         if (solverId !== currentUserId) {
-            pushRecipients.add(solverId);
+            const [sUsers] = await pool.query('SELECT language FROM users WHERE id = ?', [solverId]);
+            const sLang = sUsers[0]?.language || 'cs';
+            pushRecipients.set(solverId, sLang);
         }
     } else {
         // B) Request is unassigned (New) -> Notify all Maintenance staff (who can take over)
@@ -119,8 +136,9 @@ router.post('/', async (req, res) => {
         const [maintUsers] = await pool.query("SELECT email, id, language FROM users WHERE role = 'maintenance' AND isBlocked = 0");
         maintUsers.forEach(u => {
             if (u.id !== currentUserId) {
-                if (u.email) recipientsMap.set(u.email, u.language || 'cs');
-                pushRecipients.add(u.id);
+                const uLang = u.language || 'cs';
+                if (u.email) recipientsMap.set(u.email, uLang);
+                pushRecipients.set(u.id, uLang);
             }
         });
     }
@@ -143,18 +161,15 @@ router.post('/', async (req, res) => {
         );
     }
 
-    // Send Push Notifications
-    for (const userId of pushRecipients) {
-        // We need to fetch the target user's language to localize the push
-        const [users] = await pool.query('SELECT language FROM users WHERE id = ?', [userId]);
-        const lang = users[0]?.language || 'cs';
+    // Send Push Notifications with Localized Title
+    for (const [userId, lang] of pushRecipients.entries()) {
         const localizedTitle = getLocalized(title, lang);
         
         const pushTitle = lang === 'en' ? `New Request: ${localizedTitle}` : (lang === 'uk' ? `Новий запит: ${localizedTitle}` : `Nový požadavek: ${localizedTitle}`);
 
         sendPushToUser(userId, {
             title: pushTitle,
-            body: `${techName} - ${priority}`,
+            body: `${getLocalized(techName, lang)} - ${priority}`,
             url: `/requests`
         });
     }
@@ -173,7 +188,11 @@ router.put('/:id', async (req, res) => {
         const updates = [];
         const values = [];
 
-        if (body.title !== undefined) { updates.push('title = ?'); values.push(body.title); }
+        if (body.title !== undefined) { 
+            updates.push('title = ?'); 
+            // Ensure object titles are stringified
+            values.push(typeof body.title === 'object' ? JSON.stringify(body.title) : body.title); 
+        }
         if (body.description !== undefined) { updates.push('description = ?'); values.push(body.description); }
         if (body.priority !== undefined) { updates.push('priority = ?'); values.push(body.priority); }
         if (body.state !== undefined) { updates.push('state = ?'); values.push(body.state); }
@@ -218,7 +237,9 @@ router.put('/:id', async (req, res) => {
                  const user = users[0];
                  const lang = user.language || 'cs';
                  
+                 // Use enhanced getLocalized to parse title from DB which might be a JSON string
                  const reqTitle = getLocalized(updatedRequest.title, lang);
+                 
                  const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
                  const msgBody = lang === 'en' 
                     ? `You have been assigned: ${reqTitle}`

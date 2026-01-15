@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // base: './', // Removed to fix absolute path resolution issues in some environments
   plugins: [
     react(),
     VitePWA({
@@ -13,7 +14,7 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       devOptions: {
-        enabled: true,
+        enabled: false, // Keep disabled in dev to prevent errors
         type: 'module',
       },
       manifest: {
@@ -40,7 +41,6 @@ export default defineConfig({
   ],
   server: {
     host: '0.0.0.0',
-    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -54,7 +54,6 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0',
-    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 const router = express.Router();
 
@@ -24,26 +24,19 @@ router.post('/', async (req, res) => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
-        // Use a model recommended for basic text tasks
+        // Use gemini-3-flash-preview as recommended
+        // We structure contents as parts to safely separate instruction from user input
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). 
-            Ensure the output is strictly valid JSON format without markdown code blocks.
-            If the input is short (like a name), treat it as a UI label.
-            
-            Text to translate: "${text}"`,
+            contents: {
+                parts: [
+                    { text: 'Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.' },
+                    { text: text }
+                ]
+            },
             config: {
                 responseMimeType: "application/json",
-                // Explicitly defining schema ensures strict JSON output matching our interface
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        cs: { type: Type.STRING },
-                        en: { type: Type.STRING },
-                        uk: { type: Type.STRING }
-                    },
-                    required: ['cs', 'en', 'uk']
-                }
+                // Removed strict responseSchema to prevent "Empty response" errors on simple inputs
             }
         });
 
@@ -53,11 +46,12 @@ router.post('/', async (req, res) => {
             const translations = JSON.parse(jsonStr);
             res.json(translations);
         } else {
+            console.warn("Gemini returned empty text response.");
             throw new Error("Empty response from AI");
         }
 
     } catch (error) {
-        console.error("Translation API Error:", error);
+        console.error("Translation API Error:", error.message);
         // Fallback to avoid breaking the app flow
         res.json(fallbackTranslate(text));
     }
