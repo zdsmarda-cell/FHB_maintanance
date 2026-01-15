@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; 
@@ -9,6 +10,7 @@ import { TechConfigPage } from './pages/admin/TechConfigPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { EmailsPage } from './pages/admin/EmailsPage';
+import { PushNotificationsPage } from './pages/admin/PushNotificationsPage';
 import { AssetsPage } from './pages/Assets';
 import { RequestsPage } from './pages/RequestsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
@@ -581,6 +583,7 @@ const App = () => {
       case 'users': return <UsersPage onNavigate={handleNavigate} />;
       case 'settings': return <SettingsPage />;
       case 'emails': return <EmailsPage />;
+      case 'push_notifications': return <PushNotificationsPage />;
       default: return <Dashboard user={user} onNavigate={handleNavigate} />;
     }
   };

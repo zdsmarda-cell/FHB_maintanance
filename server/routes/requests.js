@@ -98,10 +98,14 @@ router.post('/', async (req, res) => {
         // Only send notification if I am NOT assigning it to myself
         if (solverId !== currentUserId) {
             pushRecipients.add(solverId);
-            const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [solverId]);
-            if (users.length > 0 && users[0].email) {
-                recipientsMap.set(users[0].email, users[0].language || 'cs');
-            }
+            // NOTE: Per requirement, NO email for assignment, only Push.
+            // But if it is NEW and assigned immediately, we might want to inform via email? 
+            // The prompt says "Pri prirazeni pozadavku se ma odesilat jen push notifikace".
+            // Since this is POST (Create), it technically is an assignment if solverId is present.
+            // However, usually "Assignment" refers to the PUT action.
+            // For POST (New Request), typically Admins get email. 
+            // If assigned, the solver gets Push. 
+            // Let's stick to the rule: If assigned, notify solver via Push.
         }
     } else {
         // B) Request is unassigned (New) -> Notify all Maintenance staff (who can take over)
@@ -115,7 +119,7 @@ router.post('/', async (req, res) => {
         });
     }
 
-    // Send Emails
+    // Send Emails (Only for New/Unassigned to Maintenance group, NOT for specific assignment to solver)
     for (const [email, lang] of recipientsMap.entries()) {
         const emailData = {
             title: title || 'Bez názvu',
@@ -186,26 +190,18 @@ router.put('/:id', async (req, res) => {
 
         await pool.execute(sql, values);
         
-        // --- Email & Push Logic on Assignment (PUT) ---
+        // --- Push Logic on Assignment (PUT) ---
+        // Requirement: "Pri prirazeni pozadavku se ma odesilat jen push notifikace, nikoliv i email."
+        
         // If solverId was changed AND it wasn't a self-assignment
         if (body.solverId && body.solverId !== currentUserId) {
-             const [users] = await pool.query('SELECT email, language FROM users WHERE id = ?', [body.solverId]);
+             const [users] = await pool.query('SELECT language FROM users WHERE id = ?', [body.solverId]);
              if (users.length > 0) {
                  const user = users[0];
                  const lang = user.language || 'cs';
                  const subject = lang === 'en' ? 'Task Assigned' : (lang === 'uk' ? 'Призначено завдання' : 'Přiřazení úkolu');
-                 const emailBody = lang === 'en' 
-                    ? `A request has been assigned to you.\n\nCheck FHB Maintein.` 
-                    : (lang === 'uk' 
-                        ? `Вам призначено запит.\n\nПеревірте FHB Maintein.` 
-                        : `Byl vám přiřazen požadavek.\n\nZkontrolujte systém FHB Maintein.`);
-
-                 if (user.email) {
-                     await pool.execute(
-                        'INSERT INTO email_queue (to_address, subject, body) VALUES (?, ?, ?)',
-                        [user.email, subject, emailBody]
-                     );
-                 }
+                 
+                 // Removed Email Logic Here
 
                  // Push Notification to Solver
                  sendPushToUser(body.solverId, {

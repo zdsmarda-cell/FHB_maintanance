@@ -25,7 +25,8 @@ import supplierRoutes from './routes/suppliers.js';
 import configRoutes from './routes/config.js'; 
 import maintenanceRoutes from './routes/maintenance.js'; 
 import translateRoutes from './routes/translate.js'; 
-import notificationRoutes from './routes/notifications.js'; // NEW
+import notificationRoutes from './routes/notifications.js'; 
+import pushLogsRoutes from './routes/push_logs.js'; // NEW
 
 dotenv.config();
 
@@ -63,7 +64,8 @@ app.use('/api/suppliers', authenticateToken, supplierRoutes);
 app.use('/api/config', authenticateToken, configRoutes);
 app.use('/api/maintenance', authenticateToken, maintenanceRoutes);
 app.use('/api/translate', authenticateToken, translateRoutes);
-app.use('/api/notifications', authenticateToken, notificationRoutes); // NEW
+app.use('/api/notifications', authenticateToken, notificationRoutes); 
+app.use('/api/push-logs', authenticateToken, pushLogsRoutes); // NEW
 
 const PORT = process.env.PORT || 3010;
 

@@ -1,5 +1,5 @@
 
-import { User, Location, Workplace, Supplier, TechType, TechState, Technology, Maintenance, Request, Email, AppSettings, RequestHistoryEntry } from './types';
+import { User, Location, Workplace, Supplier, TechType, TechState, Technology, Maintenance, Request, Email, AppSettings, RequestHistoryEntry, PushLog } from './types';
 
 // --- Environment Configuration ---
 const PROD_DOMAIN = 'fhbmain.impossible.cz';
@@ -141,6 +141,7 @@ const seedData = () => {
   localStorage.setItem('tmp_req_comments', JSON.stringify([]));
   localStorage.setItem('tmp_reset_tokens', JSON.stringify([]));
   localStorage.setItem('tmp_emails', JSON.stringify([]));
+  localStorage.setItem('tmp_push_logs', JSON.stringify([]));
   localStorage.setItem('tmp_settings', JSON.stringify(settings));
 };
 
@@ -176,6 +177,11 @@ const db = {
   emails: {
       list: () => db.get<Email>('tmp_emails'),
       retry: (ids: any) => { /* ... */ }
+  },
+  pushLogs: {
+      list: () => db.get<PushLog>('tmp_push_logs'),
+      add: (log: any) => { const l = db.pushLogs.list(); l.unshift({...log, id: uid(), created_at: new Date().toISOString()}); db.set('tmp_push_logs', l); },
+      retry: (id: string|number) => { /* mock */ }
   },
   users: {
     list: () => db.get<User>('tmp_users'),

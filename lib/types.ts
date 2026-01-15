@@ -177,6 +177,17 @@ export interface Email {
     created_at: string;
 }
 
+export interface PushLog {
+    id: number | string;
+    user_id: string;
+    user_name?: string; // Joined
+    title: string;
+    body: string;
+    status: 'sent' | 'error' | 'skipped';
+    error_message?: string;
+    created_at: string;
+}
+
 export interface AppSettings {
   enableOnlineTranslation: boolean;
 }

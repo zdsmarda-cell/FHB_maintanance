@@ -238,6 +238,21 @@ const migrations = [
                 INDEX (user_id)
             )`
         ]
+    },
+    {
+        name: '014_push_logs',
+        up: [
+            `CREATE TABLE IF NOT EXISTS push_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                title VARCHAR(255),
+                body TEXT,
+                status VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                error_message TEXT,
+                INDEX (user_id)
+            )`
+        ]
     }
 ];
 

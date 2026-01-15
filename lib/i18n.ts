@@ -23,6 +23,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.users': 'Uživatelé',
     'menu.settings': 'Nastavení',
     'menu.emails': 'Emaily',
+    'menu.push_notifications': 'Mobilní notifikace',
     
     'headers.locations': 'Lokality a Pracoviště',
     'headers.new_location': 'Nová Lokalita',
@@ -47,6 +48,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.change_approval': 'Schválení nákladů',
     'headers.approval': 'Schválení',
     'headers.emails': 'Správa Emailů',
+    'headers.push_logs': 'Log Mobilních Notifikací',
     'headers.status_change': 'Změna stavu',
     'headers.maintenance_detail': 'Detail údržby',
 
@@ -111,6 +113,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Otevřené požadavky',
     'col.recipient': 'Příjemce',
     'col.subject': 'Předmět',
+    'col.message': 'Zpráva',
 
     'status.new': 'Nový',
     'status.assigned': 'V řešení',
@@ -123,6 +126,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.pending': 'Čeká',
     'status.sent': 'Odesláno',
     'status.error': 'Chyba',
+    'status.skipped': 'Přeskočeno',
 
     'prio.basic': 'Běžná',
     'prio.priority': 'Priorita',
@@ -160,6 +164,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.warning': 'Upozornění',
     'common.ok': 'OK',
     'common.retry': 'Zkusit znovu',
+    'common.resend': 'Znovu odeslat',
     'common.recipient': 'Příjemce',
     'common.subject': 'Předmět',
 
@@ -183,6 +188,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.waiting_for_approval': 'Čeká na schválení',
     'msg.approval_limit_exceeded': 'Zamítnuto: Cena překračuje váš schvalovací limit.',
     'msg.confirm_delete': 'Opravdu chcete smazat tuto položku?',
+    'msg.confirm_resend': 'Opravdu znovu odeslat notifikaci?',
     'msg.calendar_legend': 'Legenda:',
     'msg.password_changed': 'Heslo bylo úspěšně změněno.',
     'msg.password_change_failed': 'Změna hesla se nezdařila.',
@@ -317,6 +323,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.users': 'Users',
     'menu.settings': 'Settings',
     'menu.emails': 'Emails',
+    'menu.push_notifications': 'Push Notifications',
 
     'headers.locations': 'Locations & Workplaces',
     'headers.new_location': 'New Location',
@@ -341,6 +348,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.change_approval': 'Cost Approval',
     'headers.approval': 'Approval',
     'headers.emails': 'Email Management',
+    'headers.push_logs': 'Push Notification Logs',
     'headers.status_change': 'Change Status',
     'headers.maintenance_detail': 'Maintenance Detail',
 
@@ -405,6 +413,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Open Requests',
     'col.recipient': 'Recipient',
     'col.subject': 'Subject',
+    'col.message': 'Message',
 
     'status.new': 'New',
     'status.assigned': 'In Progress',
@@ -417,6 +426,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.pending': 'Pending',
     'status.sent': 'Sent',
     'status.error': 'Error',
+    'status.skipped': 'Skipped',
 
     'prio.basic': 'Basic',
     'prio.priority': 'Priority',
@@ -454,6 +464,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.warning': 'Warning',
     'common.ok': 'OK',
     'common.retry': 'Retry',
+    'common.resend': 'Resend',
     'common.recipient': 'Recipient',
     'common.subject': 'Subject',
 
@@ -477,6 +488,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.waiting_for_approval': 'Waiting for approval',
     'msg.approval_limit_exceeded': 'Rejected: Cost exceeds your approval limit.',
     'msg.confirm_delete': 'Are you sure you want to delete this item?',
+    'msg.confirm_resend': 'Do you really want to resend the notification?',
     'msg.calendar_legend': 'Legend:',
     'msg.password_changed': 'Password changed successfully.',
     'msg.password_change_failed': 'Password change failed.',
@@ -611,6 +623,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.users': 'Користувачі',
     'menu.settings': 'Налаштування',
     'menu.emails': 'Електронні листи',
+    'menu.push_notifications': 'Push сповіщення',
 
     'headers.locations': 'Локації та робочі місця',
     'headers.new_location': 'Нова локація',
@@ -635,6 +648,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.change_approval': 'Затвердження витрат',
     'headers.approval': 'Затвердження',
     'headers.emails': 'Керування поштою',
+    'headers.push_logs': 'Журнал Push сповіщень',
     'headers.status_change': 'Зміна статусу',
     'headers.maintenance_detail': 'Деталі обслуговування',
 
@@ -699,6 +713,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.open_requests': 'Відкриті запити',
     'col.recipient': 'Отримувач',
     'col.subject': 'Тема',
+    'col.message': 'Повідомлення',
 
     'status.new': 'Новий',
     'status.assigned': 'У роботі',
@@ -711,6 +726,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'status.pending': 'Очікує',
     'status.sent': 'Надіслано',
     'status.error': 'Помилка',
+    'status.skipped': 'Пропущено',
 
     'prio.basic': 'Звичайний',
     'prio.priority': 'Пріоритет',
@@ -748,6 +764,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.warning': 'Попередження',
     'common.ok': 'OK',
     'common.retry': 'Спробувати знову',
+    'common.resend': 'Надіслати знову',
     'common.recipient': 'Отримувач',
     'common.subject': 'Тема',
 
@@ -771,6 +788,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'msg.waiting_for_approval': 'Очікує на затвердження',
     'msg.approval_limit_exceeded': 'Відхилено: Вартість перевищує ваш ліміт затвердження.',
     'msg.confirm_delete': 'Ви дійсно хочете видалити цей елемент?',
+    'msg.confirm_resend': 'Ви дійсно хочете повторно надіслати сповіщення?',
     'msg.calendar_legend': 'Легенда:',
     'msg.password_changed': 'Пароль успішно змінено.',
     'msg.password_change_failed': 'Не вдалося змінити пароль.',

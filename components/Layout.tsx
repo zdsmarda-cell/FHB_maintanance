@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../lib/i18n';
-import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole, Bell } from 'lucide-react';
+import { LayoutDashboard, MapPin, Truck, Settings, Box, Wrench, Users, LogOut, Globe, Sliders, Menu, X, Calendar, ClipboardList, CalendarDays, Mail, LockKeyhole, Bell, Smartphone } from 'lucide-react';
 import { User, Lang } from '../lib/types';
 import { ChangePasswordModal } from './modals/ChangePasswordModal';
 import { api, isProductionDomain } from '../lib/db';
@@ -179,6 +179,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
               <MenuLink page="tech_config" icon={Sliders} label={t('menu.tech_config')} />
               <MenuLink page="users" icon={Users} label={t('menu.users')} />
               <MenuLink page="emails" icon={Mail} label={t('menu.emails')} />
+              <MenuLink page="push_notifications" icon={Smartphone} label={t('menu.push_notifications')} />
               <div className="my-2 border-t border-slate-800"></div>
               <MenuLink page="settings" icon={Settings} label={t('menu.settings')} />
             </>
