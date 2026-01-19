@@ -211,6 +211,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         return <span className={`px-2 py-0.5 rounded-full text-xs font-bold border border-transparent ${styles[status]}`}>{t(`status.${status}`) || status}</span>;
     };
 
+  const renderPrioBadge = (p: string) => {
+      const styles: any = {
+          'urgent': 'text-red-600',
+          'priority': 'text-amber-600',
+          'basic': 'text-slate-600'
+      };
+      return <span className={`text-xs font-bold uppercase ${styles[p] || ''}`}>{t(`prio.${p}`)}</span>;
+  };
+
   const formatTime = (minutes: number | undefined) => {
         if (!minutes) return '-';
         const h = Math.floor(minutes / 60);
@@ -452,7 +461,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       onBack={() => setSelectedRequest(null)}
                       onGallery={openGallery}
                       renderStatusBadge={renderStatusBadge}
-                      renderPrioBadge={(p) => <span className="text-xs font-bold uppercase">{p}</span>}
+                      renderPrioBadge={renderPrioBadge}
                       refresh={loadData}
                   />
               </div>

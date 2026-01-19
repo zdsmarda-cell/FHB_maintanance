@@ -578,6 +578,26 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     if (loading && requests.length === 0) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
+    // BADGE RENDERERS WITH LOCALIZATION
+    const renderStatusBadge = (s: string) => {
+        const styles: any = {
+            'new': 'bg-blue-100 text-blue-800',
+            'assigned': 'bg-amber-100 text-amber-800',
+            'solved': 'bg-green-100 text-green-800',
+            'cancelled': 'bg-red-100 text-red-800'
+        };
+        return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${styles[s] || 'bg-gray-100 text-gray-800'}`}>{t(`status.${s}`)}</span>;
+    };
+
+    const renderPrioBadge = (p: string) => {
+        const styles: any = {
+            'urgent': 'text-red-600 bg-red-50 border border-red-100',
+            'priority': 'text-amber-600 bg-amber-50 border border-amber-100',
+            'basic': 'text-slate-500 bg-slate-50 border border-slate-100'
+        };
+        return <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ${styles[p] || ''}`}>{t(`prio.${p}`)}</span>;
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -679,8 +699,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                             technologies={technologies}
                             onBack={() => setSelectedRequest(null)}
                             onGallery={() => {}} // Gallery handled inside detail if needed or pass handler
-                            renderStatusBadge={(s) => <span className="font-bold uppercase">{s}</span>}
-                            renderPrioBadge={(p) => <span className="font-bold uppercase">{p}</span>}
+                            renderStatusBadge={renderStatusBadge}
+                            renderPrioBadge={renderPrioBadge}
                             refresh={loadData}
                             onStatusChange={openStatusModal} // Pass modal trigger to Detail view
                         />

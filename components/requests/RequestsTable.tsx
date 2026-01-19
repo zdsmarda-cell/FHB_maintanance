@@ -227,7 +227,7 @@ export const RequestsTable = ({
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 font-medium text-slate-800">
-                                            {isUrgent && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2" title="Urgentní"></span>}
+                                            {isUrgent && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2" title={t('prio.urgent')}></span>}
                                             {getLocalized(req.title, lang)}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{getLocalized(tech?.name, lang) || '-'}</td>
