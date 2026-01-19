@@ -249,7 +249,7 @@ const generateMaintenanceRequests = async () => {
 // --- Scheduler Function ---
 export const startWorker = () => {
     console.log('--- Worker Background Process Started ---');
-    console.log('Jobs: Email (60s), Maintenance & Overdue (Daily after 00:01)');
+    console.log('Jobs: Email (60s), Maintenance & Overdue (Daily after 06:00)');
 
     // Initial Run on Startup (Only Email Queue)
     processEmailQueue();
@@ -259,7 +259,6 @@ export const startWorker = () => {
     setInterval(async () => {
         const now = new Date();
         const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
         
         // Use a string representation of the date (YYYY-MM-DD) to track daily execution
         const todayStr = toLocalSqlDate(now);
@@ -268,8 +267,8 @@ export const startWorker = () => {
         await processEmailQueue();
 
         // Daily Jobs Logic:
-        // Run if it's past 00:01.
-        const isTimeForDailyJob = (currentHour > 0) || (currentHour === 0 && currentMinute >= 1);
+        // Run if it's 06:00 or later.
+        const isTimeForDailyJob = currentHour >= 6;
 
         if (isTimeForDailyJob) {
             try {

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { db } from '../../lib/db';
 import { useI18n } from '../../lib/i18n';
 import { Request, User, Technology } from '../../lib/types';
-import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon, Loader, Edit } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, Clock, Euro, XCircle, MessageSquare, History as HistoryIcon, Loader, ArrowLeftRight } from 'lucide-react';
 import { getLocalized, prepareMultilingual } from '../../lib/helpers';
 
 interface RequestDetailProps {
@@ -64,6 +64,22 @@ export const RequestDetail = ({
         }
     };
 
+    // Helper to translate status/priority values in history
+    const getTranslatedValue = (val: string) => {
+        if (!val) return '';
+        // Try status translation
+        const statusKey = `status.${val}`;
+        const statusTrans = t(statusKey);
+        if (statusTrans !== statusKey) return statusTrans;
+
+        // Try priority translation
+        const prioKey = `prio.${val}`;
+        const prioTrans = t(prioKey);
+        if (prioTrans !== prioKey) return prioTrans;
+
+        return val;
+    };
+
     return (
         <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
@@ -83,10 +99,11 @@ export const RequestDetail = ({
                                     {canChangeStatus && onStatusChange && (
                                         <button 
                                             onClick={() => onStatusChange(request)} 
-                                            className="text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors"
+                                            className="flex items-center gap-1 ml-2 px-2 py-1 bg-white border border-slate-200 shadow-sm rounded text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                             title={t('headers.status_change')}
                                         >
-                                            <Edit className="w-3 h-3" />
+                                            <ArrowLeftRight className="w-3 h-3 text-blue-600" />
+                                            <span>{t('action.change')}</span>
                                         </button>
                                     )}
                                 </div>
@@ -218,7 +235,7 @@ export const RequestDetail = ({
                                             <div className="font-medium text-slate-700">{t(`action.${h.action}`)} {u ? `(${u.name})` : ''}</div>
                                             {h.note && <div className="text-slate-500 italic mt-1">{h.note}</div>}
                                             {h.oldValue && h.newValue && (
-                                                <div className="text-slate-400 mt-0.5">{t(`status.${h.oldValue}`)} &rarr; {t(`status.${h.newValue}`)}</div>
+                                                <div className="text-slate-400 mt-0.5">{getTranslatedValue(h.oldValue)} &rarr; {getTranslatedValue(h.newValue)}</div>
                                             )}
                                         </div>
                                     )
