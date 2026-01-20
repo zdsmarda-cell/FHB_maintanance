@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { authenticateToken } from './middleware/auth.js';
 import { initDb } from './initDb.js';
 import { startWorker } from './worker.js';
+import { runImageOptimizer } from './imageOptimizer.js';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -70,6 +71,9 @@ app.use('/api/push-logs', authenticateToken, pushLogsRoutes); // NEW
 const PORT = process.env.PORT || 3010;
 
 initDb().then(() => {
+  // Start Image Optimizer in background
+  runImageOptimizer();
+
   console.log('--- Server Startup Diagnostics ---');
   let sslKeyPath = process.env.SSL_KEY_PATH;
   let sslCertPath = process.env.SSL_CERT_PATH;
