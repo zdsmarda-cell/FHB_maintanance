@@ -253,6 +253,46 @@ const migrations = [
                 INDEX (user_id)
             )`
         ]
+    },
+    {
+        name: '015_split_address_columns',
+        up: [
+            // Locations: Add Columns
+            `ALTER TABLE locations 
+             ADD COLUMN street VARCHAR(255), 
+             ADD COLUMN number VARCHAR(50), 
+             ADD COLUMN zip VARCHAR(20), 
+             ADD COLUMN city VARCHAR(255), 
+             ADD COLUMN country VARCHAR(100)`,
+            // Locations: Migrate Data
+            `UPDATE locations SET 
+             street = JSON_UNQUOTE(JSON_EXTRACT(address, '$.street')),
+             number = JSON_UNQUOTE(JSON_EXTRACT(address, '$.number')),
+             zip = JSON_UNQUOTE(JSON_EXTRACT(address, '$.zip')),
+             city = JSON_UNQUOTE(JSON_EXTRACT(address, '$.city')),
+             country = JSON_UNQUOTE(JSON_EXTRACT(address, '$.country'))
+             WHERE address IS NOT NULL`,
+            // Locations: Drop Old
+            `ALTER TABLE locations DROP COLUMN address`,
+
+            // Suppliers: Add Columns
+            `ALTER TABLE suppliers 
+             ADD COLUMN street VARCHAR(255), 
+             ADD COLUMN number VARCHAR(50), 
+             ADD COLUMN zip VARCHAR(20), 
+             ADD COLUMN city VARCHAR(255), 
+             ADD COLUMN country VARCHAR(100)`,
+            // Suppliers: Migrate Data
+            `UPDATE suppliers SET 
+             street = JSON_UNQUOTE(JSON_EXTRACT(address, '$.street')),
+             number = JSON_UNQUOTE(JSON_EXTRACT(address, '$.number')),
+             zip = JSON_UNQUOTE(JSON_EXTRACT(address, '$.zip')),
+             city = JSON_UNQUOTE(JSON_EXTRACT(address, '$.city')),
+             country = JSON_UNQUOTE(JSON_EXTRACT(address, '$.country'))
+             WHERE address IS NOT NULL`,
+            // Suppliers: Drop Old
+            `ALTER TABLE suppliers DROP COLUMN address`
+        ]
     }
 ];
 

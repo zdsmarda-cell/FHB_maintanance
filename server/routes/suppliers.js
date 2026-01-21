@@ -9,7 +9,23 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM suppliers');
-        res.json(rows);
+        const mapped = rows.map(r => ({
+            id: r.id,
+            name: r.name,
+            ic: r.ic,
+            dic: r.dic,
+            email: r.email,
+            phone: r.phone,
+            description: r.description,
+            address: {
+                street: r.street || '',
+                number: r.number || '',
+                zip: r.zip || '',
+                city: r.city || '',
+                country: r.country || ''
+            }
+        }));
+        res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -18,8 +34,10 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { name, address, ic, dic, email, phone, description } = req.body;
     try {
-        await pool.query('UPDATE suppliers SET name=?, address=?, ic=?, dic=?, email=?, phone=?, description=? WHERE id=?',
-            [name, JSON.stringify(address), ic, dic, email, phone, description, id]);
+        await pool.query(
+            `UPDATE suppliers SET name=?, street=?, number=?, zip=?, city=?, country=?, ic=?, dic=?, email=?, phone=?, description=? WHERE id=?`,
+            [name, address.street, address.number, address.zip, address.city, address.country, ic, dic, email, phone, description, id]
+        );
         res.json({ id, ...req.body });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -29,8 +47,10 @@ router.post('/', async (req, res) => {
     const { name, address, ic, dic, email, phone, description } = req.body;
     try {
         const id = crypto.randomUUID();
-        await pool.query('INSERT INTO suppliers (id, name, address, ic, dic, email, phone, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, name, JSON.stringify(address), ic, dic, email, phone, description]);
+        await pool.query(
+            `INSERT INTO suppliers (id, name, street, number, zip, city, country, ic, dic, email, phone, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, name, address.street, address.number, address.zip, address.city, address.country, ic, dic, email, phone, description]
+        );
         res.json({ id, name, address, ic, dic, email, phone, description });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

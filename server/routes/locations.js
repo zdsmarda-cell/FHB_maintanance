@@ -9,12 +9,18 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM locations');
-    // Map DB columns to frontend interface
+    // Map individual DB columns to frontend address object
     const mapped = rows.map(r => ({
         id: r.id,
         name: r.name,
-        address: typeof r.address === 'string' ? JSON.parse(r.address) : r.address,
-        isVisible: !!r.is_visible // Map is_visible -> isVisible
+        address: {
+            street: r.street || '',
+            number: r.number || '',
+            zip: r.zip || '',
+            city: r.city || '',
+            country: r.country || ''
+        },
+        isVisible: !!r.is_visible
     }));
     res.json(mapped);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -25,8 +31,10 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { name, address, isVisible } = req.body;
     try {
-        await pool.query('UPDATE locations SET name=?, address=?, is_visible=? WHERE id=?', 
-            [name, JSON.stringify(address), isVisible, id]);
+        await pool.query(
+            `UPDATE locations SET name=?, street=?, number=?, zip=?, city=?, country=?, is_visible=? WHERE id=?`, 
+            [name, address.street, address.number, address.zip, address.city, address.country, isVisible, id]
+        );
         res.json({ id, ...req.body });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -36,8 +44,10 @@ router.post('/', async (req, res) => {
     const { name, address, isVisible } = req.body;
     try {
         const id = crypto.randomUUID();
-        await pool.query('INSERT INTO locations (id, name, address, is_visible) VALUES (?, ?, ?, ?)', 
-            [id, name, JSON.stringify(address), isVisible]);
+        await pool.query(
+            `INSERT INTO locations (id, name, street, number, zip, city, country, is_visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
+            [id, name, address.street, address.number, address.zip, address.city, address.country, isVisible]
+        );
         res.json({ id, name, address, isVisible });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -48,13 +58,12 @@ router.post('/', async (req, res) => {
 router.get('/workplaces', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM workplaces');
-    // Map DB columns to frontend interface to fix visibility issue
     const mapped = rows.map(r => ({
         id: r.id,
-        locationId: r.location_id, // Map location_id -> locationId
+        locationId: r.location_id,
         name: r.name,
         description: r.description,
-        isVisible: !!r.is_visible // Map is_visible -> isVisible
+        isVisible: !!r.is_visible
     }));
     res.json(mapped);
   } catch (err) { res.status(500).json({ error: err.message }); }
