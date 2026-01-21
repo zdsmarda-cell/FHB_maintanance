@@ -246,7 +246,9 @@ export const SuppliersPage = ({ onNavigate, user }: SuppliersPageProps) => {
                                         </button>
                                     </div>
                                     <div className="text-sm text-slate-500">{s.address.street} {s.address.number}, {s.address.city}</div>
-                                    <div className="text-xs text-slate-400 mt-1">{t('form.ic')}: {s.ic} | {t('form.phone')}: {s.phone}</div>
+                                    <div className="text-xs text-slate-400 mt-1">
+                                        {t('form.ic')}: {s.ic} | {t('form.phone')}: {s.phone} | {t('form.email')}: {s.email}
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => toggleContacts(s.id)} className="bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors">{t('headers.contacts')}</button>
