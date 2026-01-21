@@ -47,7 +47,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
 
-    // Initialize Location based on existing Workplace
+    // Initialize Location based on existing Workplace (if set)
     useEffect(() => {
         if (initialData && initialData.workplaceId && !selectedLocId) {
             const wp = workplaces.find((w: any) => w.id === initialData.workplaceId);
@@ -64,7 +64,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
     const validate = () => {
         const errs: Record<string, string> = {};
         if(!data.name) errs.name = t('validation.required');
-        if(!data.workplaceId) errs.workplaceId = t('validation.required');
+        // REMOVED workplaceId requirement
+        // if(!data.workplaceId) errs.workplaceId = t('validation.required'); 
         if(!selectedLocId) errs.locationId = t('validation.required'); // Ensure location is picked visually
         if(!data.typeId) errs.typeId = t('validation.required');
         if(!data.stateId) errs.stateId = t('validation.required');
@@ -87,7 +88,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                 // Apply translation to description if present
                 const translatedDesc = data.description ? await prepareMultilingual(data.description) : '';
                 
-                if (data.name && data.workplaceId) {
+                // Allow name even if workplaceId is empty
+                if (data.name) {
                     // Ensure weight is number (allow 0)
                     const finalData = { 
                         ...data, 
@@ -187,14 +189,14 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                         </select>
                      </div>
                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')} *</label>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
                         <select 
                             className={`w-full border p-2 rounded ${errors.workplaceId ? 'border-red-500' : ''}`} 
-                            value={data.workplaceId} 
+                            value={data.workplaceId || ''} 
                             onChange={e => setData({...data, workplaceId: e.target.value})}
                             disabled={!selectedLocId} // Must pick location first
                         >
-                            <option value="">{t('option.select_wp')}</option>
+                            <option value="">{t('option.no_workplace')}</option>
                             {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
                         </select>
                      </div>

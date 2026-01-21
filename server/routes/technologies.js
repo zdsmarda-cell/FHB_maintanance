@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
                 supplier_id, install_date, weight, sharepoint_link, photo_urls, is_visible
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                id, name, serialNumber, description, typeId, stateId, workplaceId,
+                id, name, serialNumber, description, typeId, stateId, workplaceId || null,
                 supplierId, cleanDate, weight || 0, sharepointLink, 
                 JSON.stringify(photoUrls || []), isVisible
             ]
@@ -82,7 +82,7 @@ router.put('/:id', async (req, res) => {
                 supplier_id=?, install_date=?, weight=?, sharepoint_link=?, photo_urls=?, is_visible=?
             WHERE id=?`,
             [
-                name, serialNumber, description, typeId, stateId, workplaceId,
+                name, serialNumber, description, typeId, stateId, workplaceId || null,
                 supplierId, cleanDate, weight || 0, sharepointLink, 
                 JSON.stringify(photoUrls || []), isVisible, id
             ]

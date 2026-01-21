@@ -191,7 +191,9 @@ export const RequestDetail = ({
                             <h4 className="font-bold border-b pb-2">{t('headers.information')}</h4>
                             <div>
                                 <span className="block text-slate-500 text-xs">{t('form.technology')}</span>
-                                <span className="font-medium">{getLocalized(technologies.find(t => t.id === request.techId)?.name, lang)}</span>
+                                <span className="font-medium">
+                                    {request.techId ? getLocalized(technologies.find(t => t.id === request.techId)?.name, lang) : '-'}
+                                </span>
                             </div>
                             <div>
                                 <span className="block text-slate-500 text-xs">{t('label.author')}</span>

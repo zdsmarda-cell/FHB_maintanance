@@ -65,7 +65,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
       if ('serviceWorker' in navigator && 'PushManager' in window) {
           setPushSupported(true);
           
-          // Check if already granted, if so, ensure backend has the sub
+          // AUTO-HEAL: If permission is already granted, verify subscription with backend.
+          // This fixes the issue where backend deleted a '410' record but client thinks it's active.
           if (Notification.permission === 'granted') {
               subscribeToPush(true); // silent sync
           }
@@ -88,12 +89,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
           const registration = await navigator.serviceWorker.ready;
 
           // 3. Subscribe (or get existing)
+          // Note: calling subscribe() when one exists just returns the existing one, 
+          // effectively ensuring we have a valid object.
           const subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: urlBase64ToUint8Array(key)
           });
 
-          // 4. Send to Backend
+          // 4. Send to Backend (Upsert logic)
+          // Even if we subscribed before, sending it again ensures the DB has the record
+          // (in case it was deleted due to expiration error).
           await api.post('/notifications/subscribe', subscription);
           
           setIsSubscribed(true);
@@ -102,6 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
       } catch (e: any) {
           console.error("Push Error:", e);
           setIsSubscribed(false);
+          // Only show alert if user clicked the button manually
           if (!silent) alert("Chyba při aktivaci notifikací: " + e.message);
       }
   };

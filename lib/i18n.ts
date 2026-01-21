@@ -209,6 +209,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.internal_solution': 'Interní řešení',
     'option.choose': 'Vybrat...',
     'option.unassigned': 'Nepřiřazeno',
+    'option.no_workplace': 'Bez pracoviště',
+    'option.no_tech': 'Bez vybrané technologie',
 
     'placeholder.write_comment': 'Napsat komentář...',
 
@@ -509,6 +511,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.internal_solution': 'Internal Solution',
     'option.choose': 'Choose...',
     'option.unassigned': 'Unassigned',
+    'option.no_workplace': 'No workplace',
+    'option.no_tech': 'No technology selected',
 
     'placeholder.write_comment': 'Write a comment...',
 
@@ -809,6 +813,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.internal_solution': 'Внутрішнє рішення',
     'option.choose': 'Вибрати...',
     'option.unassigned': 'Не призначено',
+    'option.no_workplace': 'Без робочого місця',
+    'option.no_tech': 'Технологія не обрана',
 
     'placeholder.write_comment': 'Написати коментар...',
 

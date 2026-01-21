@@ -103,17 +103,24 @@ router.post('/', async (req, res) => {
         estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id
       ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        techId, authorId, description, priority, titleToSave, false, JSON.stringify(history),
+        techId || null, authorId, description, priority, titleToSave, false, JSON.stringify(history),
         estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId
       ]
     );
     
     // Fetch the newly created ID
-    const [newRequest] = await pool.query('SELECT * FROM requests WHERE tech_id = ? AND author_id = ? ORDER BY created_date DESC LIMIT 1', [techId, authorId]);
+    // Need a reliable way to get the ID if we can't trust last_insert_id with UUIDs in all MariaDB versions
+    // For now, sorting by date/author is a reasonable approximation
+    const [newRequest] = await pool.query('SELECT * FROM requests WHERE author_id = ? ORDER BY created_date DESC LIMIT 1', [authorId]);
     
-    // Fetch Tech Name for Email
-    const [techRows] = await pool.query('SELECT name FROM technologies WHERE id = ?', [techId]);
-    const techName = techRows[0]?.name || '';
+    let techName = '';
+    if (techId) {
+        // Fetch Tech Name for Email
+        const [techRows] = await pool.query('SELECT name FROM technologies WHERE id = ?', [techId]);
+        techName = techRows[0]?.name || '';
+    } else {
+        techName = 'Obecný požadavek (Bez stroje)';
+    }
 
     // 2. Email & Push Logic (Real DB Users)
     const currentUserId = req.user ? req.user.id : authorId; // Logic relies on authenticated user via middleware

@@ -338,7 +338,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                           )}
                                       </td>
                                       <td className="px-4 py-3 font-bold text-slate-800">{r.title}</td>
-                                      <td className="px-4 py-3 text-slate-600 text-xs">{tech?.name || '-'}</td>
+                                      <td className="px-4 py-3 text-slate-600 text-xs">{tech ? tech.name : '-'}</td>
                                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                                           {new Date(r.createdDate).toLocaleDateString()}
                                       </td>

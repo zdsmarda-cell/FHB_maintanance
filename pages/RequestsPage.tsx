@@ -201,7 +201,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         // Validation
         const errs: Record<string, string> = {};
         if (!formData.title) errs.title = t('validation.required');
-        if (!formData.techId) errs.techId = t('validation.required');
+        // REMOVED techId check to make it optional
+        // if (!formData.techId) errs.techId = t('validation.required');
         
         if (Object.keys(errs).length > 0) {
             setFormErrors(errs);

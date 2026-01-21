@@ -230,7 +230,7 @@ export const RequestsTable = ({
                                             {isUrgent && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2" title={t('prio.urgent')}></span>}
                                             {getLocalized(req.title, lang)}
                                         </td>
-                                        <td className="px-4 py-3 text-slate-600">{getLocalized(tech?.name, lang) || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600">{tech ? getLocalized(tech.name, lang) : '-'}</td>
                                         <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                                             {req.plannedResolutionDate ? new Date(req.plannedResolutionDate).toLocaleDateString() : '-'}
                                         </td>

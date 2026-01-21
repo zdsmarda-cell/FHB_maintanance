@@ -293,6 +293,15 @@ const migrations = [
             // Suppliers: Drop Old
             `ALTER TABLE suppliers DROP COLUMN address`
         ]
+    },
+    {
+        name: '016_optional_relations',
+        up: [
+            // Make workplace_id optional for technologies
+            `ALTER TABLE technologies MODIFY workplace_id VARCHAR(255) NULL`,
+            // Make tech_id optional for requests
+            `ALTER TABLE requests MODIFY tech_id VARCHAR(255) NULL`
+        ]
     }
 ];
 

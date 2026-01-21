@@ -76,15 +76,24 @@ export const RequestForm = ({
     }, [selWp, technologies]);
 
     // If editing, try to resolve location/workplace from techId if not set manually
+    // BUT only if a techId exists (because it's now optional)
     useEffect(() => {
-        if (isEditMode && formData.techId && !selLoc) {
-             const tech = technologies.find((t: any) => t.id === formData.techId);
-             const wp = workplaces.find((w: any) => w.id === tech?.workplaceId);
-             if (wp) {
-                 setSelLoc(wp.locationId);
-                 // Determine WP in next cycle or force here if data available, 
-                 // but better to let effects settle or set strictly:
-                 setSelWp(wp.id);
+        if (isEditMode && !selLoc) {
+             if (formData.techId) {
+                 const tech = technologies.find((t: any) => t.id === formData.techId);
+                 const wp = workplaces.find((w: any) => w.id === tech?.workplaceId);
+                 if (wp) {
+                     setSelLoc(wp.locationId);
+                     setSelWp(wp.id);
+                 }
+             } else {
+                 // No tech ID, try to infer from data if available, or user must select
+                 // Currently requests table doesn't pass workplace/location if tech is null, 
+                 // so user might need to re-select if editing an "empty tech" request. 
+                 // This is acceptable behavior or needs backend update to store loc/wp on request directly.
+                 // (Requests DB schema currently only links via tech_id or maintenance_id)
+                 // Wait: Requests table passes the request object. Request object only has techId.
+                 // If techId is null, we can't infer location/workplace from it.
              }
         }
     }, [isEditMode, formData.techId, technologies, workplaces, selLoc]);
@@ -132,7 +141,7 @@ export const RequestForm = ({
                             setSelWp(''); // Reset Workplace
                             setFormData({...formData, techId: ''}); // Reset Tech
                         }}
-                        disabled={isEditMode}
+                        disabled={isEditMode && !!formData.techId} // Disable only if tech is locked
                     >
                         <option value="">{t('option.select_location')}</option>
                         {availLocs.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
@@ -147,7 +156,7 @@ export const RequestForm = ({
                             setSelWp(e.target.value); 
                             setFormData({...formData, techId: ''}); // Reset Tech
                         }}
-                        disabled={!selLoc || isEditMode} // Strict Disable: No location -> No workplace select
+                        disabled={!selLoc || (isEditMode && !!formData.techId)} // Strict Disable
                     >
                         <option value="">{t('option.select_wp')}</option>
                         {availWps.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
@@ -156,14 +165,14 @@ export const RequestForm = ({
              </div>
              
              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.technology')} *</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.technology')}</label>
                 <select 
-                    className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${(!selWp || isEditMode) ? 'bg-slate-100' : ''}`}
+                    className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${(!selWp) ? 'bg-slate-100' : ''}`}
                     value={formData.techId || ''} 
                     onChange={e => setFormData({...formData, techId: e.target.value})}
-                    disabled={!selWp || isEditMode} // Strict Disable: No workplace -> No tech select
+                    disabled={!selWp} // Strict Disable: No workplace -> No tech select
                 >
-                    <option value="">{selWp ? t('option.select_tech') : t('option.select_wp_first')}</option>
+                    <option value="">{selWp ? t('option.no_tech') : t('option.select_wp_first')}</option>
                     {availTechs.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                 </select>
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
