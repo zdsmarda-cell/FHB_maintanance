@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { calculateNextMaintenanceDate } from '../lib/helpers';
+import { calculateNextMaintenanceDate, getLocalized } from '../lib/helpers';
 import { AlertCircle, CheckCircle, Clock, List, Calendar, Wrench, Inbox, FileCheck, Loader, ArrowRight, AlertTriangle, Euro, UserPlus, Eye, Image as ImageIcon } from 'lucide-react';
 import { User, Maintenance, Request, Technology, Supplier } from '../lib/types';
 import { Modal } from '../components/Shared';
@@ -16,7 +16,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [loading, setLoading] = useState(true);
   
   // Data States
@@ -337,8 +337,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                               </button>
                                           )}
                                       </td>
-                                      <td className="px-4 py-3 font-bold text-slate-800">{r.title}</td>
-                                      <td className="px-4 py-3 text-slate-600 text-xs">{tech ? tech.name : '-'}</td>
+                                      <td className="px-4 py-3 font-bold text-slate-800">{getLocalized(r.title, lang)}</td>
+                                      <td className="px-4 py-3 text-slate-600 text-xs">{tech ? getLocalized(tech.name, lang) : '-'}</td>
                                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                                           {new Date(r.createdDate).toLocaleDateString()}
                                       </td>
@@ -361,7 +361,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                           )}
                                       </td>
                                       <td className="px-4 py-3 text-slate-600 text-xs">
-                                          {supplier ? supplier.name : <span className="text-slate-400">Interní</span>}
+                                          {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400">Interní</span>}
                                       </td>
                                       <td className="px-4 py-3 text-center text-xs font-mono">
                                           {r.estimatedCost ? <span className="flex items-center justify-center gap-1"><Euro className="w-3 h-3 text-slate-400"/> {r.estimatedCost}</span> : '-'}
@@ -428,14 +428,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
 
                                 return (
                                     <tr key={m.id} className="border-b last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedMaintenance(m)}>
-                                        <td className="px-4 py-3 font-medium text-slate-700">{tech?.name || 'Neznámá'}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-700">{tech ? getLocalized(tech.name, lang) : 'Neznámá'}</td>
                                         <td className="px-4 py-3 font-mono text-xs text-slate-500">{tech?.serialNumber || '-'}</td>
                                         <td className="px-4 py-3">{m.interval} {t('common.days')}</td>
                                         <td className="px-4 py-3 text-slate-800 font-medium">
                                             {m.nextDateObj ? m.nextDateObj.toLocaleDateString() : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">
-                                            {supplier ? supplier.name : <span className="text-slate-400 italic">Interní</span>}
+                                            {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">Interní</span>}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 text-xs max-w-[200px] truncate">
                                             {responsibleNames || '-'}
@@ -476,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       <div>
                           <h3 className="text-lg font-bold text-slate-800">{selectedMaintenance.title}</h3>
                           <p className="text-sm text-slate-500">
-                              {techs.find(t => t.id === selectedMaintenance.techId)?.name}
+                              {getLocalized(techs.find(t => t.id === selectedMaintenance.techId)?.name, lang)}
                           </p>
                       </div>
                       <span className={`px-2 py-1 rounded text-xs font-bold ${selectedMaintenance.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'}`}>
@@ -498,7 +498,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       <div>
                           <span className="block text-xs text-slate-500">{t('form.supplier')}</span>
                           <span className="font-medium">
-                              {suppliers.find(s => s.id === selectedMaintenance.supplierId)?.name || 'Interní'}
+                              {suppliers.find(s => s.id === selectedMaintenance.supplierId) ? getLocalized(suppliers.find(s => s.id === selectedMaintenance.supplierId)?.name, lang) : 'Interní'}
                           </span>
                       </div>
                       <div>
@@ -512,7 +512,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                   <div>
                       <h4 className="font-bold text-sm text-slate-700 mb-1">{t('form.description')}</h4>
                       <p className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-100">
-                          {selectedMaintenance.description || 'Bez popisu'}
+                          {getLocalized(selectedMaintenance.description, lang) || 'Bez popisu'}
                       </p>
                   </div>
 
