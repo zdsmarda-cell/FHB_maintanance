@@ -5,9 +5,10 @@ import { Edit, Lock, Plus, ListChecks, CheckCircle, Loader, Clock } from 'lucide
 import { User } from '../../lib/types';
 import { Modal } from '../../components/Shared';
 import { useI18n } from '../../lib/i18n';
+import { getLocalized } from '../../lib/helpers'; // Import helper
 
 export const UsersPage = ({ onNavigate }: any) => {
-    const { t } = useI18n();
+    const { t, lang } = useI18n(); // Get lang
     const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState<User[]>([]);
     const [locations, setLocations] = useState<any[]>([]);
@@ -178,7 +179,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                                         </td>
                                         <td className="px-4 py-3 text-xs">
                                             {limitEntries.length > 0 ? (
-                                                <div className="flex flex-col gap-1">{limitEntries.map(([locId, limit]) => <span key={locId} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border">{locations.find(l => l.id === locId)?.name || '?'}: <strong>{limit} €</strong></span>)}</div>
+                                                <div className="flex flex-col gap-1">{limitEntries.map(([locId, limit]) => <span key={locId} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border">{getLocalized(locations.find(l => l.id === locId)?.name, lang) || '?'}: <strong>{limit} €</strong></span>)}</div>
                                             ) : <span className="text-slate-400">-</span>}
                                         </td>
                                         <td className="px-4 py-3 text-center">
@@ -239,7 +240,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                                     <div className="flex items-center justify-between mb-1 bg-slate-50 p-2 rounded">
                                         <div className="flex items-center gap-2">
                                             <input type="checkbox" checked={editingUser.assignedLocationIds?.includes(loc.id)} onChange={() => togglePermission('loc', loc.id)} />
-                                            <span className="font-medium text-sm">{loc.name}</span>
+                                            <span className="font-medium text-sm">{getLocalized(loc.name, lang)}</span>
                                         </div>
                                         {editingUser.assignedLocationIds?.includes(loc.id) && (
                                             <div className="flex items-center gap-2">
@@ -254,7 +255,7 @@ export const UsersPage = ({ onNavigate }: any) => {
                                             {workplaces.filter(w => w.locationId === loc.id).map(wp => (
                                                     <div key={wp.id} className="flex items-center gap-2 py-0.5">
                                                     <input type="checkbox" checked={editingUser.assignedWorkplaceIds?.includes(wp.id)} onChange={() => togglePermission('wp', wp.id)} />
-                                                    <span className="text-sm text-slate-600">{wp.name}</span>
+                                                    <span className="text-sm text-slate-600">{getLocalized(wp.name, lang)}</span>
                                                 </div>
                                             ))}
                                         </div>
