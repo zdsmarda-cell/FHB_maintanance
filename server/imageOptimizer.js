@@ -22,7 +22,7 @@ export const runImageOptimizer = async () => {
         let processedCount = 0;
 
         for (const file of files) {
-            // Check if it is a source image (jpg, png, jpeg) AND not already a generated webp variant
+            // Check if it is a source image (jpg, jpeg, png) AND not already a generated webp variant
             // We skip existing _desktop.webp or _mobile.webp files to avoid double processing
             if (file.match(/\.(jpg|jpeg|png)$/i) && !file.includes('_desktop') && !file.includes('_mobile')) {
                 
@@ -45,14 +45,18 @@ export const runImageOptimizer = async () => {
                         const imageBuffer = fs.readFileSync(sourcePath);
 
                         if (!desktopExists) {
+                            // Added .rotate() to fix orientation
                             await sharp(imageBuffer)
+                                .rotate()
                                 .resize({ width: 1920, withoutEnlargement: true })
                                 .webp({ quality: 80 })
                                 .toFile(desktopPath);
                         }
 
                         if (!mobileExists) {
+                            // Added .rotate() to fix orientation
                             await sharp(imageBuffer)
+                                .rotate()
                                 .resize({ width: 800, withoutEnlargement: true })
                                 .webp({ quality: 65 })
                                 .toFile(mobilePath);

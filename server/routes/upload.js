@@ -44,13 +44,17 @@ router.post('/', upload.single('image'), async (req, res) => {
         const mobilePath = path.join(uploadDir, mobileFilename);
 
         // 1. Generate Desktop Version (Max width 1920px, Quality 80)
+        // Added .rotate() to respect EXIF orientation
         await sharp(req.file.buffer)
+            .rotate()
             .resize({ width: 1920, withoutEnlargement: true })
             .webp({ quality: 80 })
             .toFile(desktopPath);
 
         // 2. Generate Mobile Version (Max width 800px, Quality 65)
+        // Added .rotate() to respect EXIF orientation
         await sharp(req.file.buffer)
+            .rotate()
             .resize({ width: 800, withoutEnlargement: true })
             .webp({ quality: 65 })
             .toFile(mobilePath);
