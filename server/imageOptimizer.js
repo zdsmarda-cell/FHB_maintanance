@@ -45,19 +45,21 @@ export const runImageOptimizer = async () => {
                         const imageBuffer = fs.readFileSync(sourcePath);
 
                         if (!desktopExists) {
-                            // Added .rotate() to fix orientation
+                            // Added .withMetadata() to fix orientation issues
                             await sharp(imageBuffer)
                                 .rotate()
                                 .resize({ width: 1920, withoutEnlargement: true })
+                                .withMetadata()
                                 .webp({ quality: 80 })
                                 .toFile(desktopPath);
                         }
 
                         if (!mobileExists) {
-                            // Added .rotate() to fix orientation
+                            // Added .withMetadata() to fix orientation issues
                             await sharp(imageBuffer)
                                 .rotate()
                                 .resize({ width: 800, withoutEnlargement: true })
+                                .withMetadata()
                                 .webp({ quality: 65 })
                                 .toFile(mobilePath);
                         }

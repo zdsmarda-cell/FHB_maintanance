@@ -42,17 +42,19 @@ const run = async () => {
                 try {
                     const imageBuffer = fs.readFileSync(sourcePath);
 
-                    // 1. Desktop (s rotací)
+                    // 1. Desktop (s rotací a metadaty)
                     await sharp(imageBuffer)
                         .rotate() // Automatická rotace podle EXIF
                         .resize({ width: 1920, withoutEnlargement: true })
+                        .withMetadata() // Zachová/Opraví EXIF orientaci
                         .webp({ quality: 80 })
                         .toFile(desktopPath);
 
-                    // 2. Mobile (s rotací)
+                    // 2. Mobile (s rotací a metadaty)
                     await sharp(imageBuffer)
                         .rotate() // Automatická rotace podle EXIF
                         .resize({ width: 800, withoutEnlargement: true })
+                        .withMetadata() // Zachová/Opraví EXIF orientaci
                         .webp({ quality: 65 })
                         .toFile(mobilePath);
 
