@@ -302,6 +302,20 @@ const migrations = [
             // Make tech_id optional for requests
             `ALTER TABLE requests MODIFY tech_id VARCHAR(255) NULL`
         ]
+    },
+    {
+        name: '017_add_projects',
+        up: [
+            `CREATE TABLE IF NOT EXISTS projects (
+                id VARCHAR(255) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                deadline DATE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`,
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS project_id VARCHAR(255)`
+        ]
     }
 ];
 

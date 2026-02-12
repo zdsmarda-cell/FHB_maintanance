@@ -24,6 +24,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.settings': 'Nastavení',
     'menu.emails': 'Emaily',
     'menu.push_notifications': 'Mobilní notifikace',
+    'menu.projects': 'Projekty',
     
     'headers.locations': 'Lokality a Pracoviště',
     'headers.new_location': 'Nová Lokalita',
@@ -51,6 +52,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.push_logs': 'Log Mobilních Notifikací',
     'headers.status_change': 'Změna stavu',
     'headers.maintenance_detail': 'Detail údržby',
+    'headers.projects': 'Správa Projektů',
+    'headers.new_project': 'Nový Projekt',
+    'headers.edit_project': 'Upravit Projekt',
 
     'form.name': 'Název',
     'form.street': 'Ulice',
@@ -96,6 +100,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.old_password': 'Staré heslo',
     'form.new_password': 'Nové heslo',
     'form.confirm_password': 'Potvrzení hesla',
+    'form.project': 'Projekt',
+    'form.deadline': 'Termín dokončení',
+    'form.is_active': 'Aktivní',
 
     'col.technology': 'Technologie',
     'col.deadline': 'Termín',
@@ -114,6 +121,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.recipient': 'Příjemce',
     'col.subject': 'Předmět',
     'col.message': 'Zpráva',
+    'col.unresolved': 'Nedořešeno',
+    'col.overdue': 'Po termínu',
+    'col.total': 'Celkem',
 
     'status.new': 'Nový',
     'status.assigned': 'V řešení',
@@ -211,6 +221,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': 'Nepřiřazeno',
     'option.no_workplace': 'Bez pracoviště',
     'option.no_tech': 'Bez vybrané technologie',
+    'option.no_project': 'Bez projektu',
 
     'placeholder.write_comment': 'Napsat komentář...',
 
@@ -326,6 +337,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.settings': 'Settings',
     'menu.emails': 'Emails',
     'menu.push_notifications': 'Push Notifications',
+    'menu.projects': 'Projects',
 
     'headers.locations': 'Locations & Workplaces',
     'headers.new_location': 'New Location',
@@ -353,6 +365,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.push_logs': 'Push Notification Logs',
     'headers.status_change': 'Change Status',
     'headers.maintenance_detail': 'Maintenance Detail',
+    'headers.projects': 'Projects Management',
+    'headers.new_project': 'New Project',
+    'headers.edit_project': 'Edit Project',
 
     'form.name': 'Name',
     'form.street': 'Street',
@@ -398,6 +413,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.old_password': 'Old Password',
     'form.new_password': 'New Password',
     'form.confirm_password': 'Confirm Password',
+    'form.project': 'Project',
+    'form.deadline': 'Deadline',
+    'form.is_active': 'Active',
 
     'col.technology': 'Technology',
     'col.deadline': 'Deadline',
@@ -416,6 +434,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.recipient': 'Recipient',
     'col.subject': 'Subject',
     'col.message': 'Message',
+    'col.unresolved': 'Unresolved',
+    'col.overdue': 'Overdue',
+    'col.total': 'Total',
 
     'status.new': 'New',
     'status.assigned': 'In Progress',
@@ -513,6 +534,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': 'Unassigned',
     'option.no_workplace': 'No workplace',
     'option.no_tech': 'No technology selected',
+    'option.no_project': 'No Project',
 
     'placeholder.write_comment': 'Write a comment...',
 
@@ -628,6 +650,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'menu.settings': 'Налаштування',
     'menu.emails': 'Електронні листи',
     'menu.push_notifications': 'Push сповіщення',
+    'menu.projects': 'Проекти',
 
     'headers.locations': 'Локації та робочі місця',
     'headers.new_location': 'Нова локація',
@@ -655,6 +678,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.push_logs': 'Журнал Push сповіщень',
     'headers.status_change': 'Зміна статусу',
     'headers.maintenance_detail': 'Деталі обслуговування',
+    'headers.projects': 'Керування проектами',
+    'headers.new_project': 'Новий проект',
+    'headers.edit_project': 'Редагувати проект',
 
     'form.name': 'Назва',
     'form.street': 'Вулиця',
@@ -694,12 +720,15 @@ const translations: Record<Lang, Record<string, string>> = {
     'form.responsible_person': 'Відповідальна особа',
     'form.assign_solver': 'Призначити виконавця',
     'form.resolution_date_required': 'Термін виконання (Обов\'язково)',
-    'form.weight': 'Вага (кг)',
+    'form.weight': 'Вага (kg)',
     'form.documentation': 'Посилання на документацію',
     'form.position': 'Посада',
     'form.old_password': 'Старий пароль',
     'form.new_password': 'Новий пароль',
     'form.confirm_password': 'Підтвердження пароля',
+    'form.project': 'Проект',
+    'form.deadline': 'Термін завершення',
+    'form.is_active': 'Активний',
 
     'col.technology': 'Технологія',
     'col.deadline': 'Термін',
@@ -718,6 +747,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.recipient': 'Отримувач',
     'col.subject': 'Тема',
     'col.message': 'Повідомлення',
+    'col.unresolved': 'Невирішено',
+    'col.overdue': 'Прострочено',
+    'col.total': 'Всього',
 
     'status.new': 'Новий',
     'status.assigned': 'У роботі',
@@ -815,6 +847,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'option.unassigned': 'Не призначено',
     'option.no_workplace': 'Без робочого місця',
     'option.no_tech': 'Технологія не обрана',
+    'option.no_project': 'Без проекту',
 
     'placeholder.write_comment': 'Написати коментар...',
 

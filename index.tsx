@@ -11,6 +11,7 @@ import { UsersPage } from './pages/admin/UsersPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { EmailsPage } from './pages/admin/EmailsPage';
 import { PushNotificationsPage } from './pages/admin/PushNotificationsPage';
+import { ProjectsPage } from './pages/admin/ProjectsPage'; // NEW
 import { AssetsPage } from './pages/Assets';
 import { RequestsPage } from './pages/RequestsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
@@ -584,6 +585,7 @@ const App = () => {
       case 'settings': return <SettingsPage />;
       case 'emails': return <EmailsPage />;
       case 'push_notifications': return <PushNotificationsPage />;
+      case 'projects': return <ProjectsPage onNavigate={handleNavigate} />; // NEW
       default: return <Dashboard user={user} onNavigate={handleNavigate} />;
     }
   };

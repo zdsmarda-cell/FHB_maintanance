@@ -28,6 +28,7 @@ import maintenanceRoutes from './routes/maintenance.js';
 import translateRoutes from './routes/translate.js'; 
 import notificationRoutes from './routes/notifications.js'; 
 import pushLogsRoutes from './routes/push_logs.js'; // NEW
+import projectRoutes from './routes/projects.js'; // NEW
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ app.use('/api/maintenance', authenticateToken, maintenanceRoutes);
 app.use('/api/translate', authenticateToken, translateRoutes);
 app.use('/api/notifications', authenticateToken, notificationRoutes); 
 app.use('/api/push-logs', authenticateToken, pushLogsRoutes); // NEW
+app.use('/api/projects', authenticateToken, projectRoutes); // NEW
 
 const PORT = process.env.PORT || 3010;
 

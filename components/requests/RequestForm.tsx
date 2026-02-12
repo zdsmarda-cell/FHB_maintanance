@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
-import { Euro, Trash2, Upload, Loader, Clock, Calendar } from 'lucide-react';
+import { Euro, Trash2, Upload, Loader, Clock, Calendar, FolderKanban } from 'lucide-react';
 import { getLocalized } from '../../lib/helpers';
+import { db, api, isProductionDomain } from '../../lib/db'; // Import DB access for fetching projects
 
 interface RequestFormProps {
     formData: any;
@@ -34,10 +35,27 @@ export const RequestForm = ({
     isUploading
 }: RequestFormProps) => {
     const { t, lang } = useI18n();
+    const [projects, setProjects] = useState<any[]>([]);
     
     // Dropdown handlers for cascading selection
     const [selLoc, setSelLoc] = useState('');
     const [selWp, setSelWp] = useState('');
+
+    // Fetch projects on mount
+    useEffect(() => {
+        const fetchProjects = async () => {
+            const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
+            try {
+                if (isMock) {
+                    setProjects(db.projects.list().filter(p => p.isActive));
+                } else {
+                    const data = await api.get('/projects');
+                    setProjects(data.filter((p: any) => p.isActive));
+                }
+            } catch (e) { console.error(e); }
+        };
+        fetchProjects();
+    }, []);
 
     // Filtering available options based on user role with safety checks
     const availLocs = user.role === 'admin' ? locations : locations.filter((l: any) => (user.assignedLocationIds || []).includes(l.id));
@@ -87,13 +105,7 @@ export const RequestForm = ({
                      setSelWp(wp.id);
                  }
              } else {
-                 // No tech ID, try to infer from data if available, or user must select
-                 // Currently requests table doesn't pass workplace/location if tech is null, 
-                 // so user might need to re-select if editing an "empty tech" request. 
-                 // This is acceptable behavior or needs backend update to store loc/wp on request directly.
-                 // (Requests DB schema currently only links via tech_id or maintenance_id)
-                 // Wait: Requests table passes the request object. Request object only has techId.
-                 // If techId is null, we can't infer location/workplace from it.
+                 // No tech ID logic
              }
         }
     }, [isEditMode, formData.techId, technologies, workplaces, selLoc]);
@@ -130,6 +142,24 @@ export const RequestForm = ({
 
     return (
         <div className="space-y-4 p-1">
+             {/* Project Selection */}
+             <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.project')}</label>
+                <div className="relative">
+                    <select 
+                        className="w-full p-2 pl-8 rounded border bg-white"
+                        value={formData.projectId || ''} 
+                        onChange={e => setFormData({...formData, projectId: e.target.value || null})}
+                    >
+                        <option value="">{t('option.no_project')}</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{getLocalized(p.name, lang)}</option>
+                        ))}
+                    </select>
+                    <FolderKanban className="w-4 h-4 absolute left-2 top-2.5 text-slate-400" />
+                </div>
+             </div>
+
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')}</label>
@@ -173,7 +203,11 @@ export const RequestForm = ({
                     disabled={!selWp} // Strict Disable: No workplace -> No tech select
                 >
                     <option value="">{selWp ? t('option.no_tech') : t('option.select_wp_first')}</option>
-                    {availTechs.map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
+                    {availTechs.map((t: any) => {
+                        const name = getLocalized(t.name, lang);
+                        const label = t.serialNumber ? `${t.serialNumber} - ${name}` : name;
+                        return <option key={t.id} value={t.id}>{label}</option>;
+                    })}
                 </select>
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
              </div>

@@ -11,6 +11,7 @@ const mapToModel = (r) => ({
     id: r.id,
     techId: r.tech_id,
     maintenanceId: r.maintenance_id,
+    projectId: r.project_id, // NEW
     title: r.title,
     authorId: r.author_id,
     solverId: r.solver_id,
@@ -73,7 +74,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { techId, authorId, description, priority, title, estimatedCost, estimatedTime, photoUrls, assignedSupplierId, plannedResolutionDate } = req.body;
+  const { techId, authorId, description, priority, title, estimatedCost, estimatedTime, photoUrls, assignedSupplierId, plannedResolutionDate, projectId } = req.body;
   
   // Logic for assigning solver: Frontend might send solverId if user selected it, or we rely on 'assigned' logic
   // Typically frontend sends solverId if selecting 'Assign to me' or specific user.
@@ -100,11 +101,11 @@ router.post('/', async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO requests (
         id, tech_id, author_id, description, priority, title, is_approved, history,
-        estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id, project_id
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         techId || null, authorId, description, priority, titleToSave, false, JSON.stringify(history),
-        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId
+        estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId, projectId || null
       ]
     );
     
@@ -207,6 +208,7 @@ router.put('/:id', async (req, res) => {
         if (body.assignedSupplierId !== undefined) { updates.push('assigned_supplier_id = ?'); values.push(body.assignedSupplierId); }
         if (body.estimatedCost !== undefined) { updates.push('estimated_cost = ?'); values.push(body.estimatedCost); }
         if (body.estimatedTime !== undefined) { updates.push('estimated_time = ?'); values.push(body.estimatedTime); }
+        if (body.projectId !== undefined) { updates.push('project_id = ?'); values.push(body.projectId || null); } // NEW
         
         if (body.plannedResolutionDate !== undefined) { 
             // Sanitize Date (Strip time if present)

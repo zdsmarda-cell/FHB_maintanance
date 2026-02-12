@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useI18n } from '../../lib/i18n';
-import { Request, User, Technology, Supplier, Workplace } from '../../lib/types';
+import { Request, User, Technology, Supplier, Workplace, Project } from '../../lib/types';
 import { getLocalized } from '../../lib/helpers';
 import { MultiSelect, Pagination } from '../Shared';
 import { Search, CheckCircle, Clock, Euro, X, Eye, Edit, Ban, UserPlus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
@@ -14,6 +14,7 @@ interface RequestsTableProps {
     suppliers: Supplier[];
     users: User[];
     workplaces: Workplace[];
+    projects: Project[]; // Added projects prop
     onDetail: (req: Request) => void;
     onEdit: (req: Request) => void;
     onCancel: (req: Request) => void;
@@ -26,12 +27,12 @@ interface RequestsTableProps {
     onItemsPerPageChange: (limit: number) => void;
     filterState: any; 
     showFilters: boolean;
-    sortConfig: SortConfig; // New Prop
-    onSort: (key: string) => void; // New Prop
+    sortConfig: SortConfig; 
+    onSort: (key: string) => void; 
 }
 
 export const RequestsTable = ({ 
-    requests, currentUser, technologies, suppliers, users, workplaces,
+    requests, currentUser, technologies, suppliers, users, workplaces, projects,
     onDetail, onEdit, onCancel, onTakeOver, onApproval, onStatusChange,
     currentPage, itemsPerPage, onPageChange, onItemsPerPageChange,
     filterState, showFilters,
@@ -52,7 +53,9 @@ export const RequestsTable = ({
         fStatusIds, setFStatusIds,
         fPriorities, setFPriorities,
         fApproved, setFApproved,
-        fMaintenanceId, setFMaintenanceId
+        fMaintenanceId, setFMaintenanceId,
+        fProjectId, setFProjectId, // Destructure project filter
+        fOverdue, setFOverdue
     } = filterState;
 
     // Pagination
@@ -93,6 +96,8 @@ export const RequestsTable = ({
         setFPriorities([]);
         setFApproved('all');
         if (setFMaintenanceId) setFMaintenanceId(null);
+        if (setFProjectId) setFProjectId([]); // Clear project filter
+        if (setFOverdue) setFOverdue(false);
     };
 
     // Helper for Sortable Headers
@@ -120,13 +125,14 @@ export const RequestsTable = ({
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
+    const projectOptions = (projects || []).map(p => ({ id: p.id, name: getLocalized(p.name, lang) })); // Project Options
     const supplierOptions = [
         { id: 'internal', name: t('form.internal_solution') },
         { id: 'external', name: `${t('label.external_tasks')} (${t('common.all')})` }, // Added "External" group option
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 
-    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId;
+    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId || (fProjectId && fProjectId.length > 0) || fOverdue;
     
     return (
         <>
@@ -179,6 +185,7 @@ export const RequestsTable = ({
                                 <option value="pending">{t('filter.approval_pending')}</option>
                             </select>
                         </div>
+                        <div><MultiSelect label={t('form.project')} options={projectOptions} selectedIds={fProjectId || []} onChange={setFProjectId} /></div>
                     </div>
                 </div>
             )}

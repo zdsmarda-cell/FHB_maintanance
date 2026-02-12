@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { Request, User, Technology, Supplier } from '../lib/types';
+import { Request, User, Technology, Supplier, Project } from '../lib/types';
 import { Loader, Plus, Filter, Download } from 'lucide-react';
 import { Modal, AlertModal } from '../components/Shared';
 import { RequestsTable } from '../components/requests/RequestsTable';
@@ -39,6 +39,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [users, setUsers] = useState<User[]>([]);
     const [locations, setLocations] = useState<any[]>([]);
     const [workplaces, setWorkplaces] = useState<any[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]); // New state for projects
 
     // View & Action States
     const [selectedRequest, setSelectedRequest] = useState<Request | null>(null); // Purely for Detail Modal
@@ -69,7 +70,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
     // Form Data
-    const emptyForm = { title: '', description: '', techId: '', priority: 'basic', estimatedCost: 0, estimatedTime: 0, photoUrls: [], assignedSupplierId: 'internal' };
+    const emptyForm = { title: '', description: '', techId: '', priority: 'basic', estimatedCost: 0, estimatedTime: 0, photoUrls: [], assignedSupplierId: 'internal', projectId: '' };
     const [formData, setFormData] = useState<any>(emptyForm);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
@@ -91,6 +92,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [fPriorities, setFPriorities] = useState<string[]>([]);
     const [fApproved, setFApproved] = useState('all');
     const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null);
+    const [fProjectIds, setFProjectIds] = useState<string[]>([]); // Changed to array for MultiSelect compatibility
+    const [fOverdue, setFOverdue] = useState(false); // Special overdue filter for projects
     const [showFilters, setShowFilters] = useState(false);
 
     // Initialize filters from props
@@ -106,6 +109,13 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (initialFilters.maintenanceId) {
                 setFMaintenanceId(initialFilters.maintenanceId);
                 setShowFilters(true); // Auto-show filters context
+            }
+            if (initialFilters.projectId) {
+                setFProjectIds([initialFilters.projectId]);
+                setShowFilters(true);
+            }
+            if (initialFilters.isOverdue) {
+                setFOverdue(true);
             }
             if (initialFilters.techId) setFTechIds([initialFilters.techId]);
             if (initialFilters.supplierId) {
@@ -133,14 +143,16 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 setUsers(db.users.list());
                 setLocations(db.locations.list());
                 setWorkplaces(db.workplaces.list());
+                setProjects(db.projects.list());
             } else {
-                const [reqRes, techRes, supRes, userRes, locRes, wpRes] = await Promise.all([
+                const [reqRes, techRes, supRes, userRes, locRes, wpRes, projRes] = await Promise.all([
                     api.get('/requests'),
                     api.get('/technologies'),
                     api.get('/suppliers'),
                     api.get('/users'),
                     api.get('/locations'),
-                    api.get('/locations/workplaces')
+                    api.get('/locations/workplaces'),
+                    api.get('/projects')
                 ]);
                 setRequests(reqRes);
                 setTechnologies(techRes);
@@ -148,6 +160,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 setUsers(userRes);
                 setLocations(locRes);
                 setWorkplaces(wpRes);
+                setProjects(projRes);
             }
         } catch (e) {
             console.error(e);
@@ -188,6 +201,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             estimatedTime: req.estimatedTime,
             photoUrls: req.photoUrls || [],
             assignedSupplierId: req.assignedSupplierId || 'internal',
+            projectId: req.projectId || '',
             // Keep original data for non-editable fields in payload if needed
             plannedResolutionDate: req.plannedResolutionDate
         });
@@ -201,8 +215,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         // Validation
         const errs: Record<string, string> = {};
         if (!formData.title) errs.title = t('validation.required');
-        // REMOVED techId check to make it optional
-        // if (!formData.techId) errs.techId = t('validation.required');
         
         if (Object.keys(errs).length > 0) {
             setFormErrors(errs);
@@ -462,8 +474,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
             // Resolution Date Filter Logic
-            // Use local time conversion to handle timezone shifts (e.g. 00:01 Local = 23:01 UTC Prev Day)
-            // This ensures "2023-10-25" input matches "2023-10-25" local date even if stored as UTC previous day.
             const rDateLocal = getLocalDateString(r.plannedResolutionDate);
             if (fDateResFrom && (!rDateLocal || rDateLocal < fDateResFrom)) return false;
             if (fDateResTo && (!rDateLocal || rDateLocal > fDateResTo)) return false;
@@ -510,6 +520,18 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             }
 
             if (fMaintenanceId && r.maintenanceId !== fMaintenanceId) return false;
+            
+            // Project Filter
+            if (fProjectIds.length > 0) {
+                if (!r.projectId || !fProjectIds.includes(r.projectId)) return false;
+            }
+
+            // Overdue Filter (Special Logic: Past deadline AND active)
+            if (fOverdue) {
+                const today = new Date().toISOString().split('T')[0];
+                if (r.state === 'solved' || r.state === 'cancelled') return false;
+                if (!r.plannedResolutionDate || r.plannedResolutionDate >= today) return false;
+            }
 
             return true;
         });
@@ -568,7 +590,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         }
 
         return result;
-    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, lang, technologies, users, sortConfig]);
+    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, fProjectIds, fOverdue, lang, technologies, users, sortConfig]);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -620,13 +642,6 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 </div>
             </div>
 
-            {fMaintenanceId && (
-                <div className="bg-purple-50 text-purple-800 p-3 rounded border border-purple-200 flex justify-between items-center text-sm">
-                    <span>Filtrováno dle údržby (ID: {fMaintenanceId})</span>
-                    <button onClick={() => setFMaintenanceId(null)} className="text-purple-600 hover:underline">Zrušit</button>
-                </div>
-            )}
-
             <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
                 <RequestsTable 
                     requests={filteredRequests}
@@ -635,6 +650,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     suppliers={suppliers}
                     users={users}
                     workplaces={workplaces}
+                    projects={projects} // Pass projects to table
                     onDetail={(r) => setSelectedRequest(r)}
                     onEdit={handleOpenEdit}
                     onCancel={openCancelModal}
@@ -657,7 +673,9 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         fStatusIds, setFStatusIds,
                         fPriorities, setFPriorities,
                         fApproved, setFApproved,
-                        fMaintenanceId, setFMaintenanceId
+                        fMaintenanceId, setFMaintenanceId,
+                        fProjectId: fProjectIds, setFProjectId: setFProjectIds, // Pass renamed props if needed or keep consistent
+                        fOverdue, setFOverdue
                     }}
                     showFilters={showFilters}
                     sortConfig={sortConfig}
@@ -676,7 +694,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         locations={locations}
                         workplaces={workplaces}
                         technologies={technologies}
-                        suppliers={suppliers} // Pass real suppliers list to component
+                        suppliers={suppliers} 
                         handleImageUpload={handleImageUpload}
                         removePhoto={removePhoto}
                         isEditMode={isEditMode}
@@ -699,11 +717,11 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                             currentUser={user}
                             technologies={technologies}
                             onBack={() => setSelectedRequest(null)}
-                            onGallery={() => {}} // Gallery handled inside detail if needed or pass handler
+                            onGallery={() => {}} 
                             renderStatusBadge={renderStatusBadge}
                             renderPrioBadge={renderPrioBadge}
                             refresh={loadData}
-                            onStatusChange={openStatusModal} // Pass modal trigger to Detail view
+                            onStatusChange={openStatusModal} 
                         />
                     </div>
                 </Modal>
@@ -714,14 +732,14 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     isOpen={assignModalOpen} 
                     onClose={() => setAssignModalOpen(false)} 
                     onConfirm={handleAssignConfirm}
-                    onRemove={handleRemoveSolver} // Pass remove handler
+                    onRemove={handleRemoveSolver} 
                     assignDate={assignDate} 
                     setAssignDate={setAssignDate} 
                     assignSolverId={assignSolverId} 
                     setAssignSolverId={setAssignSolverId}
                     candidates={users.filter(u => u.role !== 'operator' && !u.isBlocked)} 
                     currentUser={user}
-                    isAlreadyAssigned={!!assignTargetReq.solverId} // Pass if already assigned
+                    isAlreadyAssigned={!!assignTargetReq.solverId} 
                 />
             )}
 

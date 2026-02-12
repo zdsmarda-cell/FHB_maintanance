@@ -123,6 +123,14 @@ export interface MaintenanceNote {
   content: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  deadline?: string;
+  isActive: boolean;
+  description?: string;
+}
+
 export type RequestState = 'new' | 'assigned' | 'solved' | 'cancelled';
 export type RequestPriority = 'basic' | 'priority' | 'urgent';
 
@@ -139,6 +147,7 @@ export interface Request {
   id: string;
   techId: string;
   maintenanceId?: string; // Link back to template if generated
+  projectId?: string; // Link to project
   title: string; // Mandatory short title (max 20 chars)
   authorId: string; 
   solverId?: string; 

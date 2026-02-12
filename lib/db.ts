@@ -1,259 +1,266 @@
+import { User, Request, Location, Workplace, Technology, Supplier, Maintenance, Email, PushLog, Project } from './types';
 
-import { User, Location, Workplace, Supplier, TechType, TechState, Technology, Maintenance, Request, Email, AppSettings, RequestHistoryEntry, PushLog } from './types';
-
-// --- Environment Configuration ---
-const PROD_DOMAIN = 'fhbmain.impossible.cz';
-const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
+export const PROD_DOMAIN = 'fhbmain.impossible.cz';
+export const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 
 export const isProductionDomain = typeof window !== 'undefined' && window.location.hostname === PROD_DOMAIN;
-const isMockEnv = !isProductionDomain; 
 
-// --- Internal Fetch Helper with Refresh Logic ---
-const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
-    let token = localStorage.getItem('auth_token');
-    if (!token) throw new Error('API Error: No access token found. Please login again.');
+export const uid = () => Math.random().toString(36).substr(2, 9);
 
-    const headers = {
-        'Authorization': `Bearer ${token}`,
-        ...(options.headers || {})
-    };
-
-    let res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-        ...options,
-        headers
-    });
-
-    // If Access Token is expired (403 or 401), try to refresh
-    if (res.status === 403 || res.status === 401) {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-            try {
-                console.log("Access token expired, attempting refresh...");
-                const refreshRes = await fetch(`${PROD_API_URL}/api/auth/refresh`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refreshToken })
-                });
-
-                if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    const newAccessToken = data.accessToken;
-                    
-                    // Save new token
-                    localStorage.setItem('auth_token', newAccessToken);
-                    
-                    // Retry original request
-                    headers['Authorization'] = `Bearer ${newAccessToken}`;
-                    res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-                        ...options,
-                        headers
-                    });
-                } else {
-                    // Refresh failed (e.g. 24h expired), throw original error to trigger logout
-                    console.error("Refresh token expired or invalid.");
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('refresh_token');
-                    // Optional: trigger a window event or just let the app catch the error
-                }
-            } catch (refreshErr) {
-                console.error("Error during token refresh:", refreshErr);
-            }
-        }
-    }
-
-    if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorBody}`);
-    }
-    
-    return res.json();
+const getStorage = <T>(key: string): T[] => {
+  if (typeof window === 'undefined') return [];
+  const s = localStorage.getItem(key);
+  return s ? JSON.parse(s) : [];
 };
 
-// --- API Helper ---
+const setStorage = (key: string, data: any[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(data));
+};
+
 export const api = {
     baseUrl: PROD_API_URL,
-    
     get: async (endpoint: string) => {
-        return fetchWithAuth(endpoint, { method: 'GET' });
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
     },
-
     post: async (endpoint: string, body: any) => {
-        return fetchWithAuth(endpoint, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(body)
         });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
     },
-    
     put: async (endpoint: string, body: any) => {
-        return fetchWithAuth(endpoint, { 
-            method: 'PUT', 
-            headers: { 'Content-Type': 'application/json' },
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(body)
         });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
     },
-
     delete: async (endpoint: string) => {
-        return fetchWithAuth(endpoint, { method: 'DELETE' });
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
     }
 };
 
-// --- Mock Data Helpers ---
-const uid = () => Math.random().toString(36).substr(2, 9);
-
-const seedData = () => {
-  if (localStorage.getItem('tmp_users')) return;
-  // ... (Existing seed logic)
-  const locId = uid();
-  const wpId = uid();
-  const userId = uid();
-  const maintId = uid();
-  const supId = uid();
-  const typeId = uid();
-  const stateId = uid();
-  const techId = uid();
-
-  const users: User[] = [
-    { id: userId, name: 'Admin User', email: 'admin@tech.com', phone: '123456789', role: 'admin', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [], approvalLimits: {} },
-    { id: maintId, name: 'Maint Guy', email: 'maint@tech.com', phone: '987654321', role: 'maintenance', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId], approvalLimits: { [locId]: 100 } },
-    { id: uid(), name: 'Operator Jane', email: 'op@tech.com', phone: '111222333', role: 'operator', isBlocked: false, assignedLocationIds: [locId], assignedWorkplaceIds: [wpId], approvalLimits: { [locId]: 0 } },
-  ];
-  
-  const locations: Location[] = [{ id: locId, name: 'Hlavní Sklad', address: { street: 'Průmyslová', number: '1', zip: '81101', city: 'Bratislava', country: 'SK' }, isVisible: true }];
-  const workplaces: Workplace[] = [{ id: wpId, locationId: locId, name: 'Hala A - Linka 1', description: 'Hlavní montážní linka', isVisible: true }];
-  const suppliers: Supplier[] = [{ id: supId, name: 'TechCorp s.r.o.', address: { street: 'Technická', number: '5', zip: '01001', city: 'Žilina', country: 'SK' }, ic: '12345678', dic: 'CZ12345678', email: 'info@techcorp.cz', phone: '555123456', description: 'Generální dodavatel' }];
-  const techTypes: TechType[] = [{ id: typeId, name: 'Lisovací stroj', description: 'Hydraulické lisy' }];
-  const techStates: TechState[] = [{ id: stateId, name: 'V provozu', description: 'Plně funkční' }];
-  const techs: Technology[] = [{ id: techId, workplaceId: wpId, supplierId: supId, typeId: typeId, stateId: stateId, name: 'Hydraulický Lis H500', serialNumber: 'SN-2023-001-X', description: 'Hlavní lis pro karoserie', installDate: '2023-01-15', weight: 5000, sharepointLink: '#', photoUrls: [], isVisible: true }];
-  const settings: AppSettings = { enableOnlineTranslation: false };
-
-  localStorage.setItem('tmp_users', JSON.stringify(users));
-  localStorage.setItem('tmp_locations', JSON.stringify(locations));
-  localStorage.setItem('tmp_workplaces', JSON.stringify(workplaces));
-  localStorage.setItem('tmp_suppliers', JSON.stringify(suppliers));
-  localStorage.setItem('tmp_supplier_contacts', JSON.stringify([]));
-  localStorage.setItem('tmp_tech_types', JSON.stringify(techTypes));
-  localStorage.setItem('tmp_tech_states', JSON.stringify(techStates));
-  localStorage.setItem('tmp_technologies', JSON.stringify(techs));
-  localStorage.setItem('tmp_maintenances', JSON.stringify([]));
-  localStorage.setItem('tmp_maintenance_notes', JSON.stringify([]));
-  localStorage.setItem('tmp_requests', JSON.stringify([]));
-  localStorage.setItem('tmp_req_comments', JSON.stringify([]));
-  localStorage.setItem('tmp_reset_tokens', JSON.stringify([]));
-  localStorage.setItem('tmp_emails', JSON.stringify([]));
-  localStorage.setItem('tmp_push_logs', JSON.stringify([]));
-  localStorage.setItem('tmp_settings', JSON.stringify(settings));
-};
-
-// Generic Local DB Accessor
-const db = {
-  checkConnection: async (): Promise<boolean> => new Promise(r => setTimeout(() => r(true), 500)),
-  get: <T>(key: string): T[] => JSON.parse(localStorage.getItem(key) || '[]'),
-  set: <T>(key: string, data: T[]) => localStorage.setItem(key, JSON.stringify(data)),
-  
+export const db = {
   auth: {
-      createResetToken: (email: string) => { /* ... */ return 'token'; }, // simplified
-      validateToken: (t: string) => true,
-      resetPassword: (t: string, p: string) => true,
-      changePassword: (userId: string, oldP: string, newP: string) => {
-          const users = db.get<User>('tmp_users');
-          const userIndex = users.findIndex(u => u.id === userId);
+      validateToken: (token: string) => {
+          const tokens = getStorage<any>('tmp_reset_tokens');
+          const t = tokens.find(x => x.token === token);
+          if (!t) return false;
+          if (new Date(t.expires) < new Date()) return false;
+          return true;
+      },
+      createResetToken: (email: string) => {
+          const users = getStorage<User>('tmp_users');
+          const user = users.find(u => u.email === email);
+          if (!user) return null;
+          const token = uid();
+          const tokens = getStorage<any>('tmp_reset_tokens');
+          tokens.push({ token, email, expires: new Date(Date.now() + 3600000).toISOString() });
+          setStorage('tmp_reset_tokens', tokens);
+          return token;
+      },
+      resetPassword: (token: string, pass: string) => {
+          const tokens = getStorage<any>('tmp_reset_tokens');
+          const t = tokens.find(x => x.token === token);
+          if (!t) return false;
+          
+          const users = getStorage<User>('tmp_users');
+          const userIndex = users.findIndex(u => u.email === t.email);
           if (userIndex === -1) return false;
           
-          const user = users[userIndex];
-          const actualPass = user.password || 'password';
+          users[userIndex].password = pass;
+          setStorage('tmp_users', users);
           
-          if (oldP !== actualPass) return false;
-          
-          users[userIndex] = { ...user, password: newP };
-          db.set('tmp_users', users);
+          // Invalidate token
+          setStorage('tmp_reset_tokens', tokens.filter(x => x.token !== token));
+          return true;
+      },
+      changePassword: (userId: string, old: string, newP: string) => {
+          const users = getStorage<User>('tmp_users');
+          const idx = users.findIndex(u => u.id === userId);
+          if (idx === -1) return false;
+          if (users[idx].password !== old && old !== 'password') return false; // Mock check
+          users[idx].password = newP;
+          setStorage('tmp_users', users);
           return true;
       }
   },
-  settings: {
-    get: (): AppSettings => JSON.parse(localStorage.getItem('tmp_settings') || '{"enableOnlineTranslation": false}'),
-    save: (s: AppSettings) => localStorage.setItem('tmp_settings', JSON.stringify(s)),
-  },
-  emails: {
-      list: () => db.get<Email>('tmp_emails'),
-      retry: (ids: any) => { /* ... */ }
-  },
-  pushLogs: {
-      list: () => db.get<PushLog>('tmp_push_logs'),
-      add: (log: any) => { const l = db.pushLogs.list(); l.unshift({...log, id: uid(), created_at: new Date().toISOString()}); db.set('tmp_push_logs', l); },
-      retry: (id: string|number) => { /* mock */ }
-  },
   users: {
-    list: () => db.get<User>('tmp_users'),
-    add: (u: any) => { const l = db.users.list(); l.push({ ...u, id: uid() }); db.set('tmp_users', l); },
-    update: (id: string, d: any) => { const l = db.users.list().map(x => x.id === id ? {...x, ...d} : x); db.set('tmp_users', l); }
+    list: () => getStorage<User>('tmp_users'),
+    add: (u: any) => { const l = db.users.list(); l.push({...u, id: uid()}); setStorage('tmp_users', l); },
+    update: (id: string, d: any) => { setStorage('tmp_users', db.users.list().map(x => x.id === id ? {...x, ...d} : x)); },
   },
   locations: {
-    list: () => db.get<Location>('tmp_locations'),
-    add: (l: any) => { const list = db.locations.list(); list.push({ isVisible: true, ...l, id: uid() }); db.set('tmp_locations', list); },
-    update: (id: string, d: any) => { db.set('tmp_locations', db.locations.list().map(x => x.id === id ? {...x, ...d} : x)); },
-    delete: (id: string) => db.set('tmp_locations', db.locations.list().filter(x => x.id !== id))
+    list: () => getStorage<Location>('tmp_locations'),
+    add: (l: any) => { const list = db.locations.list(); list.push({...l, id: uid()}); setStorage('tmp_locations', list); },
+    update: (id: string, d: any) => { setStorage('tmp_locations', db.locations.list().map(x => x.id === id ? {...x, ...d} : x)); }
   },
   workplaces: {
-    list: () => db.get<Workplace>('tmp_workplaces'),
-    byLoc: (lid: string) => db.workplaces.list().filter(w => w.locationId === lid),
-    add: (w: any) => { const list = db.workplaces.list(); list.push({ isVisible: true, ...w, id: uid() }); db.set('tmp_workplaces', list); },
-    update: (id: string, d: any) => { db.set('tmp_workplaces', db.workplaces.list().map(x => x.id === id ? {...x, ...d} : x)); },
-    delete: (id: string) => db.set('tmp_workplaces', db.workplaces.list().filter(x => x.id !== id)),
-    isUsed: (id: string) => db.technologies.list().some(t => t.workplaceId === id),
+    list: () => getStorage<Workplace>('tmp_workplaces'),
+    add: (w: any) => { const list = db.workplaces.list(); list.push({...w, id: uid()}); setStorage('tmp_workplaces', list); },
+    update: (id: string, d: any) => { setStorage('tmp_workplaces', db.workplaces.list().map(x => x.id === id ? {...x, ...d} : x)); },
+    delete: (id: string) => { setStorage('tmp_workplaces', db.workplaces.list().filter(x => x.id !== id)); },
+    isUsed: (id: string) => getStorage<Technology>('tmp_technologies').some(t => t.workplaceId === id)
   },
   suppliers: {
-    list: () => db.get<Supplier>('tmp_suppliers'),
-    add: (s: any) => { const l = db.suppliers.list(); l.push({ ...s, id: uid() }); db.set('tmp_suppliers', l); },
-    update: (id: string, d: any) => { db.set('tmp_suppliers', db.suppliers.list().map(x => x.id === id ? {...x, ...d} : x)); }
+    list: () => getStorage<Supplier>('tmp_suppliers'),
+    add: (s: any) => { const list = db.suppliers.list(); list.push({...s, id: uid()}); setStorage('tmp_suppliers', list); },
+    update: (id: string, d: any) => { setStorage('tmp_suppliers', db.suppliers.list().map(x => x.id === id ? {...x, ...d} : x)); }
   },
   supplierContacts: {
-    list: (sid: string) => db.get<any>('tmp_supplier_contacts').filter(c => c.supplierId === sid),
-    add: (c: any) => { const l = db.get<any>('tmp_supplier_contacts'); l.push({...c, id: uid()}); db.set('tmp_supplier_contacts', l); },
-    delete: (id: string) => { db.set('tmp_supplier_contacts', db.get<any>('tmp_supplier_contacts').filter(c => c.id !== id)); },
-    update: (id: string, d: any) => { db.set('tmp_supplier_contacts', db.get<any>('tmp_supplier_contacts').map(c => c.id === id ? {...c, ...d} : c)); }
+      list: (supId: string) => getStorage<any>('tmp_supplier_contacts').filter(c => c.supplierId === supId),
+      add: (c: any) => { const l = getStorage<any>('tmp_supplier_contacts'); l.push({...c, id: uid()}); setStorage('tmp_supplier_contacts', l); },
+      delete: (id: string) => { setStorage('tmp_supplier_contacts', getStorage<any>('tmp_supplier_contacts').filter(x => x.id !== id)); },
+      update: (id: string, d: any) => { setStorage('tmp_supplier_contacts', getStorage<any>('tmp_supplier_contacts').map(x => x.id === id ? {...x, ...d} : x)); }
   },
   techTypes: {
-    list: () => db.get<TechType>('tmp_tech_types'),
-    add: (t: any) => { const l = db.techTypes.list(); l.push({ ...t, id: uid() }); db.set('tmp_tech_types', l); },
-    update: (id: string, d: any) => { db.set('tmp_tech_types', db.techTypes.list().map(x => x.id === id ? {...x, ...d} : x)); },
-    delete: (id: string) => db.set('tmp_tech_types', db.techTypes.list().filter(x => x.id !== id)),
-    isUsed: (id: string) => db.technologies.list().some(t => t.typeId === id),
+      list: () => getStorage<any>('tmp_tech_types'),
+      add: (t: any) => { const l = db.techTypes.list(); l.push({...t, id: uid()}); setStorage('tmp_tech_types', l); },
+      update: (id: string, d: any) => { setStorage('tmp_tech_types', db.techTypes.list().map(x => x.id === id ? {...x, ...d} : x)); },
+      delete: (id: string) => { setStorage('tmp_tech_types', db.techTypes.list().filter(x => x.id !== id)); },
+      isUsed: (id: string) => getStorage<Technology>('tmp_technologies').some(t => t.typeId === id)
   },
   techStates: {
-    list: () => db.get<TechState>('tmp_tech_states'),
-    add: (t: any) => { const l = db.techStates.list(); l.push({ ...t, id: uid() }); db.set('tmp_tech_states', l); },
-    update: (id: string, d: any) => { db.set('tmp_tech_states', db.techStates.list().map(x => x.id === id ? {...x, ...d} : x)); },
-    delete: (id: string) => db.set('tmp_tech_states', db.techStates.list().filter(x => x.id !== id)),
-    isUsed: (id: string) => db.technologies.list().some(t => t.stateId === id),
+      list: () => getStorage<any>('tmp_tech_states'),
+      add: (t: any) => { const l = db.techStates.list(); l.push({...t, id: uid()}); setStorage('tmp_tech_states', l); },
+      update: (id: string, d: any) => { setStorage('tmp_tech_states', db.techStates.list().map(x => x.id === id ? {...x, ...d} : x)); },
+      delete: (id: string) => { setStorage('tmp_tech_states', db.techStates.list().filter(x => x.id !== id)); },
+      isUsed: (id: string) => getStorage<Technology>('tmp_technologies').some(t => t.stateId === id)
   },
   technologies: {
-    list: () => db.get<Technology>('tmp_technologies'),
-    add: (t: any) => { const l = db.technologies.list(); l.push({ isVisible: true, ...t, id: uid() }); db.set('tmp_technologies', l); },
-    update: (id: string, d: any) => { db.set('tmp_technologies', db.technologies.list().map(x => x.id === id ? {...x, ...d} : x)); }
+    list: () => getStorage<Technology>('tmp_technologies'),
+    add: (t: any) => { const l = db.technologies.list(); l.push({...t, id: uid()}); setStorage('tmp_technologies', l); },
+    update: (id: string, d: any) => { setStorage('tmp_technologies', db.technologies.list().map(x => x.id === id ? {...x, ...d} : x)); },
+    delete: (id: string) => { setStorage('tmp_technologies', db.technologies.list().filter(x => x.id !== id)); }
+  },
+  maintenances: {
+    list: () => getStorage<Maintenance>('tmp_maintenances'),
+    add: (m: any) => { const l = db.maintenances.list(); l.push({...m, id: uid(), createdAt: new Date().toISOString()}); setStorage('tmp_maintenances', l); },
+    update: (id: string, d: any) => { setStorage('tmp_maintenances', db.maintenances.list().map(x => x.id === id ? {...x, ...d} : x)); },
+    delete: (id: string) => { setStorage('tmp_maintenances', db.maintenances.list().filter(x => x.id !== id)); }
   },
   requests: {
-    list: () => db.get<Request>('tmp_requests'),
-    add: (r: any) => { const l = db.requests.list(); l.push({ ...r, id: uid(), createdDate: new Date().toISOString(), state: 'new', history: [] }); db.set('tmp_requests', l); },
-    update: (id: string, d: any) => { db.set('tmp_requests', db.requests.list().map(x => x.id === id ? {...x, ...d} : x)); },
-    updateState: (id: string, state: any, reason: string, userId: string, updates: any) => {
-        const l = db.requests.list().map(r => r.id === id ? { ...r, state, cancellationReason: reason, ...updates } : r);
-        db.set('tmp_requests', l);
+    list: () => getStorage<Request>('tmp_requests'),
+    add: (r: any) => { 
+        const l = db.requests.list(); 
+        const now = new Date().toISOString();
+        const defaultState = r.solverId ? 'assigned' : 'new';
+        l.push({ 
+            ...r, 
+            id: uid(), 
+            state: r.state || defaultState,
+            createdDate: now,
+            history: [{ date: now, userId: r.authorId, action: 'created', note: 'Vytvořeno v demo režimu' }]
+        }); 
+        setStorage('tmp_requests', l); 
+    },
+    update: (id: string, d: any) => { 
+        setStorage('tmp_requests', db.requests.list().map(x => x.id === id ? {...x, ...d} : x)); 
+    },
+    updateState: (id: string, state: string, reason: string, userId: string, extraFields: any = {}) => {
+        setStorage('tmp_requests', db.requests.list().map(x => {
+            if (x.id === id) {
+                const history = x.history || [];
+                history.push({
+                    date: new Date().toISOString(),
+                    userId: userId,
+                    action: 'status_change',
+                    note: reason || `Změna stavu na ${state}`,
+                    oldValue: x.state,
+                    newValue: state
+                });
+                return { ...x, state, cancellationReason: reason, ...extraFields, history };
+            }
+            return x;
+        }));
     }
   },
   comments: {
-    list: (rid: string) => db.get<any>('tmp_req_comments').filter(c => c.requestId === rid),
-    add: (c: any) => { const l = db.get<any>('tmp_req_comments'); l.push({...c, id: uid(), date: new Date().toISOString()}); db.set('tmp_req_comments', l); }
+      list: (reqId: string) => getStorage<any>('tmp_comments').filter(c => c.requestId === reqId),
+      add: (c: any) => { const l = getStorage<any>('tmp_comments'); l.push({...c, id: uid(), date: new Date().toISOString()}); setStorage('tmp_comments', l); }
   },
-  maintenances: {
-    list: () => db.get<Maintenance>('tmp_maintenances'),
-    add: (m: any) => { const l = db.maintenances.list(); l.push({ ...m, id: uid() }); db.set('tmp_maintenances', l); },
-    update: (id: string, d: any) => { db.set('tmp_maintenances', db.maintenances.list().map(x => x.id === id ? {...x, ...d} : x)); }
+  settings: {
+      get: () => {
+          const s = localStorage.getItem('tmp_settings');
+          return s ? JSON.parse(s) : { enableOnlineTranslation: false };
+      },
+      save: (s: any) => localStorage.setItem('tmp_settings', JSON.stringify(s))
   },
-  maintenanceNotes: {
-    list: (mid: string) => db.get<any>('tmp_maintenance_notes').filter(n => n.maintenanceId === mid),
-    add: (n: any) => { const l = db.get<any>('tmp_maintenance_notes'); l.push({...n, id: uid(), date: new Date().toISOString()}); db.set('tmp_maintenance_notes', l); }
+  emails: {
+      list: () => {
+          let l = getStorage<Email>('tmp_emails');
+          if (l.length === 0) {
+              l = [
+                  { id: '1', to_address: 'admin@tech.com', subject: 'Nový požadavek: Oprava lisu', body: 'Prosím o opravu...', created_at: new Date().toISOString(), sent_at: new Date().toISOString(), attempts: 1, error: null },
+                  { id: '2', to_address: 'maint@tech.com', subject: 'Údržba', body: 'Check...', created_at: new Date(Date.now() - 86400000).toISOString(), sent_at: null, attempts: 0, error: null }
+              ];
+              setStorage('tmp_emails', l);
+          }
+          return l;
+      },
+      retry: (ids: (string|number)[]) => {
+          const l = getStorage<Email>('tmp_emails');
+          setStorage('tmp_emails', l.map(e => ids.includes(e.id) ? { ...e, sent_at: null, error: null, attempts: 0 } : e));
+      }
+  },
+  pushLogs: {
+      list: () => getStorage<PushLog>('tmp_push_logs')
+  },
+  projects: {
+      list: () => getStorage<Project>('tmp_projects'),
+      add: (p: any) => { const l = getStorage<Project>('tmp_projects'); l.push({...p, id: uid(), createdAt: new Date().toISOString()}); setStorage('tmp_projects', l); },
+      update: (id: string, d: any) => { setStorage('tmp_projects', getStorage<Project>('tmp_projects').map(x => x.id === id ? {...x, ...d} : x)); },
+      delete: (id: string) => { setStorage('tmp_projects', getStorage<Project>('tmp_projects').filter(x => x.id !== id)); }
   }
 };
 
-export { seedData, db, uid };
+export const seedData = () => {
+  if (typeof window === 'undefined') return;
+  if (!localStorage.getItem('tmp_users')) {
+    const users: User[] = [
+      { id: 'u1', name: 'Admin User', email: 'admin@tech.com', role: 'admin', phone: '+420123456789', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [], password: 'password', approvalLimits: {} },
+      { id: 'u2', name: 'Maintenance User', email: 'maint@tech.com', role: 'maintenance', phone: '+420987654321', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [], password: 'password', approvalLimits: {} },
+      { id: 'u3', name: 'Operator User', email: 'op@tech.com', role: 'operator', phone: '+420111222333', isBlocked: false, assignedLocationIds: [], assignedWorkplaceIds: [], password: 'password', approvalLimits: {} }
+    ];
+    setStorage('tmp_users', users);
+
+    const locs = [{ id: 'l1', name: 'Hlavní Sklad', address: { street: 'Průmyslová', number: '1', city: 'Praha', zip: '10000', country: 'CZ' }, isVisible: true }];
+    setStorage('tmp_locations', locs);
+    const wps = [{ id: 'w1', locationId: 'l1', name: 'Dílna A', description: 'Montáž', isVisible: true }];
+    setStorage('tmp_workplaces', wps);
+
+    setStorage('tmp_tech_types', [{id: 'tt1', name: 'Hydraulika'}, {id: 'tt2', name: 'Elektro'}]);
+    setStorage('tmp_tech_states', [{id: 'ts1', name: 'V provozu'}, {id: 'ts2', name: 'Mimo provoz'}]);
+
+    setStorage('tmp_technologies', [
+        { id: 't1', name: 'Hydraulický Lis 500T', serialNumber: 'SN-2023-001-X', typeId: 'tt1', stateId: 'ts1', workplaceId: 'w1', isVisible: true, supplierId: '', installDate: '2023-01-01', weight: 5000, description: 'Velký lis', sharepointLink: '', photoUrls: [] }
+    ]);
+    
+    setStorage('tmp_requests', []);
+    setStorage('tmp_suppliers', []);
+    setStorage('tmp_maintenances', []);
+    setStorage('tmp_comments', []);
+    setStorage('tmp_supplier_contacts', []);
+    setStorage('tmp_push_logs', []);
+    setStorage('tmp_projects', []);
+  }
+};
