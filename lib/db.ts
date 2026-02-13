@@ -180,7 +180,7 @@ export const db = {
     add: (w: any) => { const list = db.workplaces.list(); list.push({...w, id: uid()}); setStorage('tmp_workplaces', list); },
     update: (id: string, d: any) => { setStorage('tmp_workplaces', db.workplaces.list().map(x => x.id === id ? {...x, ...d} : x)); },
     delete: (id: string) => { setStorage('tmp_workplaces', db.workplaces.list().filter(x => x.id !== id)); },
-    isUsed: (id: string) => getStorage<Technology>('tmp_technologies').some(t => t.workplaceId === id)
+    isUsed: (id: string) => getStorage<Technology>('tmp_technologies').some(t => t.workplaceIds?.includes(id))
   },
   suppliers: {
     list: () => getStorage<Supplier>('tmp_suppliers'),
@@ -312,8 +312,9 @@ export const seedData = () => {
     setStorage('tmp_tech_types', [{id: 'tt1', name: 'Hydraulika'}, {id: 'tt2', name: 'Elektro'}]);
     setStorage('tmp_tech_states', [{id: 'ts1', name: 'V provozu'}, {id: 'ts2', name: 'Mimo provoz'}]);
 
+    // Use workplaceIds array
     setStorage('tmp_technologies', [
-        { id: 't1', name: 'Hydraulický Lis 500T', serialNumber: 'SN-2023-001-X', typeId: 'tt1', stateId: 'ts1', workplaceId: 'w1', isVisible: true, supplierId: '', installDate: '2023-01-01', weight: 5000, description: 'Velký lis', sharepointLink: '', photoUrls: [] }
+        { id: 't1', name: 'Hydraulický Lis 500T', serialNumber: 'SN-2023-001-X', typeId: 'tt1', stateId: 'ts1', workplaceIds: ['w1'], isVisible: true, supplierId: '', installDate: '2023-01-01', weight: 5000, description: 'Velký lis', sharepointLink: '', photoUrls: [] }
     ]);
     
     setStorage('tmp_requests', []);

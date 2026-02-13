@@ -316,6 +316,22 @@ const migrations = [
             )`,
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS project_id VARCHAR(255)`
         ]
+    },
+    {
+        name: '018_tech_workplaces_m2m',
+        up: [
+            `CREATE TABLE IF NOT EXISTS technology_workplaces (
+                tech_id VARCHAR(255) NOT NULL,
+                workplace_id VARCHAR(255) NOT NULL,
+                PRIMARY KEY (tech_id, workplace_id),
+                INDEX (workplace_id)
+            )`,
+            // Migrate existing relationship
+            `INSERT INTO technology_workplaces (tech_id, workplace_id)
+             SELECT id, workplace_id FROM technologies WHERE workplace_id IS NOT NULL`,
+            // Drop old column
+            `ALTER TABLE technologies DROP COLUMN workplace_id`
+        ]
     }
 ];
 
@@ -348,10 +364,10 @@ export const initDb = async () => {
                     await pool.query(sql);
                 } catch (sqlErr) {
                     // Ignore "Duplicate column name" error if manual patch was applied, but log others
-                    if (sqlErr.code !== 'ER_DUP_FIELDNAME') {
+                    if (sqlErr.code !== 'ER_DUP_FIELDNAME' && sqlErr.code !== 'ER_DUP_ENTRY') {
                         throw sqlErr;
                     } else {
-                        console.log(`Skipping duplicate field error in migration ${migration.name}`);
+                        console.log(`Skipping duplicate/exists error in migration ${migration.name}: ${sqlErr.message}`);
                     }
                 }
             }

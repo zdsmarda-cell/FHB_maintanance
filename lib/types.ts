@@ -81,7 +81,7 @@ export interface TechState {
 
 export interface Technology {
   id: string;
-  workplaceId: string;
+  workplaceIds: string[]; // CHANGED: Now an array of IDs
   supplierId: string;
   typeId: string;
   stateId: string;

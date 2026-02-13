@@ -14,10 +14,10 @@ interface LocationsPageProps {
 export const LocationsPage = ({ onNavigate }: LocationsPageProps) => {
   const { t, lang } = useI18n();
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false); // New state for save loading
+  const [saving, setSaving] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [workplaces, setWorkplaces] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]); // Need assets to count
+  const [assets, setAssets] = useState<any[]>([]); 
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateWpOpen, setIsCreateWpOpen] = useState(false);
@@ -162,7 +162,6 @@ export const LocationsPage = ({ onNavigate }: LocationsPageProps) => {
       }
   }
 
-  // Pre-process for editing: Decode JSON to current lang for input field
   const startEditLoc = (loc: any) => {
       setEditingLoc({ ...loc, name: getLocalized(loc.name, lang) });
   };
@@ -176,11 +175,11 @@ export const LocationsPage = ({ onNavigate }: LocationsPageProps) => {
 
   const getAssetCount = (type: 'loc'|'wp', id: string) => {
       if (type === 'wp') {
-          return assets.filter(a => a.workplaceId === id).length;
+          return assets.filter(a => a.workplaceIds?.includes(id)).length;
       }
-      // For location, sum assets of all workplaces in this location
       const locWps = workplaces.filter(w => w.locationId === id).map(w => w.id);
-      return assets.filter(a => locWps.includes(a.workplaceId)).length;
+      // Check if tech is in ANY of the location's workplaces
+      return assets.filter(a => a.workplaceIds?.some((wid: string) => locWps.includes(wid))).length;
   }
 
   if (loading) return <div className="p-10 text-center"><Loader className="animate-spin w-8 h-8 mx-auto text-blue-600"/></div>;

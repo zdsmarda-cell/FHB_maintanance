@@ -6,7 +6,7 @@ import { Technology, User } from '../lib/types';
 import { Plus, Edit, Search, Upload, Loader, X, Eye, EyeOff, Wrench, Link as LinkIcon, Weight, Image as ImageIcon, Calendar } from 'lucide-react';
 import { Modal, MultiSelect, Pagination } from '../components/Shared';
 import { GalleryModal } from '../components/requests/modals/GalleryModal';
-import { prepareMultilingual, getLocalized } from '../lib/helpers'; // Import getLocalized
+import { prepareMultilingual, getLocalized } from '../lib/helpers';
 
 const PROD_API_URL = 'https://fhbmain.impossible.cz:3010';
 let API_BASE = PROD_API_URL;
@@ -18,22 +18,19 @@ interface AssetsPageProps {
 }
 
 const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techStates, workplaces, suppliers, locations }: any) => {
-    const { t, lang } = useI18n(); // Destructure lang
-    const [saving, setSaving] = useState(false); // Add saving state
+    const { t, lang } = useI18n(); 
+    const [saving, setSaving] = useState(false);
     
-    // Initialize state with careful date handling and defaults
     const [data, setData] = useState<Partial<Technology>>(() => {
         const base = initialData ? { ...initialData } : {
-            name: '', serialNumber: '', typeId: '', stateId: '', workplaceId: '', supplierId: '', 
+            name: '', serialNumber: '', typeId: '', stateId: '', workplaceIds: [], supplierId: '', 
             installDate: '', weight: 0, description: '', sharepointLink: '', photoUrls: [], isVisible: true
         };
         
-        // Fix: If date comes in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ), strip time for input type="date"
         if (base.installDate && typeof base.installDate === 'string' && base.installDate.includes('T')) {
             base.installDate = base.installDate.split('T')[0];
         }
 
-        // Fix: Localize description if it exists (don't show JSON)
         if (base.description) {
             base.description = getLocalized(base.description, lang);
         }
@@ -41,40 +38,53 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         return base;
     });
     
-    // State for Location Filter
-    const [selectedLocId, setSelectedLocId] = useState('');
+    // Constraint: All selected workplaces must belong to ONE location.
+    // We use this state to drive the MultiSelect options.
+    const [selectedLocationId, setSelectedLocationId] = useState('');
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
 
-    // Initialize Location based on existing Workplace (if set)
+    // Initialization: If editing, detect location from the first assigned workplace
     useEffect(() => {
-        if (initialData && initialData.workplaceId && !selectedLocId) {
-            const wp = workplaces.find((w: any) => w.id === initialData.workplaceId);
-            if (wp) setSelectedLocId(wp.locationId);
+        if (initialData && initialData.workplaceIds && initialData.workplaceIds.length > 0) {
+            const firstWp = workplaces.find((w: any) => w.id === initialData.workplaceIds[0]);
+            if (firstWp) {
+                setSelectedLocationId(firstWp.locationId);
+            }
         }
     }, [initialData, workplaces]);
 
-    // Filter workplaces strictly based on selected Location
-    // If no location is selected, show NO workplaces to enforce hierarchy
-    const filteredWorkplaces = selectedLocId 
-        ? workplaces.filter((w: any) => w.locationId === selectedLocId)
+    // Constraint Logic: Show only workplaces for the selected location
+    const availableWorkplaces = selectedLocationId 
+        ? workplaces.filter((w: any) => w.locationId === selectedLocationId)
         : [];
+
+    // Map for MultiSelect
+    const workplaceOptions = availableWorkplaces.map((w: any) => ({
+        id: w.id, 
+        name: getLocalized(w.name, lang)
+    }));
+
+    const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newLocId = e.target.value;
+        setSelectedLocationId(newLocId);
+        
+        // CRITICAL: Clear workplaces when location changes to prevent mixed locations
+        if (newLocId !== selectedLocationId) {
+            setData(prev => ({ ...prev, workplaceIds: [] }));
+        }
+    };
 
     const validate = () => {
         const errs: Record<string, string> = {};
         if(!data.name) errs.name = t('validation.required');
-        // REMOVED workplaceId requirement
-        // if(!data.workplaceId) errs.workplaceId = t('validation.required'); 
-        if(!selectedLocId) errs.locationId = t('validation.required'); // Ensure location is picked visually
+        // Workplace is strictly optional in DB, but if you want to enforce it visually:
+        // if(!data.workplaceIds || data.workplaceIds.length === 0) errs.workplaceId = t('validation.required'); 
         if(!data.typeId) errs.typeId = t('validation.required');
         if(!data.stateId) errs.stateId = t('validation.required');
-        
-        // New Mandatory Fields
         if(!data.supplierId) errs.supplierId = t('validation.required');
         if(!data.installDate) errs.installDate = t('validation.required');
-        
-        // Weight Validation
         if(data.weight !== undefined && data.weight < 0) errs.weight = "Váha nesmí být záporná";
 
         setErrors(errs);
@@ -85,12 +95,9 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
         if(validate()) {
             setSaving(true);
             try {
-                // Apply translation to description if present
                 const translatedDesc = data.description ? await prepareMultilingual(data.description) : '';
                 
-                // Allow name even if workplaceId is empty
                 if (data.name) {
-                    // Ensure weight is number (allow 0)
                     const finalData = { 
                         ...data, 
                         description: translatedDesc,
@@ -98,11 +105,8 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                     };
                     await onSave(finalData as any);
                 }
-            } catch(e) {
-                console.error(e);
-            } finally {
-                setSaving(false);
-            }
+            } catch(e) { console.error(e); } 
+            finally { setSaving(false); }
         }
     }
 
@@ -151,8 +155,6 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                      <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.serial_number')}</label>
                      <input className="w-full border p-2 rounded" value={data.serialNumber} onChange={e => setData({...data, serialNumber: e.target.value})} />
                 </div>
-                
-                {/* Description - Will be translated on save */}
                 <div>
                      <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.description')}</label>
                      <textarea className="w-full border p-2 rounded" rows={2} value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} />
@@ -175,31 +177,33 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                      </div>
                 </div>
                 
-                {/* Location & Workplace - STRICT HIERARCHY */}
-                <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')} *</label>
-                        <select 
-                            className={`w-full border p-2 rounded ${errors.locationId ? 'border-red-500' : ''}`} 
-                            value={selectedLocId} 
-                            onChange={e => { setSelectedLocId(e.target.value); setData({...data, workplaceId: ''}); }}
-                        >
-                            <option value="">{t('option.select_location')}</option>
-                            {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
-                        </select>
-                     </div>
-                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.workplace')}</label>
-                        <select 
-                            className={`w-full border p-2 rounded ${errors.workplaceId ? 'border-red-500' : ''}`} 
-                            value={data.workplaceId || ''} 
-                            onChange={e => setData({...data, workplaceId: e.target.value})}
-                            disabled={!selectedLocId} // Must pick location first
-                        >
-                            <option value="">{t('option.no_workplace')}</option>
-                            {filteredWorkplaces.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
-                        </select>
-                     </div>
+                {/* Location Selector (Enforces Single Parent) & Workplace Selection */}
+                <div className="bg-slate-50 p-3 rounded border border-slate-100">
+                    <p className="text-xs text-slate-400 mb-2">Umístění (Všechna pracoviště musí být v jedné lokalitě)</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.location')}</label>
+                            <select 
+                                className="w-full border p-2 rounded" 
+                                value={selectedLocationId} 
+                                onChange={handleLocationChange}
+                            >
+                                <option value="">{t('option.select_location')}</option>
+                                {locations.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
+                            </select>
+                         </div>
+                         <div>
+                            <div className={`${!selectedLocationId ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <MultiSelect 
+                                    label={t('form.workplace')}
+                                    options={workplaceOptions}
+                                    selectedIds={data.workplaceIds || []}
+                                    onChange={(ids) => setData({...data, workplaceIds: ids})}
+                                />
+                            </div>
+                            {!selectedLocationId && <span className="text-[10px] text-slate-400">Nejdříve vyberte lokalitu</span>}
+                         </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -216,15 +220,12 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
                      </div>
                 </div>
 
-                {/* Weight & Sharepoint */}
                 <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center"><Weight className="w-3 h-3 mr-1"/> {t('form.weight')}</label>
                         <input 
-                            type="number" 
-                            min="0" 
+                            type="number" min="0" 
                             className={`w-full border p-2 rounded ${errors.weight ? 'border-red-500' : ''}`} 
-                            /* Fix: Check for undefined specifically to allow 0 */
                             value={data.weight !== undefined ? data.weight : ''} 
                             onChange={e => setData({...data, weight: e.target.value === '' ? undefined : Number(e.target.value)})} 
                             placeholder="kg" 
@@ -272,7 +273,7 @@ const AssetModal = ({ isOpen, onClose, initialData, onSave, techTypes, techState
 };
 
 export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps) => {
-    const { t, lang } = useI18n(); // Destructure lang
+    const { t, lang } = useI18n();
     const [loading, setLoading] = useState(true);
     const [assets, setAssets] = useState<Technology[]>([]);
     const [techTypes, setTechTypes] = useState<any[]>([]);
@@ -282,47 +283,39 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const [locations, setLocations] = useState<any[]>([]);
     const [requests, setRequests] = useState<any[]>([]);
 
-    // Filtering State
     const [search, setSearch] = useState('');
     const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
     const [filterStateIds, setFilterStateIds] = useState<string[]>([]);
     const [filterWpIds, setFilterWpIds] = useState<string[]>([]);
-    const [filterSupplierId, setFilterSupplierId] = useState<string>(''); // New Supplier Filter
+    const [filterSupplierId, setFilterSupplierId] = useState<string>(''); 
     const [filterVisible, setFilterVisible] = useState<'all' | 'true' | 'false'>('true');
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
 
-    // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
     
-    // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Technology | null>(null);
-    const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    // Gallery Modal State
     const [galleryImages, setGalleryImages] = useState<string[]>([]);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-    // Initial Filters
     useEffect(() => {
         if (initialFilters) {
             if (initialFilters.typeId) setFilterTypeIds([initialFilters.typeId]);
             if (initialFilters.stateId) setFilterStateIds([initialFilters.stateId]);
+            // If filtering by workplace, match technologies containing that workplace ID
             if (initialFilters.workplaceId) setFilterWpIds([initialFilters.workplaceId]);
             if (initialFilters.supplierId) setFilterSupplierId(initialFilters.supplierId);
             if (initialFilters.locationId) {
-                // Wait for workplaces to load if needed, but here we assume strict effect ordering or eventual consistency
                 const wps = workplaces.filter(w => w.locationId === initialFilters.locationId).map(w => w.id);
-                // Only set if we found workplaces, otherwise might be race condition (re-run when workplaces change)
                 if (workplaces.length > 0) setFilterWpIds(wps);
             }
         }
     }, [initialFilters, workplaces]);
 
-    // FETCH DATA
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -391,10 +384,15 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
         if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !a.serialNumber?.toLowerCase().includes(search.toLowerCase())) return false;
         if (filterTypeIds.length > 0 && !filterTypeIds.includes(a.typeId)) return false;
         if (filterStateIds.length > 0 && !filterStateIds.includes(a.stateId)) return false;
-        if (filterWpIds.length > 0 && !filterWpIds.includes(a.workplaceId)) return false;
-        if (filterSupplierId && a.supplierId !== filterSupplierId) return false; // Supplier Filter Logic
         
-        // Date Logic
+        // Workplace Filter: Check if asset has ANY of the selected filter IDs in its workplaceIds array
+        if (filterWpIds.length > 0) {
+            const assetWps = a.workplaceIds || [];
+            const hasMatch = assetWps.some(id => filterWpIds.includes(id));
+            if (!hasMatch) return false;
+        }
+        
+        if (filterSupplierId && a.supplierId !== filterSupplierId) return false;
         if (filterDateFrom && (!a.installDate || a.installDate < filterDateFrom)) return false;
         if (filterDateTo && (!a.installDate || a.installDate > filterDateTo)) return false;
 
@@ -403,13 +401,10 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     const paginatedAssets = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     
-    // Count logic: Filter out closed/cancelled requests.
-    // Show count of ALL requests for the tech regardless of author (even for operators).
     const getOpenRequestCount = (techId: string) => {
         return requests.filter(r => r.techId === techId && r.state !== 'solved' && r.state !== 'cancelled').length;
     };
 
-    // Gallery Handlers - FIXED SIGNATURE
     const openGallery = (photos: string[], e: React.MouseEvent) => {
         e.stopPropagation();
         if (photos && photos.length > 0) {
@@ -421,7 +416,6 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
 
     if (loading) return <div className="p-10 flex justify-center"><Loader className="animate-spin w-8 h-8 text-blue-600"/></div>;
 
-    // Use getLocalized for Type and State names in Filter MultiSelects
     const localizedTypes = techTypes.map(t => ({...t, name: getLocalized(t.name, lang)}));
     const localizedStates = techStates.map(s => ({...s, name: getLocalized(s.name, lang)}));
     const localizedSuppliers = suppliers.map(s => ({...s, name: getLocalized(s.name, lang)}));
@@ -448,7 +442,6 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                     <div><MultiSelect label={t('headers.tech_states')} options={localizedStates} selectedIds={filterStateIds} onChange={setFilterStateIds} /></div>
                     <div><MultiSelect label={t('form.workplace')} options={localizedWorkplaces} selectedIds={filterWpIds} onChange={setFilterWpIds} /></div>
                     
-                    {/* Date Filters */}
                     <div>
                         <div className="mb-1 text-xs text-slate-500 font-medium">{t('form.install_date')}</div>
                         <div className="flex items-center gap-1">
@@ -459,7 +452,6 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        {/* Supplier Filter dropdown */}
                         <div className="flex-1">
                             <select className="w-full p-1.5 border rounded text-sm mt-5" value={filterSupplierId} onChange={e => setFilterSupplierId(e.target.value)}>
                                 <option value="">{t('form.supplier')}: {t('common.all')}</option>
@@ -468,7 +460,6 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                         </div>
                     </div>
                 </div>
-                {/* Second row of filters for visibility if needed, or inline above */}
                 <div className="mt-2 flex justify-end">
                      <select className="p-1.5 border rounded text-sm" value={filterVisible} onChange={e => setFilterVisible(e.target.value as any)}>
                         <option value="all">{t('filter.visibility_all')}</option>
@@ -487,7 +478,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                 <th className="px-4 py-3">{t('form.install_date')}</th>
                                 <th className="px-4 py-3">{t('form.type')}</th>
                                 <th className="px-4 py-3">{t('form.state')}</th>
-                                <th className="px-4 py-3">{t('form.location')}</th>
+                                <th className="px-4 py-3">{t('form.workplace')}</th>
                                 <th className="px-4 py-3">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 text-center">{t('form.is_visible')}</th>
                                 <th className="px-4 py-3 text-center">{t('col.open_requests')}</th>
@@ -498,11 +489,15 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                             {paginatedAssets.map(asset => {
                                 const type = techTypes.find(t => t.id === asset.typeId)?.name;
                                 const state = techStates.find(t => t.id === asset.stateId)?.name;
-                                const wp = workplaces.find(w => w.id === asset.workplaceId);
-                                const loc = locations.find(l => l.id === wp?.locationId);
                                 const sup = suppliers.find(s => s.id === asset.supplierId);
                                 const reqCount = getOpenRequestCount(asset.id);
                                 const hasPhotos = asset.photoUrls && asset.photoUrls.length > 0;
+                                
+                                // Resolve workplaces
+                                const assignedWps = (asset.workplaceIds || []).map(id => {
+                                    const w = workplaces.find(x => x.id === id);
+                                    return w ? getLocalized(w.name, lang) : null;
+                                }).filter(Boolean).join(', ');
 
                                 return (
                                     <tr key={asset.id} className={`border-b hover:bg-slate-50 ${!asset.isVisible ? 'bg-slate-50 opacity-70' : ''}`}>
@@ -524,9 +519,8 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                         </td>
                                         <td className="px-4 py-3">{getLocalized(type, lang) || '-'}</td>
                                         <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border">{getLocalized(state, lang) || '-'}</span></td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium">{getLocalized(wp?.name, lang)}</div>
-                                            <div className="text-xs text-slate-500">{getLocalized(loc?.name, lang)}</div>
+                                        <td className="px-4 py-3 text-xs max-w-[150px] truncate" title={assignedWps}>
+                                            {assignedWps || '-'}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{getLocalized(sup?.name, lang) || '-'}</td>
                                         <td className="px-4 py-3 text-center">

@@ -296,9 +296,9 @@ export const SuppliersPage = ({ onNavigate, user }: SuppliersPageProps) => {
                              <input className={`p-2 border rounded w-full ${errors.name ? 'border-red-500' : ''}`} value={newSup.name} onChange={e => setNewSup({...newSup, name: e.target.value})} />
                         </div>
                         <div className="col-span-1"><input placeholder={t('form.ic')} className="p-2 border rounded w-full" value={newSup.ic} onChange={e => setNewSup({...newSup, ic: e.target.value})} /></div>
-                        <div className="col-span-1"><input placeholder={t('form.phone')} className="p-2 border rounded w-full" value={newSup.phone} onChange={e => setNewSup({...newSup, phone: e.target.value})} /></div>
+                        <div className="col-span-1"><input placeholder={t('form.phone')} className={`p-2 border rounded w-full ${errors.phone ? 'border-red-500' : ''}`} value={newSup.phone} onChange={e => setNewSup({...newSup, phone: e.target.value})} /></div>
                         <div className="col-span-2"><input placeholder={t('form.dic')} className="p-2 border rounded w-full" value={newSup.dic} onChange={e => setNewSup({...newSup, dic: e.target.value})} /></div>
-                        <div className="col-span-2"><input placeholder={t('form.email')} className="p-2 border rounded w-full" value={newSup.email} onChange={e => setNewSup({...newSup, email: e.target.value})} /></div>
+                        <div className="col-span-2"><input placeholder={t('form.email')} className={`p-2 border rounded w-full ${errors.email ? 'border-red-500' : ''}`} value={newSup.email} onChange={e => setNewSup({...newSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={newSup.address} onChange={a => setNewSup({...newSup, address: a})} errors={errors} />
                     <div className="flex justify-end mt-4">
@@ -312,11 +312,11 @@ export const SuppliersPage = ({ onNavigate, user }: SuppliersPageProps) => {
             {editingSup && (
                 <Modal title={t('headers.edit_supplier')} onClose={() => setEditingSup(null)}>
                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.name} onChange={e => setEditingSup({...editingSup, name: e.target.value})} /></div>
+                        <div className="col-span-2"><input className={`p-2 border rounded w-full ${errors.name ? 'border-red-500' : ''}`} value={editingSup.name} onChange={e => setEditingSup({...editingSup, name: e.target.value})} /></div>
                         <div className="col-span-1"><input className="p-2 border rounded w-full" value={editingSup.ic} onChange={e => setEditingSup({...editingSup, ic: e.target.value})} /></div>
-                        <div className="col-span-1"><input className="p-2 border rounded w-full" value={editingSup.phone} onChange={e => setEditingSup({...editingSup, phone: e.target.value})} /></div>
+                        <div className="col-span-1"><input className={`p-2 border rounded w-full ${errors.phone ? 'border-red-500' : ''}`} value={editingSup.phone} onChange={e => setEditingSup({...editingSup, phone: e.target.value})} /></div>
                         <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.dic} onChange={e => setEditingSup({...editingSup, dic: e.target.value})} /></div>
-                        <div className="col-span-2"><input className="p-2 border rounded w-full" value={editingSup.email} onChange={e => setEditingSup({...editingSup, email: e.target.value})} /></div>
+                        <div className="col-span-2"><input className={`p-2 border rounded w-full ${errors.email ? 'border-red-500' : ''}`} value={editingSup.email} onChange={e => setEditingSup({...editingSup, email: e.target.value})} /></div>
                     </div>
                     <AddressInput address={editingSup.address} onChange={a => setEditingSup({...editingSup, address: a})} errors={errors} />
                     <div className="flex justify-end mt-4">

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useI18n } from '../../lib/i18n';
 import { Euro, Trash2, Upload, Loader, Clock, Calendar, FolderKanban } from 'lucide-react';
 import { getLocalized } from '../../lib/helpers';
-import { db, api, isProductionDomain } from '../../lib/db'; // Import DB access for fetching projects
+import { db, api, isProductionDomain } from '../../lib/db'; 
 
 interface RequestFormProps {
     formData: any;
@@ -13,7 +13,7 @@ interface RequestFormProps {
     locations: any[];
     workplaces: any[];
     technologies: any[];
-    suppliers: any[]; // Added suppliers prop
+    suppliers: any[]; 
     handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     removePhoto: (index: number) => void;
     isEditMode: boolean;
@@ -28,7 +28,7 @@ export const RequestForm = ({
     locations, 
     workplaces, 
     technologies,
-    suppliers, // Destructure suppliers
+    suppliers,
     handleImageUpload,
     removePhoto,
     isEditMode,
@@ -41,7 +41,6 @@ export const RequestForm = ({
     const [selLoc, setSelLoc] = useState('');
     const [selWp, setSelWp] = useState('');
 
-    // Fetch projects on mount
     useEffect(() => {
         const fetchProjects = async () => {
             const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
@@ -57,73 +56,61 @@ export const RequestForm = ({
         fetchProjects();
     }, []);
 
-    // Filtering available options based on user role with safety checks
     const availLocs = user.role === 'admin' ? locations : locations.filter((l: any) => (user.assignedLocationIds || []).includes(l.id));
     
-    // Auto-prefill Location if only one is available (New Request Mode)
     useEffect(() => {
         if (!isEditMode && !selLoc && availLocs.length === 1) {
             setSelLoc(availLocs[0].id);
         }
     }, [isEditMode, availLocs, selLoc]);
 
-    // STRICT HIERARCHY: Filter workplaces based on selected location
-    // If no location selected, return empty array to prevent random pre-filling
     const availWps = useMemo(() => {
         if (!selLoc) return [];
-        
         const allowedWps = user.role === 'admin' 
             ? workplaces 
             : workplaces.filter((w: any) => (user.assignedWorkplaceIds || []).includes(w.id));
-            
         return allowedWps.filter((w: any) => w.locationId === selLoc);
     }, [selLoc, workplaces, user]);
 
-    // Auto-prefill Workplace if only one is available AND location is selected
     useEffect(() => {
         if (!isEditMode && selLoc && !selWp && availWps.length === 1) {
             setSelWp(availWps[0].id);
         }
     }, [isEditMode, selLoc, availWps, selWp]);
 
-    // STRICT HIERARCHY: Filter technologies based on selected workplace
-    // If no workplace selected, return empty array
+    // Update tech filter to check if tech.workplaceIds includes selWp
     const availTechs = useMemo(() => {
         if (!selWp) return [];
-        return technologies.filter((t: any) => t.workplaceId === selWp && t.isVisible);
+        return technologies.filter((t: any) => t.workplaceIds?.includes(selWp) && t.isVisible);
     }, [selWp, technologies]);
 
-    // If editing, try to resolve location/workplace from techId if not set manually
-    // BUT only if a techId exists (because it's now optional)
+    // Auto-resolve Loc/Wp from existing techId in edit mode
     useEffect(() => {
-        if (isEditMode && !selLoc) {
-             if (formData.techId) {
-                 const tech = technologies.find((t: any) => t.id === formData.techId);
-                 const wp = workplaces.find((w: any) => w.id === tech?.workplaceId);
+        if (isEditMode && !selLoc && formData.techId) {
+             const tech = technologies.find((t: any) => t.id === formData.techId);
+             // Since tech can have multiple workplaces, we pick the first one that matches user's allowed locations/workplaces
+             // or simply the first one found.
+             if (tech && tech.workplaceIds && tech.workplaceIds.length > 0) {
+                 const firstWpId = tech.workplaceIds[0];
+                 const wp = workplaces.find((w: any) => w.id === firstWpId);
                  if (wp) {
                      setSelLoc(wp.locationId);
                      setSelWp(wp.id);
                  }
-             } else {
-                 // No tech ID logic
              }
         }
     }, [isEditMode, formData.techId, technologies, workplaces, selLoc]);
 
-    // Force 'internal' supplier for operators if not already set
     useEffect(() => {
         if (user.role === 'operator' && formData.assignedSupplierId !== 'internal') {
             setFormData({...formData, assignedSupplierId: 'internal'});
         }
     }, [user.role, formData, setFormData]);
 
-    // --- Dynamic Supplier Logic ---
     const { defaultSupplier, otherSuppliers } = useMemo(() => {
-        // Use props.suppliers instead of db.suppliers.list()
         const allSuppliers = suppliers || []; 
         let defSup = null;
         
-        // Find default supplier for selected technology
         if (formData.techId) {
             const tech = technologies.find((t: any) => t.id === formData.techId);
             if (tech && tech.supplierId) {
@@ -131,7 +118,6 @@ export const RequestForm = ({
             }
         }
 
-        // Filter and Sort others
         const others = allSuppliers
             .filter(s => s.id !== defSup?.id)
             .sort((a, b) => getLocalized(a.name, lang).localeCompare(getLocalized(b.name, lang)));
@@ -142,7 +128,6 @@ export const RequestForm = ({
 
     return (
         <div className="space-y-4 p-1">
-             {/* Project Selection */}
              <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.project')}</label>
                 <div className="relative">
@@ -168,10 +153,10 @@ export const RequestForm = ({
                         value={selLoc} 
                         onChange={e => { 
                             setSelLoc(e.target.value); 
-                            setSelWp(''); // Reset Workplace
-                            setFormData({...formData, techId: ''}); // Reset Tech
+                            setSelWp(''); 
+                            setFormData({...formData, techId: ''}); 
                         }}
-                        disabled={isEditMode && !!formData.techId} // Disable only if tech is locked
+                        disabled={isEditMode && !!formData.techId} 
                     >
                         <option value="">{t('option.select_location')}</option>
                         {availLocs.map((l: any) => <option key={l.id} value={l.id}>{getLocalized(l.name, lang)}</option>)}
@@ -184,9 +169,9 @@ export const RequestForm = ({
                         value={selWp} 
                         onChange={e => { 
                             setSelWp(e.target.value); 
-                            setFormData({...formData, techId: ''}); // Reset Tech
+                            setFormData({...formData, techId: ''}); 
                         }}
-                        disabled={!selLoc || (isEditMode && !!formData.techId)} // Strict Disable
+                        disabled={!selLoc || (isEditMode && !!formData.techId)} 
                     >
                         <option value="">{t('option.select_wp')}</option>
                         {availWps.map((w: any) => <option key={w.id} value={w.id}>{getLocalized(w.name, lang)}</option>)}
@@ -200,7 +185,7 @@ export const RequestForm = ({
                     className={`w-full p-2 rounded border ${errors.techId ? 'border-red-500' : ''} ${(!selWp) ? 'bg-slate-100' : ''}`}
                     value={formData.techId || ''} 
                     onChange={e => setFormData({...formData, techId: e.target.value})}
-                    disabled={!selWp} // Strict Disable: No workplace -> No tech select
+                    disabled={!selWp} 
                 >
                     <option value="">{selWp ? t('option.no_tech') : t('option.select_wp_first')}</option>
                     {availTechs.map((t: any) => {
@@ -212,7 +197,6 @@ export const RequestForm = ({
                 {errors.techId && <span className="text-xs text-red-500">{errors.techId}</span>}
              </div>
 
-             {/* Supplier Selection - Hidden for Operators */}
              {user.role !== 'operator' && (
                  <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">{t('form.solution')}</label>

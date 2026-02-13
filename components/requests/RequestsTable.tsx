@@ -5,16 +5,16 @@ import { Request, User, Technology, Supplier, Workplace, Project } from '../../l
 import { getLocalized } from '../../lib/helpers';
 import { MultiSelect, Pagination } from '../Shared';
 import { Search, CheckCircle, Clock, Euro, X, Eye, Edit, Ban, UserPlus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
-import { SortConfig } from '../../pages/RequestsPage'; // Import type from parent
+import { SortConfig } from '../../pages/RequestsPage'; 
 
 interface RequestsTableProps {
-    requests: Request[]; // Already filtered
+    requests: Request[]; 
     currentUser: User;
     technologies: Technology[];
     suppliers: Supplier[];
     users: User[];
     workplaces: Workplace[];
-    projects: Project[]; // Added projects prop
+    projects: Project[]; 
     onDetail: (req: Request) => void;
     onEdit: (req: Request) => void;
     onCancel: (req: Request) => void;
@@ -40,7 +40,6 @@ export const RequestsTable = ({
 }: RequestsTableProps) => {
     const { t, lang } = useI18n();
     
-    // Destructure controlled state
     const {
         fTitle, setFTitle,
         fTechIds, setFTechIds,
@@ -54,18 +53,16 @@ export const RequestsTable = ({
         fPriorities, setFPriorities,
         fApproved, setFApproved,
         fMaintenanceId, setFMaintenanceId,
-        fProjectId, setFProjectId, // Destructure project filter
+        fProjectId, setFProjectId,
         fOverdue, setFOverdue
     } = filterState;
 
-    // Pagination
     const totalItems = requests.length;
     const paginatedRequests = requests.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // Helpers
     const renderStatusBadge = (status: string) => {
         const styles: any = {
             'new': 'bg-blue-100 text-blue-800',
@@ -96,11 +93,10 @@ export const RequestsTable = ({
         setFPriorities([]);
         setFApproved('all');
         if (setFMaintenanceId) setFMaintenanceId(null);
-        if (setFProjectId) setFProjectId([]); // Clear project filter
+        if (setFProjectId) setFProjectId([]); 
         if (setFOverdue) setFOverdue(false);
     };
 
-    // Helper for Sortable Headers
     const SortableHeader = ({ label, sortKey, align = 'left' }: { label: string, sortKey: string, align?: string }) => {
         const isActive = sortConfig.key === sortKey;
         return (
@@ -120,15 +116,14 @@ export const RequestsTable = ({
         );
     };
 
-    // Options for Filters
     const localizedTechs = technologies.map(t => ({ id: t.id, name: getLocalized(t.name, lang) }));
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
-    const projectOptions = (projects || []).map(p => ({ id: p.id, name: getLocalized(p.name, lang) })); // Project Options
+    const projectOptions = (projects || []).map(p => ({ id: p.id, name: getLocalized(p.name, lang) }));
     const supplierOptions = [
         { id: 'internal', name: t('form.internal_solution') },
-        { id: 'external', name: `${t('label.external_tasks')} (${t('common.all')})` }, // Added "External" group option
+        { id: 'external', name: `${t('label.external_tasks')} (${t('common.all')})` }, 
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 
@@ -215,14 +210,11 @@ export const RequestsTable = ({
                                 const solver = users.find(u => u.id === req.solverId);
                                 const isUrgent = req.priority === 'urgent';
                                 
-                                // Check permissions logic
                                 const canTakeOver = currentUser.role === 'admin' || currentUser.role === 'maintenance';
                                 const canApprove = currentUser.role === 'admin' || currentUser.role === 'maintenance';
                                 const canEdit = currentUser.role !== 'operator' || currentUser.id === req.authorId;
                                 const isFinal = req.state === 'solved' || req.state === 'cancelled';
                                 
-                                // Approval Enabled: Just check if user has ROLE to approve and request is not final.
-                                // We do NOT check limit here anymore for disabled state, that logic moves to modal.
                                 const approvalEnabled = canApprove && !isFinal;
 
                                 return (
@@ -242,7 +234,6 @@ export const RequestsTable = ({
                                             {req.plannedResolutionDate ? new Date(req.plannedResolutionDate).toLocaleDateString() : '-'}
                                         </td>
                                         
-                                        {/* Solver / Take Over Column */}
                                         <td className="px-4 py-3 text-slate-600">
                                             {req.solverId ? (
                                                 <span className="font-medium text-slate-700">{solver ? solver.name : 'Neznámý'}</span>
@@ -265,11 +256,9 @@ export const RequestsTable = ({
                                             {req.estimatedTime ? <span className="flex items-center justify-center"><Clock className="w-3 h-3 text-slate-400 mr-1"/>{formatTime(req.estimatedTime)}</span> : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            {/* Status Badge is now static, changes moved to Detail */}
                                             {renderStatusBadge(req.state)}
                                         </td>
                                         
-                                        {/* Approval Column - Show only if approved OR cost > 0 */}
                                         <td className="px-4 py-3 text-center">
                                             {(req.isApproved || (req.estimatedCost || 0) > 0) ? (
                                                 <button 
@@ -286,7 +275,6 @@ export const RequestsTable = ({
                                             ) : null}
                                         </td>
 
-                                        {/* Actions Column */}
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1">
                                                 <button onClick={() => onDetail(req)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title={t('headers.request_detail')}>
