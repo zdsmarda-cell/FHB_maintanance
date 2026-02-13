@@ -1,3 +1,4 @@
+
 import { User, Request, Location, Workplace, Technology, Supplier, Maintenance, Email, PushLog, Project } from './types';
 
 export const PROD_DOMAIN = 'fhbmain.impossible.cz';
@@ -18,45 +19,105 @@ const setStorage = (key: string, data: any[]) => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
+// --- API Client with Auto-Refresh Logic ---
+
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth_user');
+        window.location.href = '/';
+    }
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return null;
+
+    try {
+        const res = await fetch(`${PROD_API_URL}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem('auth_token', data.accessToken);
+            return data.accessToken;
+        } else {
+            // Refresh token is invalid or expired
+            handleLogout();
+            return null;
+        }
+    } catch (error) {
+        console.error('Failed to refresh token', error);
+        handleLogout();
+        return null;
+    }
+};
+
+const fetchWithRetry = async (url: string, options: RequestInit = {}) => {
+    // 1. Attach current token
+    const token = localStorage.getItem('auth_token');
+    const headers = { ...options.headers } as Record<string, string>;
+    
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // 2. Initial Request
+    let res = await fetch(url, { ...options, headers });
+
+    // 3. Check for 403 (Forbidden) or 401 (Unauthorized) indicating token expiration
+    if (res.status === 403 || res.status === 401) {
+        // Only attempt refresh if we have a refresh token
+        if (localStorage.getItem('refresh_token')) {
+            if (!isRefreshing) {
+                isRefreshing = true;
+                refreshPromise = refreshAccessToken().finally(() => {
+                    isRefreshing = false;
+                    refreshPromise = null;
+                });
+            }
+
+            // Wait for the single refresh request to finish
+            const newToken = await refreshPromise;
+
+            if (newToken) {
+                // Retry the original request with the new token
+                headers['Authorization'] = `Bearer ${newToken}`;
+                res = await fetch(url, { ...options, headers });
+            }
+        }
+    }
+
+    if (!res.ok) throw new Error(await res.text());
+    
+    // Check if response has content (for 204 No Content support)
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+};
+
 export const api = {
     baseUrl: PROD_API_URL,
-    get: async (endpoint: string) => {
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if(!res.ok) throw new Error(await res.text());
-        return res.json();
-    },
-    post: async (endpoint: string, body: any) => {
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(body)
-        });
-        if(!res.ok) throw new Error(await res.text());
-        return res.json();
-    },
-    put: async (endpoint: string, body: any) => {
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(body)
-        });
-        if(!res.ok) throw new Error(await res.text());
-        return res.json();
-    },
-    delete: async (endpoint: string) => {
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${PROD_API_URL}/api${endpoint}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if(!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
+    get: (endpoint: string) => fetchWithRetry(`${PROD_API_URL}/api${endpoint}`),
+    post: (endpoint: string, body: any) => fetchWithRetry(`${PROD_API_URL}/api${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    }),
+    put: (endpoint: string, body: any) => fetchWithRetry(`${PROD_API_URL}/api${endpoint}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    }),
+    delete: (endpoint: string) => fetchWithRetry(`${PROD_API_URL}/api${endpoint}`, {
+        method: 'DELETE'
+    })
 };
 
 export const db = {
