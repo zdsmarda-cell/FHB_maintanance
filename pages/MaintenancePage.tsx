@@ -184,12 +184,16 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             if (!tech) return false;
             
             // Check if tech belongs to a workplace/location accessible by the operator
-            const workplace = workplaces.find(w => w.id === tech.workplaceId);
-            if (!workplace) return false;
+            const techWorkplaceIds = tech.workplaceIds || [];
+            if (techWorkplaceIds.length === 0) return false;
 
-            const hasAccess = 
-                (user.assignedWorkplaceIds || []).includes(workplace.id) || 
-                (user.assignedLocationIds || []).includes(workplace.locationId);
+            const hasAccess = techWorkplaceIds.some(wpId => {
+                const workplace = workplaces.find(w => w.id === wpId);
+                if (!workplace) return false;
+                
+                return (user.assignedWorkplaceIds || []).includes(workplace.id) || 
+                       (user.assignedLocationIds || []).includes(workplace.locationId);
+            });
             
             if (!hasAccess) return false;
         }
@@ -241,8 +245,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         setMaintForm(m);
         // Pre-fill location/workplace selectors based on techId
         const tech = technologies.find(t => t.id === m.techId);
-        if (tech) {
-            const wp = workplaces.find(w => w.id === tech.workplaceId);
+        if (tech && tech.workplaceIds && tech.workplaceIds.length > 0) {
+            // Pick first workplace for context
+            const wp = workplaces.find(w => w.id === tech.workplaceIds[0]);
             if (wp) {
                 setSelectedWpId(wp.id);
                 setSelectedLocId(wp.locationId);
@@ -675,7 +680,8 @@ const MaintModal = ({
                                 disabled={!selectedWpId}
                             >
                                 <option value="">{selectedWpId ? t('option.select_tech') : t('option.select_wp_first')}</option>
-                                {selectedWpId && technologies.filter((t: any) => t.workplaceId === selectedWpId && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
+                                {/* Fix for multiple workplaces: Check if workplaceIds includes selectedWpId */}
+                                {selectedWpId && technologies.filter((t: any) => t.workplaceIds?.includes(selectedWpId) && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
                             </select>
                             {errors.techId && <span className="text-xs text-red-500 font-bold">{errors.techId}</span>}
                         </div>

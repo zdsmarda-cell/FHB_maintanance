@@ -355,23 +355,32 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     // 4. Approval Logic
     const openApprovalModal = (req: Request) => {
         const tech = technologies.find(t => t.id === req.techId);
-        const wp = workplaces.find(w => w.id === tech?.workplaceId);
-        const locId = wp?.locationId;
+        // tech.workplaceIds is string[]
+        const techWorkplaceIds = tech?.workplaceIds || [];
+        
+        // Get all location IDs associated with this technology
+        const locationIds = techWorkplaceIds
+            .map(wpId => workplaces.find(w => w.id === wpId)?.locationId)
+            .filter((id): id is string => !!id); // Filter undefined
         
         // CRITICAL FIX: Use the fresh user data from the 'users' state array (loaded from API)
         // instead of the potentially stale 'user' prop (from session storage).
-        // This ensures recent limit updates in Admin panel are respected immediately without relogin.
         const freshUser = users.find(u => u.id === user.id) || user;
 
-        let limit = 0;
-        if (locId && freshUser.approvalLimits && freshUser.approvalLimits[locId] !== undefined) {
-            limit = Number(freshUser.approvalLimits[locId]);
-        }
-        
+        let hasLimit = false;
         const cost = Number(req.estimatedCost) || 0;
-        
-        // Strict Logic: Even Admins must have sufficient limit set for the location
-        const hasLimit = cost <= limit;
+
+        if (locationIds.length === 0) {
+             // Fallback if no location found (e.g. tech deleted workplace relation or not assigned)
+             // Allow only if cost is 0
+             hasLimit = cost === 0; 
+        } else {
+            // Check if user has sufficient limit in ANY of the tech's locations
+            hasLimit = locationIds.some(locId => {
+                const limit = Number(freshUser.approvalLimits?.[locId] || 0);
+                return cost <= limit;
+            });
+        }
 
         setApprovalTargetReq(req);
         setApprovalHasLimit(hasLimit);
