@@ -420,14 +420,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <th className="px-4 py-3 whitespace-nowrap">Generování</th>
                                 <th className="px-4 py-3 whitespace-nowrap text-center">{t('col.open_requests')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('form.supplier')}</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('form.responsible_person')}</th>
                                 <th className="px-4 py-3 text-right">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={9} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
@@ -457,8 +455,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap">{renderActiveBadge(m.isActive)}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap">{supplier ? getLocalized(supplier.name, lang) : '-'}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap max-w-[200px] truncate" title={responsibleNames}>{responsibleNames || '-'}</td>
                                             <td className="px-4 py-3 text-right">
                                                 {user.role !== 'operator' && (
                                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
