@@ -325,6 +325,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-800">{selectedTemplate.title}</h2>
                                     <div className="text-slate-500 mt-1">{getLocalized(tech?.name, lang) || 'Neznámá technologie'}</div>
+                                    <div className="text-slate-500 text-sm mt-1">Sériové číslo: {tech?.serialNumber || '-'}</div>
                                 </div>
                                 {renderActiveBadge(selectedTemplate.isActive)}
                             </div>
@@ -677,7 +678,7 @@ const MaintModal = ({
                             >
                                 <option value="">{selectedWpId ? t('option.select_tech') : t('option.select_wp_first')}</option>
                                 {/* Fix for multiple workplaces: Check if workplaceIds includes selectedWpId */}
-                                {selectedWpId && technologies.filter((t: any) => t.workplaceIds?.includes(selectedWpId) && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}</option>)}
+                                {selectedWpId && technologies.filter((t: any) => t.workplaceIds?.includes(selectedWpId) && t.isVisible).map((t: any) => <option key={t.id} value={t.id}>{getLocalized(t.name, lang)}{t.serialNumber ? ` - ${t.serialNumber}` : ''}</option>)}
                             </select>
                             {errors.techId && <span className="text-xs text-red-500 font-bold">{errors.techId}</span>}
                         </div>
