@@ -427,7 +427,12 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const localizedTypes = techTypes.map(t => ({...t, name: getLocalized(t.name, lang)}));
     const localizedStates = techStates.map(s => ({...s, name: getLocalized(s.name, lang)}));
     const localizedSuppliers = suppliers.map(s => ({...s, name: getLocalized(s.name, lang)}));
-    const localizedWorkplaces = workplaces.map(w => ({...w, name: getLocalized(w.name, lang)}));
+    
+    const filteredWorkplaces = filterLocationIds.length > 0 
+        ? workplaces.filter(w => filterLocationIds.includes(w.locationId))
+        : workplaces;
+        
+    const localizedWorkplaces = filteredWorkplaces.map(w => ({...w, name: getLocalized(w.name, lang)}));
     const localizedLocations = locations.map(l => ({...l, name: getLocalized(l.name, lang)}));
 
     return (

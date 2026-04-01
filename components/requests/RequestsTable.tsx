@@ -13,6 +13,7 @@ interface RequestsTableProps {
     technologies: Technology[];
     suppliers: Supplier[];
     users: User[];
+    locations: any[];
     workplaces: Workplace[];
     projects: Project[]; 
     onDetail: (req: Request) => void;
@@ -32,7 +33,7 @@ interface RequestsTableProps {
 }
 
 export const RequestsTable = ({ 
-    requests, currentUser, technologies, suppliers, users, workplaces, projects,
+    requests, currentUser, technologies, suppliers, users, locations, workplaces, projects,
     onDetail, onEdit, onCancel, onTakeOver, onApproval, onStatusChange,
     currentPage, itemsPerPage, onPageChange, onItemsPerPageChange,
     filterState, showFilters,
@@ -41,6 +42,8 @@ export const RequestsTable = ({
     const { t, lang } = useI18n();
     
     const {
+        fLocationIds, setFLocationIds,
+        fWorkplaceIds, setFWorkplaceIds,
         fTitle, setFTitle,
         fTechIds, setFTechIds,
         fDateResFrom, setFDateResFrom,
@@ -82,6 +85,8 @@ export const RequestsTable = ({
     };
 
     const handleClearFilters = () => {
+        if (setFLocationIds) setFLocationIds([]);
+        if (setFWorkplaceIds) setFWorkplaceIds([]);
         setFTitle('');
         setFTechIds([]);
         setFDateResFrom('');
@@ -118,7 +123,22 @@ export const RequestsTable = ({
         );
     };
 
-    const localizedTechs = technologies.map(t => ({ id: t.id, name: getLocalized(t.name, lang) }));
+    const filteredWorkplaces = fLocationIds && fLocationIds.length > 0 
+        ? workplaces.filter(wp => fLocationIds.includes(wp.locationId))
+        : workplaces;
+
+    const filteredTechs = technologies.filter(tech => {
+        const techWpIds = tech.workplaceIds || [];
+        const techLocIds = techWpIds.map(wpId => workplaces.find(w => w.id === wpId)?.locationId).filter(Boolean) as string[];
+
+        if (fLocationIds && fLocationIds.length > 0 && !techLocIds.some(locId => fLocationIds.includes(locId))) return false;
+        if (fWorkplaceIds && fWorkplaceIds.length > 0 && !techWpIds.some(wpId => fWorkplaceIds.includes(wpId))) return false;
+        return true;
+    });
+
+    const localizedLocations = (locations || []).map(l => ({ id: l.id, name: getLocalized(l.name, lang) }));
+    const localizedWorkplaces = filteredWorkplaces.map(wp => ({ id: wp.id, name: getLocalized(wp.name, lang) }));
+    const localizedTechs = filteredTechs.map(t => ({ id: t.id, name: getLocalized(t.name, lang) }));
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
@@ -130,7 +150,7 @@ export const RequestsTable = ({
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 
-    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fAuthorIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId || (fProjectId && fProjectId.length > 0) || fOverdue;
+    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fAuthorIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId || (fProjectId && fProjectId.length > 0) || fOverdue || (fLocationIds && fLocationIds.length > 0) || (fWorkplaceIds && fWorkplaceIds.length > 0);
     
     return (
         <>
@@ -152,6 +172,8 @@ export const RequestsTable = ({
                                 <input className="w-full pl-8 p-1.5 border rounded text-sm bg-white" value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder={t('common.search')} />
                             </div>
                         </div>
+                        <div><MultiSelect label={t('form.location')} options={localizedLocations} selectedIds={fLocationIds || []} onChange={setFLocationIds || (() => {})} /></div>
+                        <div><MultiSelect label={t('form.workplace')} options={localizedWorkplaces} selectedIds={fWorkplaceIds || []} onChange={setFWorkplaceIds || (() => {})} /></div>
                         <div><MultiSelect label={t('col.technology')} options={localizedTechs} selectedIds={fTechIds} onChange={setFTechIds} /></div>
                         <div><MultiSelect label={t('common.status')} options={statusOptions} selectedIds={fStatusIds} onChange={setFStatusIds} /></div>
                         <div><MultiSelect label={t('col.solver')} options={solverOptions} selectedIds={fSolverIds} onChange={setFSolverIds} /></div>

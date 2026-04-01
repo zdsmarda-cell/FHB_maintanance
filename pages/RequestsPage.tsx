@@ -77,6 +77,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [saving, setSaving] = useState(false);
 
     // Filter State
+    const [fLocationIds, setFLocationIds] = useState<string[]>([]);
+    const [fWorkplaceIds, setFWorkplaceIds] = useState<string[]>([]);
     const [fTitle, setFTitle] = useState('');
     const [fTechIds, setFTechIds] = useState<string[]>([]);
     // Resolution Date Filters
@@ -481,6 +483,13 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         const result = requests.filter(r => {
             if (fTitle && !getLocalized(r.title, lang).toLowerCase().includes(fTitle.toLowerCase())) return false;
             
+            const tech = technologies.find(t => t.id === r.techId);
+            const techWpIds = tech?.workplaceIds || [];
+            const techLocIds = techWpIds.map(wpId => workplaces.find(w => w.id === wpId)?.locationId).filter(Boolean) as string[];
+
+            if (fLocationIds.length > 0 && !techLocIds.some(locId => fLocationIds.includes(locId))) return false;
+            if (fWorkplaceIds.length > 0 && !techWpIds.some(wpId => fWorkplaceIds.includes(wpId))) return false;
+            
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
             // Resolution Date Filter Logic
@@ -604,7 +613,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         }
 
         return result;
-    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fAuthorIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, fProjectIds, fOverdue, lang, technologies, users, sortConfig]);
+    }, [requests, fTitle, fLocationIds, fWorkplaceIds, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fAuthorIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, fProjectIds, fOverdue, lang, technologies, users, sortConfig]);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -663,6 +672,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     technologies={technologies}
                     suppliers={suppliers}
                     users={users}
+                    locations={locations}
                     workplaces={workplaces}
                     projects={projects} // Pass projects to table
                     onDetail={(r) => setSelectedRequest(r)}
@@ -676,6 +686,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={setItemsPerPage}
                     filterState={{
+                        fLocationIds, setFLocationIds,
+                        fWorkplaceIds, setFWorkplaceIds,
                         fTitle, setFTitle,
                         fTechIds, setFTechIds,
                         fDateResFrom, setFDateResFrom,
