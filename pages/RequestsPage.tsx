@@ -90,6 +90,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [fSupplierIds, setFSupplierIds] = useState<string[]>([]);
     const [fStatusIds, setFStatusIds] = useState<string[]>([]);
     const [fPriorities, setFPriorities] = useState<string[]>([]);
+    const [fAuthorIds, setFAuthorIds] = useState<string[]>([]);
     const [fApproved, setFApproved] = useState('all');
     const [fMaintenanceId, setFMaintenanceId] = useState<string | null>(null);
     const [fProjectIds, setFProjectIds] = useState<string[]>([]); // Changed to array for MultiSelect compatibility
@@ -104,7 +105,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 setFStatusIds(statuses);
             }
             if (initialFilters.solverId) setFSolverIds([initialFilters.solverId]);
-            if (initialFilters.authorId) { /* Add author filter logic if needed, currently not in UI */ }
+            if (initialFilters.authorId) { setFAuthorIds([initialFilters.authorId]); }
             if (initialFilters.mode === 'approval') setFApproved('pending');
             if (initialFilters.maintenanceId) {
                 setFMaintenanceId(initialFilters.maintenanceId);
@@ -496,6 +497,10 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                 if (!r.solverId || !fSolverIds.includes(r.solverId)) return false;
             }
 
+            if (fAuthorIds.length > 0) {
+                if (!r.authorId || !fAuthorIds.includes(r.authorId)) return false;
+            }
+
             // Status Filter
             if (fStatusIds.length > 0 && !fStatusIds.includes(r.state)) return false;
 
@@ -599,7 +604,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         }
 
         return result;
-    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, fProjectIds, fOverdue, lang, technologies, users, sortConfig]);
+    }, [requests, fTitle, fTechIds, fDateResFrom, fDateResTo, fDateCreatedFrom, fDateCreatedTo, fSolverIds, fAuthorIds, fSupplierIds, fStatusIds, fPriorities, fApproved, fMaintenanceId, fProjectIds, fOverdue, lang, technologies, users, sortConfig]);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -678,6 +683,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                         fDateCreatedFrom, setFDateCreatedFrom,
                         fDateCreatedTo, setFDateCreatedTo,
                         fSolverIds, setFSolverIds,
+                        fAuthorIds, setFAuthorIds,
                         fSupplierIds, setFSupplierIds,
                         fStatusIds, setFStatusIds,
                         fPriorities, setFPriorities,

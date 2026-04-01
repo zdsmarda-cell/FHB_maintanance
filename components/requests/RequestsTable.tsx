@@ -48,6 +48,7 @@ export const RequestsTable = ({
         fDateCreatedFrom, setFDateCreatedFrom,
         fDateCreatedTo, setFDateCreatedTo,
         fSolverIds, setFSolverIds,
+        fAuthorIds, setFAuthorIds,
         fSupplierIds, setFSupplierIds,
         fStatusIds, setFStatusIds,
         fPriorities, setFPriorities,
@@ -88,6 +89,7 @@ export const RequestsTable = ({
         setFDateCreatedFrom('');
         setFDateCreatedTo('');
         setFSolverIds([]);
+        setFAuthorIds([]);
         setFSupplierIds([]);
         setFStatusIds([]);
         setFPriorities([]);
@@ -120,6 +122,7 @@ export const RequestsTable = ({
     const statusOptions = ['new', 'assigned', 'solved', 'cancelled'].map(s => ({ id: s, name: t(`status.${s}`) }));
     const priorityOptions = ['basic', 'priority', 'urgent'].map(p => ({ id: p, name: t(`prio.${p}`) }));
     const solverOptions = users.filter(u => u.role !== 'operator').map(u => ({ id: u.id, name: u.name }));
+    const authorOptions = users.map(u => ({ id: u.id, name: u.name }));
     const projectOptions = (projects || []).map(p => ({ id: p.id, name: getLocalized(p.name, lang) }));
     const supplierOptions = [
         { id: 'internal', name: t('form.internal_solution') },
@@ -127,7 +130,7 @@ export const RequestsTable = ({
         ...suppliers.map(s => ({ id: s.id, name: getLocalized(s.name, lang) }))
     ];
 
-    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId || (fProjectId && fProjectId.length > 0) || fOverdue;
+    const hasActiveFilters = fTitle || fTechIds.length > 0 || fDateResFrom || fDateResTo || fDateCreatedFrom || fDateCreatedTo || fSolverIds.length > 0 || fAuthorIds.length > 0 || fSupplierIds.length > 0 || fStatusIds.length > 0 || fPriorities.length > 0 || fApproved !== 'all' || fMaintenanceId || (fProjectId && fProjectId.length > 0) || fOverdue;
     
     return (
         <>
@@ -152,6 +155,7 @@ export const RequestsTable = ({
                         <div><MultiSelect label={t('col.technology')} options={localizedTechs} selectedIds={fTechIds} onChange={setFTechIds} /></div>
                         <div><MultiSelect label={t('common.status')} options={statusOptions} selectedIds={fStatusIds} onChange={setFStatusIds} /></div>
                         <div><MultiSelect label={t('col.solver')} options={solverOptions} selectedIds={fSolverIds} onChange={setFSolverIds} /></div>
+                        <div><MultiSelect label={t('col.author') || 'Zadavatel'} options={authorOptions} selectedIds={fAuthorIds} onChange={setFAuthorIds} /></div>
                         
                         <div>
                             <div className="mb-1 text-xs text-slate-500 font-medium">{t('col.deadline')}</div>
@@ -208,6 +212,7 @@ export const RequestsTable = ({
                             paginatedRequests.map(req => {
                                 const tech = technologies.find(t => t.id === req.techId);
                                 const solver = users.find(u => u.id === req.solverId);
+                                const author = users.find(u => u.id === req.authorId);
                                 const isUrgent = req.priority === 'urgent';
                                 
                                 const canTakeOver = currentUser.role === 'admin' || currentUser.role === 'maintenance';
@@ -224,6 +229,11 @@ export const RequestsTable = ({
                                             <div className="text-xs text-slate-400">
                                                 {new Date(req.createdDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                             </div>
+                                            {author && (
+                                                <div className="text-xs text-slate-500 mt-0.5" title="Zadavatel">
+                                                    {author.name}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 font-medium text-slate-800">
                                             {isUrgent && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-2" title={t('prio.urgent')}></span>}

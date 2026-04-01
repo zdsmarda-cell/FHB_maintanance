@@ -286,6 +286,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const [search, setSearch] = useState('');
     const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
     const [filterStateIds, setFilterStateIds] = useState<string[]>([]);
+    const [filterLocationIds, setFilterLocationIds] = useState<string[]>([]);
     const [filterWpIds, setFilterWpIds] = useState<string[]>([]);
     const [filterSupplierId, setFilterSupplierId] = useState<string>(''); 
     const [filterVisible, setFilterVisible] = useState<'all' | 'true' | 'false'>('true');
@@ -310,11 +311,10 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
             if (initialFilters.workplaceId) setFilterWpIds([initialFilters.workplaceId]);
             if (initialFilters.supplierId) setFilterSupplierId(initialFilters.supplierId);
             if (initialFilters.locationId) {
-                const wps = workplaces.filter(w => w.locationId === initialFilters.locationId).map(w => w.id);
-                if (workplaces.length > 0) setFilterWpIds(wps);
+                setFilterLocationIds([initialFilters.locationId]);
             }
         }
-    }, [initialFilters, workplaces]);
+    }, [initialFilters]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -385,6 +385,14 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
         if (filterTypeIds.length > 0 && !filterTypeIds.includes(a.typeId)) return false;
         if (filterStateIds.length > 0 && !filterStateIds.includes(a.stateId)) return false;
         
+        // Location Filter: Check if asset has ANY of the selected location IDs via its workplaces
+        if (filterLocationIds.length > 0) {
+            const assetWps = a.workplaceIds || [];
+            const assetLocs = assetWps.map(id => workplaces.find(w => w.id === id)?.locationId).filter(Boolean);
+            const hasMatch = assetLocs.some(locId => filterLocationIds.includes(locId));
+            if (!hasMatch) return false;
+        }
+
         // Workplace Filter: Check if asset has ANY of the selected filter IDs in its workplaceIds array
         if (filterWpIds.length > 0) {
             const assetWps = a.workplaceIds || [];
@@ -420,6 +428,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
     const localizedStates = techStates.map(s => ({...s, name: getLocalized(s.name, lang)}));
     const localizedSuppliers = suppliers.map(s => ({...s, name: getLocalized(s.name, lang)}));
     const localizedWorkplaces = workplaces.map(w => ({...w, name: getLocalized(w.name, lang)}));
+    const localizedLocations = locations.map(l => ({...l, name: getLocalized(l.name, lang)}));
 
     return (
         <div className="space-y-6">
@@ -433,13 +442,14 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
             </div>
 
             <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" />
                         <input className="w-full pl-8 p-1.5 border rounded text-sm" placeholder={t('common.search')} value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     <div><MultiSelect label={t('headers.tech_types')} options={localizedTypes} selectedIds={filterTypeIds} onChange={setFilterTypeIds} /></div>
                     <div><MultiSelect label={t('headers.tech_states')} options={localizedStates} selectedIds={filterStateIds} onChange={setFilterStateIds} /></div>
+                    <div><MultiSelect label={t('form.location')} options={localizedLocations} selectedIds={filterLocationIds} onChange={setFilterLocationIds} /></div>
                     <div><MultiSelect label={t('form.workplace')} options={localizedWorkplaces} selectedIds={filterWpIds} onChange={setFilterWpIds} /></div>
                     
                     <div>
@@ -478,6 +488,7 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                 <th className="px-4 py-3">{t('form.install_date')}</th>
                                 <th className="px-4 py-3">{t('form.type')}</th>
                                 <th className="px-4 py-3">{t('form.state')}</th>
+                                <th className="px-4 py-3">{t('form.location')}</th>
                                 <th className="px-4 py-3">{t('form.workplace')}</th>
                                 <th className="px-4 py-3">{t('form.supplier')}</th>
                                 <th className="px-4 py-3 text-center">{t('form.is_visible')}</th>
@@ -499,6 +510,16 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                     return w ? getLocalized(w.name, lang) : null;
                                 }).filter(Boolean).join(', ');
 
+                                // Resolve locations
+                                const assignedLocs = [...new Set((asset.workplaceIds || []).map(id => {
+                                    const w = workplaces.find(x => x.id === id);
+                                    if (w) {
+                                        const l = locations.find(loc => loc.id === w.locationId);
+                                        return l ? getLocalized(l.name, lang) : null;
+                                    }
+                                    return null;
+                                }).filter(Boolean))].join(', ');
+
                                 return (
                                     <tr key={asset.id} className={`border-b hover:bg-slate-50 ${!asset.isVisible ? 'bg-slate-50 opacity-70' : ''}`}>
                                         <td className="px-4 py-3 font-medium text-slate-900">
@@ -519,6 +540,9 @@ export const AssetsPage = ({ user, onNavigate, initialFilters }: AssetsPageProps
                                         </td>
                                         <td className="px-4 py-3">{getLocalized(type, lang) || '-'}</td>
                                         <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border">{getLocalized(state, lang) || '-'}</span></td>
+                                        <td className="px-4 py-3 text-xs max-w-[150px] truncate" title={assignedLocs}>
+                                            {assignedLocs || '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-xs max-w-[150px] truncate" title={assignedWps}>
                                             {assignedWps || '-'}
                                         </td>

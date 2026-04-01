@@ -137,15 +137,18 @@ export const generateWorkListPDF = async (
         }
         
         const solverName = r.solverId ? users.find(u => u.id === r.solverId)?.name || '-' : '-';
+        const authorName = r.authorId ? users.find(u => u.id === r.authorId)?.name || '-' : '-';
         const localizedPrio = t(`prio.${r.priority}`);
         const estTime = r.estimatedTime ? formatTimeHHMM(r.estimatedTime) : '-';
         const cost = formatCurrency(r.estimatedCost);
         const plannedDate = formatDateCZ(r.plannedResolutionDate);
+        const createdDate = formatDateCZ(r.createdDate);
 
         return [
+            createdDate + '\n' + authorName,
             { content: getLocalized(r.title, lang), styles: { fontStyle: 'bold' } },
             techName + (tech?.serialNumber ? `\n(S.N.: ${tech.serialNumber})` : ''),
-            { content: getLocalized(r.description, lang) || '', styles: { cellWidth: 60 } }, 
+            { content: getLocalized(r.description, lang) || '', styles: { cellWidth: 50 } }, 
             solverName,
             plannedDate,
             localizedPrio,
@@ -166,7 +169,7 @@ export const generateWorkListPDF = async (
             // Add Separator Row
             tableBody.push([{ 
                 content: t('pdf.ext_suppliers'), 
-                colSpan: 9, 
+                colSpan: 10, 
                 styles: { fillColor: [220, 220, 220], textColor: [50, 50, 50], fontStyle: 'bold', halign: 'center', minCellHeight: 8 } 
             }]);
         }
@@ -175,6 +178,7 @@ export const generateWorkListPDF = async (
 
     // --- Main Table ---
     const columns = [
+        t('col.created'),
         t('form.title'), 
         t('pdf.col_tech'), 
         t('form.description'), 
@@ -202,10 +206,11 @@ export const generateWorkListPDF = async (
             fontStyle: 'bold'
         },
         columnStyles: {
-            2: { cellWidth: 60 }, // Description wider
-            4: { cellWidth: 20 }, // Date
-            6: { cellWidth: 15 }, // Time
-            7: { cellWidth: 20 }, // Cost
+            0: { cellWidth: 20 }, // Created
+            3: { cellWidth: 50 }, // Description wider
+            5: { cellWidth: 20 }, // Date
+            7: { cellWidth: 15 }, // Time
+            8: { cellWidth: 20 }, // Cost
         }
     });
 
