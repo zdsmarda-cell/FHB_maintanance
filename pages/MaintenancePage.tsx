@@ -52,7 +52,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
 
             if (isMock) {
-                setTemplates(db.maintenances.list());
+                const reqs = db.requests.list();
+                const maints = db.maintenances.list().map(m => ({
+                    ...m,
+                    generatedRequestCount: reqs.filter(r => r.maintenanceId === m.id && !['solved', 'cancelled'].includes(r.state)).length
+                }));
+                setTemplates(maints);
                 setTechnologies(db.technologies.list());
                 setSuppliers(db.suppliers.list());
                 setUsers(db.users.list());

@@ -7,9 +7,9 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
     try {
-        // Updated query to include count of generated requests
+        // Updated query to include count of generated requests (excluding solved and cancelled)
         const [rows] = await pool.query(`
-            SELECT m.*, (SELECT COUNT(*) FROM requests r WHERE r.maintenance_id = m.id) as request_count 
+            SELECT m.*, (SELECT COUNT(*) FROM requests r WHERE r.maintenance_id = m.id AND r.state NOT IN ('solved', 'cancelled')) as request_count 
             FROM maintenances m
         `);
         

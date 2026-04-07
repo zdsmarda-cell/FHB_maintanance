@@ -48,9 +48,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
 
           if (isMock) {
-              setRequests(db.requests.list());
+              const reqs = db.requests.list();
+              setRequests(reqs);
               setTechs(db.technologies.list());
-              setMaintenance(db.maintenances.list());
+              const maints = db.maintenances.list().map(m => ({
+                  ...m,
+                  generatedRequestCount: reqs.filter(r => r.maintenanceId === m.id && !['solved', 'cancelled'].includes(r.state)).length
+              }));
+              setMaintenance(maints);
               setUsers(db.users.list());
               setSuppliers(db.suppliers.list());
           } else {
