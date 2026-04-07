@@ -5,7 +5,7 @@ import { useI18n } from '../lib/i18n';
 import { calculateNextMaintenanceDate, getLocalized } from '../lib/helpers';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
 import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
-import { Modal, ConfirmModal } from '../components/Shared';
+import { Modal, ConfirmModal, MultiSelect } from '../components/Shared';
 
 interface MaintenancePageProps {
     user: User;
@@ -32,7 +32,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         techName: '',
         serialNumber: '', // Added Serial Number filter
         supplierId: '',
-        responsiblePersonId: ''
+        responsiblePersonId: '',
+        locationIds: [] as string[],
+        workplaceIds: [] as string[]
     });
     const [showFilters, setShowFilters] = useState(user.role !== 'operator');
 
@@ -110,7 +112,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             techName: '',
             serialNumber: '',
             supplierId: '',
-            responsiblePersonId: ''
+            responsiblePersonId: '',
+            locationIds: [],
+            workplaceIds: []
         });
     };
 
@@ -206,8 +210,21 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         if (filters.supplierId && m.supplierId !== filters.supplierId) return false;
         if (filters.responsiblePersonId) { if (!m.responsiblePersonIds?.includes(filters.responsiblePersonId)) return false; }
         
+        const techWpIds = tech?.workplaceIds || [];
+        const techLocIds = techWpIds.map(wpId => workplaces.find(w => w.id === wpId)?.locationId).filter(Boolean) as string[];
+
+        if (filters.locationIds.length > 0 && !techLocIds.some(locId => filters.locationIds.includes(locId))) return false;
+        if (filters.workplaceIds.length > 0 && !techWpIds.some(wpId => filters.workplaceIds.includes(wpId))) return false;
+
         return true;
     });
+
+    const filteredWorkplaces = filters.locationIds.length > 0
+        ? workplaces.filter(w => filters.locationIds.includes(w.locationId))
+        : workplaces;
+
+    const localizedLocations = locations.map(l => ({ id: l.id, name: getLocalized(l.name, lang) }));
+    const localizedWorkplaces = filteredWorkplaces.map(w => ({ id: w.id, name: getLocalized(w.name, lang) }));
 
     const renderActiveBadge = (isActive: boolean) => {
         return isActive 
@@ -390,7 +407,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         <span className="font-bold text-slate-700">{t('common.filter')}</span>
                         <button onClick={resetFilters} className="text-xs text-blue-600 hover:underline">Reset</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                         <div>
                             <label className="block text-xs text-slate-500 mb-1">Název technologie</label>
                             <input className="w-full p-1.5 border rounded" value={filters.techName} onChange={e => setFilters({...filters, techName: e.target.value})} />
@@ -399,6 +416,8 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                             <label className="block text-xs text-slate-500 mb-1">{t('form.serial_number')}</label>
                             <input className="w-full p-1.5 border rounded" placeholder="S.N." value={filters.serialNumber} onChange={e => setFilters({...filters, serialNumber: e.target.value})} />
                         </div>
+                        <div><MultiSelect label={t('form.location')} options={localizedLocations} selectedIds={filters.locationIds} onChange={(ids) => setFilters({...filters, locationIds: ids, workplaceIds: []})} /></div>
+                        <div><MultiSelect label={t('form.workplace')} options={localizedWorkplaces} selectedIds={filters.workplaceIds} onChange={(ids) => setFilters({...filters, workplaceIds: ids})} /></div>
                         <div>
                              <label className="block text-xs text-slate-500 mb-1">{t('form.supplier')} / {t('form.responsible_person')}</label>
                              <select className="w-full p-1.5 border rounded" value={filters.supplierId} onChange={e => setFilters({...filters, supplierId: e.target.value})}>
@@ -416,7 +435,6 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                             <tr>
                                 <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
-                                <th className="px-4 py-3 whitespace-nowrap">S.N.</th>
                                 <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
                                 <th className="px-4 py-3 whitespace-nowrap">Generování</th>
                                 <th className="px-4 py-3 whitespace-nowrap text-center">{t('col.open_requests')}</th>
@@ -426,7 +444,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                         </thead>
                         <tbody>
                             {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
                                 filteredTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
@@ -437,8 +455,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
 
                                     return (
                                         <tr key={m.id} onClick={() => handleRowClick(m)} className="border-b hover:bg-slate-50 cursor-pointer group">
-                                            <td className="px-4 py-3 font-medium whitespace-nowrap">{getLocalized(tech?.name, lang) || 'Neznámá technologie'}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{tech?.serialNumber || '-'}</td>
+                                            <td className="px-4 py-3 font-medium whitespace-nowrap">
+                                                <div>
+                                                    <div>{getLocalized(tech?.name, lang) || 'Neznámá technologie'}</div>
+                                                    {tech?.serialNumber && <div className="text-xs text-slate-500 font-mono">{tech.serialNumber}</div>}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap">{m.interval} {t('common.days')}</td>
                                             <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">
                                                 <div className="flex items-center gap-1">
