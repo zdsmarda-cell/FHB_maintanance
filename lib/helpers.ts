@@ -1,6 +1,7 @@
 
 import { db, api, isProductionDomain } from './db';
 import { Maintenance } from './types';
+import { GoogleGenAI } from "@google/genai";
 
 // Helper to parse JSON string (e.g., '{"cs":"Sklad","en":"Warehouse"}') or Object and return current lang
 export const getLocalized = (data: any, lang: string): string => {
@@ -147,12 +148,35 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
         let translations;
         
         if (isMock) {
-            await new Promise(r => setTimeout(r, 500));
-            translations = {
-                cs: text,
-                en: `[EN] ${text}`,
-                uk: `[UK] ${text}`
-            };
+            try {
+                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                const model = 'gemini-3-flash-preview';
+                const response = await ai.models.generateContent({
+                    model: model,
+                    contents: {
+                        parts: [
+                            { text: 'Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.' },
+                            { text: text }
+                        ]
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                    }
+                });
+                const jsonStr = response?.text;
+                if (jsonStr) {
+                    translations = JSON.parse(jsonStr);
+                } else {
+                    throw new Error("Empty response from AI");
+                }
+            } catch (aiError) {
+                console.error("AI Translation failed, using fallback:", aiError);
+                translations = {
+                    cs: text,
+                    en: `[EN] ${text}`,
+                    uk: `[UK] ${text}`
+                };
+            }
         } else {
             translations = await api.post('/translate', { text });
         }
