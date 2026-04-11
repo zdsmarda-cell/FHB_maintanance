@@ -162,7 +162,7 @@ export const RequestForm = ({
                         onChange={e => { 
                             setSelLoc(e.target.value); 
                             setSelWp(''); 
-                            setFormData({...formData, techId: ''}); 
+                            setFormData({...formData, locationId: e.target.value, workplaceId: '', techId: ''}); 
                         }}
                         disabled={isEditMode && !!formData.techId} 
                     >
