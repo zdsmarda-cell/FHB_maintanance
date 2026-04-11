@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const router = express.Router();
 
@@ -18,13 +18,14 @@ router.post('/', async (req, res) => {
         uk: `[UK] ${t}`
     });
 
-    if (!process.env.GEMINI_API_KEY) {
-        console.warn("GEMINI_API_KEY not found in environment variables. Using mock translation.");
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+        console.warn("API_KEY not found in environment variables. Using mock translation.");
         return res.json(fallbackTranslate(text));
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: apiKey });
         const model = 'gemini-3-flash-preview';
         
         let response;
@@ -35,14 +36,18 @@ router.post('/', async (req, res) => {
             try {
                 response = await ai.models.generateContent({
                     model: model,
-                    contents: {
-                        parts: [
-                            { text: 'Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.' },
-                            { text: text }
-                        ]
-                    },
+                    contents: `Translate the following text into Czech (key: "cs"), English (key: "en"), and Ukrainian (key: "uk"). Return strictly valid JSON object.\n\nText to translate: ${text}`,
                     config: {
                         responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                cs: { type: Type.STRING },
+                                en: { type: Type.STRING },
+                                uk: { type: Type.STRING }
+                            },
+                            required: ["cs", "en", "uk"]
+                        }
                     }
                 });
                 break; // Success, exit loop
@@ -78,7 +83,9 @@ router.post('/', async (req, res) => {
     } catch (error) {
         console.error("Translation API Error:", error.message);
         // Fallback to avoid breaking the app flow
-        res.json(fallbackTranslate(text));
+        const fallback = fallbackTranslate(text);
+        fallback.error = error.message; // Add error message to help debugging in production
+        res.json(fallback);
     }
 });
 
