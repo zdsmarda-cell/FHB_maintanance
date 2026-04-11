@@ -8,13 +8,16 @@ export const getLocalized = (data: any, lang: string): string => {
     
     let parsed = data;
 
-    // If it's a string that looks like JSON, try to parse it
-    if (typeof data === 'string' && data.trim().startsWith('{')) {
+    // If it's a string, try to parse it (handle potential double-stringification)
+    while (typeof parsed === 'string' && (parsed.trim().startsWith('{') || parsed.trim().startsWith('"'))) {
         try {
-            parsed = JSON.parse(data);
+            const nextParsed = JSON.parse(parsed);
+            if (typeof nextParsed === 'string' && nextParsed === parsed) {
+                break; // Prevent infinite loop if JSON.parse returns the same string
+            }
+            parsed = nextParsed;
         } catch (e) {
-            // Not valid JSON, return as is
-            return data;
+            break; // Not valid JSON, stop parsing
         }
     }
 
@@ -25,7 +28,7 @@ export const getLocalized = (data: any, lang: string): string => {
     }
 
     // Fallback for plain strings
-    return String(data);
+    return String(parsed);
 };
 
 // Shared Logic for calculating Next Run Date

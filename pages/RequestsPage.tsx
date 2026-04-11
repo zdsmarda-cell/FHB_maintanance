@@ -196,8 +196,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     const handleOpenEdit = (req: Request) => {
         setFormData({
-            title: req.title,
-            description: req.description,
+            title: getLocalized(req.title, lang),
+            description: getLocalized(req.description, lang),
             techId: req.techId,
             locationId: req.locationId || '',
             workplaceId: req.workplaceId || '',
@@ -232,8 +232,19 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
             
             // Translate title and description
-            const translatedTitle = await prepareMultilingual(formData.title);
-            const translatedDesc = await prepareMultilingual(formData.description);
+            let translatedTitle = formData.title;
+            if (isEditMode && editingRequest && formData.title === getLocalized(editingRequest.title, lang)) {
+                translatedTitle = editingRequest.title;
+            } else {
+                translatedTitle = await prepareMultilingual(formData.title);
+            }
+
+            let translatedDesc = formData.description;
+            if (isEditMode && editingRequest && formData.description === getLocalized(editingRequest.description, lang)) {
+                translatedDesc = editingRequest.description;
+            } else {
+                translatedDesc = await prepareMultilingual(formData.description);
+            }
 
             const payload = {
                 ...formData,
