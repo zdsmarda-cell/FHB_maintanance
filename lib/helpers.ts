@@ -102,6 +102,15 @@ export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
 export const prepareMultilingual = async (text: string): Promise<string> => {
     if (!text) return '';
     
+    if (typeof text === 'string' && text.trim().startsWith('{')) {
+        try {
+            JSON.parse(text);
+            return text; // Already a JSON string
+        } catch (e) {
+            // Not valid JSON, proceed
+        }
+    }
+
     console.log(`[Translate] Preparing: "${text}"`);
 
     let settings;

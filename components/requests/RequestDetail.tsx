@@ -10,6 +10,8 @@ interface RequestDetailProps {
     request: Request;
     currentUser: User;
     technologies: Technology[];
+    locations?: any[];
+    workplaces?: any[];
     onBack: () => void;
     onGallery: (images: string[], e: React.MouseEvent) => void;
     renderStatusBadge: (status: string) => React.ReactNode;
@@ -22,6 +24,8 @@ export const RequestDetail = ({
     request,
     currentUser,
     technologies,
+    locations = [],
+    workplaces = [],
     onBack,
     onGallery,
     renderStatusBadge,
@@ -189,6 +193,18 @@ export const RequestDetail = ({
                     <div className="space-y-6">
                         <div className="bg-slate-50 p-4 rounded border border-slate-100 text-sm space-y-3">
                             <h4 className="font-bold border-b pb-2">{t('headers.information')}</h4>
+                            <div>
+                                <span className="block text-slate-500 text-xs">{t('form.location')}</span>
+                                <span className="font-medium">
+                                    {request.locationId ? getLocalized(locations.find(l => l.id === request.locationId)?.name, lang) : '-'}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="block text-slate-500 text-xs">{t('form.workplace')}</span>
+                                <span className="font-medium">
+                                    {request.workplaceId ? getLocalized(workplaces.find(w => w.id === request.workplaceId)?.name, lang) : '-'}
+                                </span>
+                            </div>
                             <div>
                                 <span className="block text-slate-500 text-xs">{t('form.technology')}</span>
                                 <span className="font-medium">

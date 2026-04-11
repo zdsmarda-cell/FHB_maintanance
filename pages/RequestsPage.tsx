@@ -70,7 +70,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
     // Form Data
-    const emptyForm = { title: '', description: '', techId: '', priority: 'basic', estimatedCost: 0, estimatedTime: 0, photoUrls: [], assignedSupplierId: 'internal', projectId: '' };
+    const emptyForm = { title: '', description: '', techId: '', locationId: '', workplaceId: '', priority: 'basic', estimatedCost: 0, estimatedTime: 0, photoUrls: [], assignedSupplierId: 'internal', projectId: '' };
     const [formData, setFormData] = useState<any>(emptyForm);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
@@ -199,6 +199,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             title: req.title,
             description: req.description,
             techId: req.techId,
+            locationId: req.locationId || '',
+            workplaceId: req.workplaceId || '',
             priority: req.priority,
             estimatedCost: req.estimatedCost,
             estimatedTime: req.estimatedTime,
@@ -357,14 +359,19 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
 
     // 4. Approval Logic
     const openApprovalModal = (req: Request) => {
-        const tech = technologies.find(t => t.id === req.techId);
-        // tech.workplaceIds is string[]
-        const techWorkplaceIds = tech?.workplaceIds || [];
-        
-        // Get all location IDs associated with this technology
-        const locationIds = techWorkplaceIds
-            .map(wpId => workplaces.find(w => w.id === wpId)?.locationId)
-            .filter((id): id is string => !!id); // Filter undefined
+        let locationIds: string[] = [];
+
+        if (req.locationId) {
+            locationIds.push(req.locationId);
+        } else {
+            const tech = technologies.find(t => t.id === req.techId);
+            const techWorkplaceIds = tech?.workplaceIds || [];
+            
+            // Get all location IDs associated with this technology
+            locationIds = techWorkplaceIds
+                .map(wpId => workplaces.find(w => w.id === wpId)?.locationId)
+                .filter((id): id is string => !!id); // Filter undefined
+        }
         
         // CRITICAL FIX: Use the fresh user data from the 'users' state array (loaded from API)
         // instead of the potentially stale 'user' prop (from session storage).
@@ -484,11 +491,21 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             if (fTitle && !getLocalized(r.title, lang).toLowerCase().includes(fTitle.toLowerCase())) return false;
             
             const tech = technologies.find(t => t.id === r.techId);
-            const techWpIds = tech?.workplaceIds || [];
-            const techLocIds = techWpIds.map(wpId => workplaces.find(w => w.id === wpId)?.locationId).filter(Boolean) as string[];
+            
+            let reqLocIds: string[] = [];
+            let reqWpIds: string[] = [];
 
-            if (fLocationIds.length > 0 && !techLocIds.some(locId => fLocationIds.includes(locId))) return false;
-            if (fWorkplaceIds.length > 0 && !techWpIds.some(wpId => fWorkplaceIds.includes(wpId))) return false;
+            if (r.locationId) reqLocIds.push(r.locationId);
+            if (r.workplaceId) reqWpIds.push(r.workplaceId);
+
+            if (reqLocIds.length === 0 && tech) {
+                const techWpIds = tech.workplaceIds || [];
+                reqWpIds = techWpIds;
+                reqLocIds = techWpIds.map(wpId => workplaces.find(w => w.id === wpId)?.locationId).filter(Boolean) as string[];
+            }
+
+            if (fLocationIds.length > 0 && !reqLocIds.some(locId => fLocationIds.includes(locId))) return false;
+            if (fWorkplaceIds.length > 0 && !reqWpIds.some(wpId => fWorkplaceIds.includes(wpId))) return false;
             
             if (fTechIds.length > 0 && !fTechIds.includes(r.techId)) return false;
             
@@ -743,6 +760,8 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
                             request={selectedRequest}
                             currentUser={user}
                             technologies={technologies}
+                            locations={locations}
+                            workplaces={workplaces}
                             onBack={() => setSelectedRequest(null)}
                             onGallery={() => {}} 
                             renderStatusBadge={renderStatusBadge}

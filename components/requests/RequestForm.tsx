@@ -61,7 +61,7 @@ export const RequestForm = ({
     useEffect(() => {
         if (!isEditMode && !selLoc && availLocs.length === 1) {
             setSelLoc(availLocs[0].id);
-            setFormData(prev => ({...prev, locationId: availLocs[0].id}));
+            setFormData((prev: any) => ({...prev, locationId: availLocs[0].id}));
         }
     }, [isEditMode, availLocs, selLoc]);
 
@@ -76,7 +76,7 @@ export const RequestForm = ({
     useEffect(() => {
         if (!isEditMode && selLoc && !selWp && availWps.length === 1) {
             setSelWp(availWps[0].id);
-            setFormData(prev => ({...prev, workplaceId: availWps[0].id}));
+            setFormData((prev: any) => ({...prev, workplaceId: availWps[0].id}));
         }
     }, [isEditMode, selLoc, availWps, selWp]);
 
@@ -98,7 +98,7 @@ export const RequestForm = ({
                  if (wp) {
                      setSelLoc(wp.locationId);
                      setSelWp(wp.id);
-                     setFormData(prev => ({...prev, locationId: wp.locationId, workplaceId: wp.id}));
+                     setFormData((prev: any) => ({...prev, locationId: wp.locationId, workplaceId: wp.id}));
                  }
              }
         } else if (isEditMode && !selLoc && formData.locationId) {
