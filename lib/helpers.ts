@@ -143,20 +143,7 @@ export const prepareMultilingual = async (text: string): Promise<string> => {
     }
 
     try {
-        const isMock = !isProductionDomain || (localStorage.getItem('auth_token')?.startsWith('mock-token-'));
-        let translations;
-        
-        if (isMock) {
-            await new Promise(r => setTimeout(r, 500));
-            translations = {
-                cs: text,
-                en: `[EN] ${text}`,
-                uk: `[UK] ${text}`
-            };
-        } else {
-            translations = await api.post('/translate', { text });
-        }
-        
+        const translations = await api.post('/translate', { text });
         return JSON.stringify(translations);
     } catch (e) {
         console.error("[Translate] API Failed, saving raw text:", e);

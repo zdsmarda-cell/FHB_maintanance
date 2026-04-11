@@ -14,8 +14,8 @@ router.post('/', async (req, res) => {
     // Helper for fallback if API fails or key is missing
     const fallbackTranslate = (t) => ({
         cs: t,
-        en: `[EN] ${t}`,
-        uk: `[UK] ${t}`
+        en: t,
+        uk: t
     });
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
