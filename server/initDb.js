@@ -332,6 +332,13 @@ const migrations = [
             // Drop old column
             `ALTER TABLE technologies DROP COLUMN workplace_id`
         ]
+    },
+    {
+        name: '019_add_location_workplace_to_requests',
+        up: [
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS location_id VARCHAR(255)`,
+            `ALTER TABLE requests ADD COLUMN IF NOT EXISTS workplace_id VARCHAR(255)`
+        ]
     }
 ];
 

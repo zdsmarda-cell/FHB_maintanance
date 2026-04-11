@@ -146,6 +146,8 @@ export interface RequestHistoryEntry {
 export interface Request {
   id: string;
   techId: string;
+  locationId?: string;
+  workplaceId?: string;
   maintenanceId?: string; // Link back to template if generated
   projectId?: string; // Link to project
   title: string; // Mandatory short title (max 20 chars)

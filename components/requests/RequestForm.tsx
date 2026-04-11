@@ -38,8 +38,8 @@ export const RequestForm = ({
     const [projects, setProjects] = useState<any[]>([]);
     
     // Dropdown handlers for cascading selection
-    const [selLoc, setSelLoc] = useState('');
-    const [selWp, setSelWp] = useState('');
+    const [selLoc, setSelLoc] = useState(formData.locationId || '');
+    const [selWp, setSelWp] = useState(formData.workplaceId || '');
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -61,6 +61,7 @@ export const RequestForm = ({
     useEffect(() => {
         if (!isEditMode && !selLoc && availLocs.length === 1) {
             setSelLoc(availLocs[0].id);
+            setFormData(prev => ({...prev, locationId: availLocs[0].id}));
         }
     }, [isEditMode, availLocs, selLoc]);
 
@@ -75,6 +76,7 @@ export const RequestForm = ({
     useEffect(() => {
         if (!isEditMode && selLoc && !selWp && availWps.length === 1) {
             setSelWp(availWps[0].id);
+            setFormData(prev => ({...prev, workplaceId: availWps[0].id}));
         }
     }, [isEditMode, selLoc, availWps, selWp]);
 
@@ -96,10 +98,16 @@ export const RequestForm = ({
                  if (wp) {
                      setSelLoc(wp.locationId);
                      setSelWp(wp.id);
+                     setFormData(prev => ({...prev, locationId: wp.locationId, workplaceId: wp.id}));
                  }
              }
+        } else if (isEditMode && !selLoc && formData.locationId) {
+             setSelLoc(formData.locationId);
+             if (formData.workplaceId) {
+                 setSelWp(formData.workplaceId);
+             }
         }
-    }, [isEditMode, formData.techId, technologies, workplaces, selLoc]);
+    }, [isEditMode, formData.techId, formData.locationId, formData.workplaceId, technologies, workplaces, selLoc]);
 
     useEffect(() => {
         if (user.role === 'operator' && formData.assignedSupplierId !== 'internal') {
@@ -169,7 +177,7 @@ export const RequestForm = ({
                         value={selWp} 
                         onChange={e => { 
                             setSelWp(e.target.value); 
-                            setFormData({...formData, techId: ''}); 
+                            setFormData({...formData, workplaceId: e.target.value, techId: ''}); 
                         }}
                         disabled={!selLoc || (isEditMode && !!formData.techId)} 
                     >

@@ -10,6 +10,8 @@ const router = express.Router();
 const mapToModel = (r) => ({
     id: r.id,
     techId: r.tech_id,
+    locationId: r.location_id,
+    workplaceId: r.workplace_id,
     maintenanceId: r.maintenance_id,
     projectId: r.project_id, // NEW
     title: r.title,
@@ -74,7 +76,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { techId, authorId, description, priority, title, estimatedCost, estimatedTime, photoUrls, assignedSupplierId, plannedResolutionDate, projectId } = req.body;
+  const { techId, locationId, workplaceId, authorId, description, priority, title, estimatedCost, estimatedTime, photoUrls, assignedSupplierId, plannedResolutionDate, projectId } = req.body;
   
   // Logic for assigning solver: Frontend might send solverId if user selected it, or we rely on 'assigned' logic
   // Typically frontend sends solverId if selecting 'Assign to me' or specific user.
@@ -100,11 +102,11 @@ router.post('/', async (req, res) => {
 
     const [result] = await pool.execute(
       `INSERT INTO requests (
-        id, tech_id, author_id, description, priority, title, is_approved, history,
+        id, tech_id, location_id, workplace_id, author_id, description, priority, title, is_approved, history,
         estimated_cost, estimated_time, photo_urls, assigned_supplier_id, planned_resolution_date, state, solver_id, project_id
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        techId || null, authorId, description, priority, titleToSave, false, JSON.stringify(history),
+        techId || null, locationId || null, workplaceId || null, authorId, description, priority, titleToSave, false, JSON.stringify(history),
         estimatedCost || 0, estimatedTime || 0, JSON.stringify(photoUrls || []), assignedSupplierId, cleanPlannedDate, state, solverId, projectId || null
       ]
     );
@@ -196,6 +198,9 @@ router.put('/:id', async (req, res) => {
         const updates = [];
         const values = [];
 
+        if (body.techId !== undefined) { updates.push('tech_id = ?'); values.push(body.techId || null); }
+        if (body.locationId !== undefined) { updates.push('location_id = ?'); values.push(body.locationId || null); }
+        if (body.workplaceId !== undefined) { updates.push('workplace_id = ?'); values.push(body.workplaceId || null); }
         if (body.title !== undefined) { 
             updates.push('title = ?'); 
             // Ensure object titles are stringified
