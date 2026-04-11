@@ -18,13 +18,13 @@ router.post('/', async (req, res) => {
         uk: `[UK] ${t}`
     });
 
-    if (!process.env.API_KEY) {
-        console.warn("API_KEY not found in environment variables. Using mock translation.");
+    if (!process.env.GEMINI_API_KEY) {
+        console.warn("GEMINI_API_KEY not found in environment variables. Using mock translation.");
         return res.json(fallbackTranslate(text));
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const model = 'gemini-3-flash-preview';
         
         let response;
