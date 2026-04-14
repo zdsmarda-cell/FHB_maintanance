@@ -189,9 +189,9 @@ const generateMaintenanceRequests = async () => {
                 // Create Request
                 // Note: The planned_resolution_date corresponds to targetDateStr which is usually TODAY
                 await pool.execute(
-                    `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
-                    [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr]
+                    `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?)`,
+                    [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr, template.estimated_time || null]
                 );
 
                 // Update Success State

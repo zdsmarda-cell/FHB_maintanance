@@ -27,6 +27,7 @@ router.get('/', async (req, res) => {
             lastGeneratedDate: r.last_generated_at,
             createdAt: r.created_at,
             type: r.type,
+            estimatedTime: r.estimated_time,
             generatedRequestCount: r.request_count || 0
         }));
         res.json(parsed);
@@ -59,9 +60,9 @@ router.post('/', async (req, res) => {
     const id = crypto.randomUUID();
     try {
         await pool.query(`INSERT INTO maintenances 
-            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds)]
+            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids, estimated_time) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null]
         );
         res.json({ id, ...data });
     } catch (err) {
@@ -95,9 +96,9 @@ router.post('/:id/run', async (req, res) => {
             const requestId = crypto.randomUUID();
 
             await pool.execute(
-                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?)`,
-                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr]
+                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?)`,
+                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr, template.estimated_time || null]
             );
 
             await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [todayStr, id]);
@@ -127,9 +128,9 @@ router.put('/:id', async (req, res) => {
     const data = req.body;
     try {
         await pool.query(`UPDATE maintenances SET 
-            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?
+            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?, estimated_time=?
             WHERE id=?`,
-            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), id]
+            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, id]
         );
         res.json({ id, ...data });
     } catch (err) {

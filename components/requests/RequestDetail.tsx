@@ -210,6 +210,11 @@ export const RequestDetail = ({
                                 <span className="font-medium">
                                     {request.techId ? getLocalized(technologies.find(t => t.id === request.techId)?.name, lang) : '-'}
                                 </span>
+                                {request.techId && technologies.find(t => t.id === request.techId)?.serialNumber && (
+                                    <span className="block text-slate-500 text-xs mt-0.5">
+                                        SN: {technologies.find(t => t.id === request.techId)?.serialNumber}
+                                    </span>
+                                )}
                             </div>
                             <div>
                                 <span className="block text-slate-500 text-xs">{t('label.author')}</span>

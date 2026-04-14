@@ -110,6 +110,7 @@ export interface Maintenance {
   lastGeneratedDate?: string; // ISO Date of last created request
   createdAt?: string; // For calculation if lastGeneratedDate is null
   generatedRequestCount?: number; // Count of requests generated from this template
+  estimatedTime?: number; // Estimated effort in minutes
   
   type: 'planned' | 'operational'; // operational might be ad-hoc templates
   isActive: boolean; // Can disable template

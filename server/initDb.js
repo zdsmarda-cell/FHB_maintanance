@@ -339,6 +339,12 @@ const migrations = [
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS location_id VARCHAR(255)`,
             `ALTER TABLE requests ADD COLUMN IF NOT EXISTS workplace_id VARCHAR(255)`
         ]
+    },
+    {
+        name: '020_add_estimated_time_to_maintenances',
+        up: [
+            `ALTER TABLE maintenances ADD COLUMN IF NOT EXISTS estimated_time INT`
+        ]
     }
 ];
 

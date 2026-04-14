@@ -737,6 +737,13 @@ const MaintModal = ({
                         </div>
                         {errors.interval && <span className="text-xs text-red-500">{errors.interval}</span>}
                      </div>
+                     <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Odhad času (minuty)</label>
+                        <div className="flex items-center">
+                            <input type="number" min="0" className="w-full border p-2 rounded" value={data.estimatedTime || ''} onChange={e => setData({...data, estimatedTime: parseInt(e.target.value) || undefined})} />
+                            <span className="ml-2 text-sm text-slate-500">min</span>
+                        </div>
+                     </div>
                  </div>
             </div>
 
