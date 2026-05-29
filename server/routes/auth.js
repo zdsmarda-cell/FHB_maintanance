@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import pool from '../db.js';
 import dotenv from 'dotenv';
 import { getPasswordResetEmail } from '../templates/email.js';
+import dns from 'dns';
 
 dotenv.config();
 
@@ -57,7 +58,7 @@ router.post('/login', async (req, res) => {
     // Resolve hostname in background if possible, or leave null for now to avoid blocking login.
     // Actually, node's dns.reverse can take time. Let's do it asynchronously so we don't block the request response overmuch, or just save the IP.
     // For simplicity, we just save IP now, we can resolve hostname next.
-    require('dns').reverse(ipAddress, (err, hostnames) => {
+    dns.reverse(ipAddress, (err, hostnames) => {
         hostname = (hostnames && hostnames.length > 0) ? hostnames[0] : '';
         pool.query('INSERT INTO login_history (user_id, ip_address, hostname) VALUES (?, ?, ?)', [user.id, ipAddress, hostname]).catch(console.error);
     });
