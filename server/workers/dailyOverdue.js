@@ -184,10 +184,9 @@ export const checkDailyOverdue = async () => {
             SELECT 
                 r.id, r.title, r.priority, r.planned_resolution_date, r.solver_id,
                 t.name as tech_name,
-                w.id as wp_id, w.location_id as loc_id
+                r.workplace_id as wp_id, r.location_id as loc_id
             FROM requests r
             LEFT JOIN technologies t ON r.tech_id = t.id
-            LEFT JOIN workplaces w ON t.workplace_id = w.id
             WHERE r.state NOT IN ('solved', 'cancelled')
             AND r.planned_resolution_date < ?
         `, [today]);
