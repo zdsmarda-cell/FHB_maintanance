@@ -345,6 +345,19 @@ const migrations = [
         up: [
             `ALTER TABLE maintenances ADD COLUMN IF NOT EXISTS estimated_time INT`
         ]
+    },
+    {
+        name: '021_add_login_history',
+        up: [
+            `CREATE TABLE IF NOT EXISTS login_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                ip_address VARCHAR(45),
+                hostname VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (user_id)
+            )`
+        ]
     }
 ];
 

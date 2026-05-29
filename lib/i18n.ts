@@ -55,6 +55,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.projects': 'Správa Projektů',
     'headers.new_project': 'Nový Projekt',
     'headers.edit_project': 'Upravit Projekt',
+    'headers.login_history': 'Historie přihlášení',
 
     'form.name': 'Název',
     'form.street': 'Ulice',
@@ -125,6 +126,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.unresolved': 'Nedořešeno',
     'col.overdue': 'Po termínu',
     'col.total': 'Celkem',
+    'col.user_name': 'Jméno uživatele',
+    'col.user_id': 'ID',
+    'col.login_time': 'Čas přihlášení',
+    'col.ip_address': 'IP adresa',
+    'col.hostname': 'Hostname',
 
     'status.new': 'Nový',
     'status.assigned': 'V řešení',
@@ -369,6 +375,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.projects': 'Projects Management',
     'headers.new_project': 'New Project',
     'headers.edit_project': 'Edit Project',
+    'headers.login_history': 'Login History',
 
     'form.name': 'Name',
     'form.street': 'Street',
@@ -439,6 +446,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.unresolved': 'Unresolved',
     'col.overdue': 'Overdue',
     'col.total': 'Total',
+    'col.user_name': 'Username',
+    'col.user_id': 'ID',
+    'col.login_time': 'Login Time',
+    'col.ip_address': 'IP Address',
+    'col.hostname': 'Hostname',
 
     'status.new': 'New',
     'status.assigned': 'In Progress',
@@ -683,6 +695,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'headers.projects': 'Керування проектами',
     'headers.new_project': 'Новий проект',
     'headers.edit_project': 'Редагувати проект',
+    'headers.login_history': 'Історія входів',
 
     'form.name': 'Назва',
     'form.street': 'Вулиця',
@@ -753,6 +766,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'col.unresolved': 'Невирішено',
     'col.overdue': 'Прострочено',
     'col.total': 'Всього',
+    'col.user_name': 'Ім\'я користувача',
+    'col.user_id': 'ID',
+    'col.login_time': 'Час входу',
+    'col.ip_address': 'IP адреса',
+    'col.hostname': 'Hostname',
 
     'status.new': 'Новий',
     'status.assigned': 'У роботі',

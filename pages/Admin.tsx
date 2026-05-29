@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { db, uid } from '../lib/db';
+import React, { useState, useEffect } from 'react';
+import { db, api, uid } from '../lib/db';
 import { useI18n } from '../lib/i18n';
-import { Plus, Trash, Edit, Save, X, ChevronRight, ChevronDown, CheckSquare, Square, Lock, Unlock } from 'lucide-react';
+import { Plus, Trash, Edit, Save, X, ChevronRight, ChevronDown, CheckSquare, Square, Lock, Unlock, Search, ChevronLeft } from 'lucide-react';
 import { Address, User } from '../lib/types';
 
 // --- Shared Components ---
@@ -349,7 +349,112 @@ export const TechConfigPage = () => {
 };
 
 // --- Users ---
+const LoginHistory = () => {
+    const { t } = useI18n();
+    const [history, setHistory] = useState<any[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [limit] = useState(20);
+    const [userNameSearch, setUserNameSearch] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const loadHistory = async (p = page, q = userNameSearch) => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/users/login-history?page=${p}&limit=${limit}&userName=${encodeURIComponent(q)}`);
+            setHistory(res.data);
+            setTotal(res.total);
+            setPage(res.page);
+        } catch (err) {
+            console.error('Failed to load login history', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadHistory(1, userNameSearch);
+    }, []);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return (
+        <div className="bg-white rounded border border-slate-200">
+             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                 <h2 className="font-bold">{t('headers.login_history')}</h2>
+                 <div className="flex gap-2">
+                     <div className="relative">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                             <Search className="h-4 w-4 text-slate-400" />
+                         </div>
+                         <input 
+                             type="text" 
+                             placeholder={t('common.search')}
+                             className="pl-9 pr-3 py-2 border rounded text-sm w-64"
+                             value={userNameSearch}
+                             onChange={e => setUserNameSearch(e.target.value)}
+                             onKeyDown={e => e.key === 'Enter' && loadHistory(1, userNameSearch)}
+                         />
+                     </div>
+                     <button onClick={() => loadHistory(1, userNameSearch)} className="bg-blue-600 text-white px-3 py-2 rounded text-sm">{t('common.filter')}</button>
+                 </div>
+             </div>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                     <thead className="bg-slate-50 text-slate-600 border-b">
+                         <tr>
+                             <th className="px-4 py-3">{t('col.login_time')}</th>
+                             <th className="px-4 py-3">{t('col.user_name')}</th>
+                             <th className="px-4 py-3">{t('col.ip_address')}</th>
+                             <th className="px-4 py-3">{t('col.hostname')}</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                         {loading ? (
+                             <tr><td colSpan={4} className="text-center py-4">{t('status.pending')}</td></tr>
+                         ) : history.length === 0 ? (
+                             <tr><td colSpan={4} className="text-center py-4 text-slate-500">Žádná data</td></tr>
+                         ) : history.map(item => (
+                             <tr key={item.id} className="hover:bg-slate-50">
+                                 <td className="px-4 py-3 whitespace-nowrap">{new Date(item.createdAt).toLocaleString()}</td>
+                                 <td className="px-4 py-3 font-medium">{item.userName || item.userId}</td>
+                                 <td className="px-4 py-3 text-slate-500">{item.ipAddress}</td>
+                                 <td className="px-4 py-3 text-slate-500">{item.hostname}</td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+             </div>
+             {totalPages > 1 && (
+                 <div className="p-4 border-t flex justify-between items-center bg-slate-50">
+                     <div className="text-sm text-slate-500">
+                         {t('common.showing')} {(page - 1) * limit + 1} - {Math.min(page * limit, total)} {t('common.of')} {total}
+                     </div>
+                     <div className="flex gap-2">
+                         <button 
+                             disabled={page <= 1}
+                             onClick={() => loadHistory(page - 1)}
+                             className="p-1 border rounded bg-white disabled:opacity-50"
+                         >
+                             <ChevronLeft className="w-5 h-5"/>
+                         </button>
+                         <button 
+                             disabled={page >= totalPages}
+                             onClick={() => loadHistory(page + 1)}
+                             className="p-1 border rounded bg-white disabled:opacity-50"
+                         >
+                             <ChevronRight className="w-5 h-5"/>
+                         </button>
+                     </div>
+                 </div>
+             )}
+        </div>
+    );
+};
+
 export const UsersPage = () => {
+    const { t } = useI18n();
+    const [activeTab, setActiveTab] = useState<'users' | 'history'>('users');
     const [users, setUsers] = useState(db.users.list());
     const [newUser, setNewUser] = useState<any>({ name: '', email: '', role: 'operator', phone: '', isBlocked: false });
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -374,6 +479,23 @@ export const UsersPage = () => {
 
     return (
         <div className="space-y-6">
+            <div className="flex border-b border-slate-200">
+                <button 
+                    onClick={() => setActiveTab('users')}
+                    className={`px-4 py-2 font-medium text-sm ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    {t('menu.users')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('history')}
+                    className={`px-4 py-2 font-medium text-sm ${activeTab === 'history' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    {t('headers.login_history')}
+                </button>
+            </div>
+
+            {activeTab === 'users' && (
+                <>
              <div className="bg-white p-4 rounded shadow-sm border border-slate-200 flex gap-2 items-center flex-wrap">
                 <input placeholder="Jméno" className="p-2 border rounded" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
                 <input placeholder="Email" className="p-2 border rounded" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
@@ -441,6 +563,10 @@ export const UsersPage = () => {
                     </div>
                 </Modal>
             )}
+            </>
+            )}
+
+            {activeTab === 'history' && <LoginHistory />}
         </div>
     );
 };

@@ -4,6 +4,55 @@ import pool from '../db.js';
 
 const router = express.Router();
 
+router.get('/login-history', async (req, res) => {
+    let { page = 1, limit = 20, userName = '' } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    try {
+        let query = `
+            SELECT lh.*, u.name as user_name 
+            FROM login_history lh
+            LEFT JOIN users u ON lh.user_id = u.id
+        `;
+        let countQuery = `
+            SELECT COUNT(*) as total
+            FROM login_history lh
+            LEFT JOIN users u ON lh.user_id = u.id
+        `;
+        const params = [];
+
+        if (userName) {
+            const search = `%${userName}%`;
+            query += ` WHERE u.name LIKE ?`;
+            countQuery += ` WHERE u.name LIKE ?`;
+            params.push(search);
+        }
+
+        query += ` ORDER BY lh.created_at DESC LIMIT ? OFFSET ?`;
+        
+        const [rows] = await pool.query(query, [...params, limit, offset]);
+        const [countResult] = await pool.query(countQuery, params);
+        
+        res.json({
+            data: rows.map(r => ({
+                id: r.id,
+                userId: r.user_id,
+                userName: r.user_name,
+                ipAddress: r.ip_address,
+                hostname: r.hostname,
+                createdAt: r.created_at
+            })),
+            total: countResult[0].total,
+            page,
+            limit
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM users');

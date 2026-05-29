@@ -50,6 +50,17 @@ router.post('/login', async (req, res) => {
       JWT_REFRESH_SECRET,
       { expiresIn: '24h' }
     );
+    
+    // Log login history
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '';
+    let hostname = '';
+    // Resolve hostname in background if possible, or leave null for now to avoid blocking login.
+    // Actually, node's dns.reverse can take time. Let's do it asynchronously so we don't block the request response overmuch, or just save the IP.
+    // For simplicity, we just save IP now, we can resolve hostname next.
+    require('dns').reverse(ipAddress, (err, hostnames) => {
+        hostname = (hostnames && hostnames.length > 0) ? hostnames[0] : '';
+        pool.query('INSERT INTO login_history (user_id, ip_address, hostname) VALUES (?, ?, ?)', [user.id, ipAddress, hostname]).catch(console.error);
+    });
 
     // Return token and user info (excluding password)
     const { password: _, ...userWithoutPass } = user;
