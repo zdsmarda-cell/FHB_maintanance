@@ -107,6 +107,7 @@ export interface Maintenance {
   // Template Logic
   interval: number; // Days between maintenance
   allowedDays: number[]; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  validFrom?: string; // Optional start date for intervals
   lastGeneratedDate?: string; // ISO Date of last created request
   createdAt?: string; // For calculation if lastGeneratedDate is null
   generatedRequestCount?: number; // Count of requests generated from this template

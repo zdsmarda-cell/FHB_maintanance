@@ -21,6 +21,7 @@ router.get('/', async (req, res) => {
             description: r.description,
             interval: r.interval_days,
             allowedDays: r.allowed_days ? (typeof r.allowed_days === 'string' ? JSON.parse(r.allowed_days) : r.allowed_days) : [],
+            validFrom: r.valid_from ? (r.valid_from instanceof Date ? new Date(r.valid_from.getTime() - r.valid_from.getTimezoneOffset() * 60000).toISOString().split('T')[0] : String(r.valid_from).split('T')[0]) : undefined,
             responsiblePersonIds: r.responsible_person_ids ? (typeof r.responsible_person_ids === 'string' ? JSON.parse(r.responsible_person_ids) : r.responsible_person_ids) : [],
             isActive: !!r.is_active,
             supplierId: r.supplier_id,
@@ -60,9 +61,9 @@ router.post('/', async (req, res) => {
     const id = crypto.randomUUID();
     try {
         await pool.query(`INSERT INTO maintenances 
-            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids, estimated_time) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null]
+            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids, estimated_time, valid_from) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null]
         );
         res.json({ id, ...data });
     } catch (err) {
@@ -128,9 +129,9 @@ router.put('/:id', async (req, res) => {
     const data = req.body;
     try {
         await pool.query(`UPDATE maintenances SET 
-            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?, estimated_time=?
+            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?, estimated_time=?, valid_from=?
             WHERE id=?`,
-            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, id]
+            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null, id]
         );
         res.json({ id, ...data });
     } catch (err) {

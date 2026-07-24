@@ -21,7 +21,7 @@ const mapToModel = (r) => ({
     description: r.description,
     priority: r.priority,
     state: r.state,
-    plannedResolutionDate: r.planned_resolution_date,
+    plannedResolutionDate: r.planned_resolution_date ? (r.planned_resolution_date instanceof Date ? new Date(r.planned_resolution_date.getTime() - r.planned_resolution_date.getTimezoneOffset() * 60000).toISOString().split('T')[0] : String(r.planned_resolution_date).split('T')[0]) : null,
     estimatedCost: r.estimated_cost,
     estimatedTime: r.estimated_time,
     photoUrls: typeof r.photo_urls === 'string' ? JSON.parse(r.photo_urls || '[]') : (r.photo_urls || []),

@@ -135,7 +135,8 @@ export const RequestForm = ({
 
     const todayStr = new Date().toISOString().split('T')[0];
     const isPastDate = formData.plannedResolutionDate && formData.plannedResolutionDate < todayStr;
-    const dateError = isPastDate ? t('validation.date_in_past') : errors.plannedResolutionDate;
+    const dateError = isPastDate && user.role !== 'admin' ? t('validation.date_in_past') : errors.plannedResolutionDate;
+    const adminDateWarning = isPastDate && user.role === 'admin' ? t('validation.date_in_past') : null;
 
     return (
         <div className="space-y-4 p-1">
@@ -257,6 +258,7 @@ export const RequestForm = ({
                         <Calendar className="w-4 h-4 absolute left-2 top-2.5 text-slate-400" />
                     </div>
                     {dateError && <span className="text-xs text-red-500">{dateError}</span>}
+                    {adminDateWarning && <span className="text-xs text-slate-500">{adminDateWarning}</span>}
                 </div>
             </div>
 

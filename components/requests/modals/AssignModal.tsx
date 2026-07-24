@@ -49,7 +49,8 @@ export const AssignModal = ({
     // Validation: Date is now mandatory
     const todayStr = new Date().toISOString().split('T')[0];
     const isPastDate = assignDate && assignDate < todayStr;
-    const dateError = isPastDate ? t('validation.date_in_past') : '';
+    const dateError = isPastDate && !isAdmin ? t('validation.date_in_past') : '';
+    const adminDateWarning = isPastDate && isAdmin ? t('validation.date_in_past') : '';
     const isValid = assignSolverId && assignDate && (isAdmin || !isPastDate);
 
     return (
@@ -86,6 +87,7 @@ export const AssignModal = ({
                         required
                     />
                     {dateError && <span className="text-xs text-red-500">{dateError}</span>}
+                    {adminDateWarning && <span className="text-xs text-slate-500">{adminDateWarning}</span>}
                 </div>
             </div>
             

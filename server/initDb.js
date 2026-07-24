@@ -358,6 +358,12 @@ const migrations = [
                 INDEX (user_id)
             )`
         ]
+    },
+    {
+        name: '022_add_maintenance_valid_from',
+        up: [
+            `ALTER TABLE maintenances ADD COLUMN IF NOT EXISTS valid_from DATE`
+        ]
     }
 ];
 

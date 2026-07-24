@@ -233,7 +233,7 @@ export const RequestDetail = ({
                             {request.plannedResolutionDate && (
                                 <div>
                                     <span className="block text-slate-500 text-xs">{t('common.date')}</span>
-                                    <span className="font-medium text-slate-800">{new Date(request.plannedResolutionDate).toLocaleDateString()}</span>
+                                    <span className="font-medium text-slate-800">{new Date(request.plannedResolutionDate + (request.plannedResolutionDate.includes('T') ? '' : 'T12:00:00Z')).toLocaleDateString()}</span>
                                 </div>
                             )}
                             {request.maintenanceId && (

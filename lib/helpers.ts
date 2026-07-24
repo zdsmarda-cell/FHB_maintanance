@@ -63,7 +63,8 @@ export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
     };
 
     // 1. Determine Base Date (Last Generated OR Created At)
-    const baseDate = toLocalMidnight(m.lastGeneratedDate || m.createdAt);
+    // If validFrom is set, it overrides the base calculation
+    const baseDate = toLocalMidnight(m.validFrom ? m.validFrom : (m.lastGeneratedDate || m.createdAt));
     
     // 2. Determine "Floor" Date (The earliest possible Next Run)
     // The worker runs at 00:01. If we are viewing this app, "today's" 00:01 has already passed.
@@ -75,13 +76,36 @@ export const calculateNextMaintenanceDate = (m: Maintenance): Date | null => {
     // 3. Add Interval
     const interval = Number(m.interval) || 1;
     let targetDate = new Date(baseDate);
-    targetDate.setDate(baseDate.getDate() + interval);
+    
+    if (m.validFrom) {
+        // If validFrom is set, the very first run should be exactly on validFrom (if it's in the future)
+        // Or if it's in the past, we find the next validFrom + N * interval that is >= earliestPossibleRun
+        if (targetDate.getTime() >= earliestPossibleRun.getTime() && !m.lastGeneratedDate) {
+            // First run is on validFrom
+        } else {
+            // Calculate how many days we are behind earliestPossibleRun
+            const diffTime = earliestPossibleRun.getTime() - targetDate.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 0) {
+                const intervalsToCatchUp = Math.ceil(diffDays / interval);
+                targetDate.setDate(targetDate.getDate() + (intervalsToCatchUp * interval));
+            } else {
+                // targetDate is >= earliestPossibleRun, but we've already generated it
+                // so we need the NEXT interval
+                targetDate.setDate(targetDate.getDate() + interval);
+            }
+        }
+    } else {
+        // Legacy behavior: just add interval to lastGeneratedDate or createdAt
+        targetDate.setDate(baseDate.getDate() + interval);
 
-    // 4. Catch-up Logic
-    // If the theoretical target is older than the earliest possible run (Tomorrow),
-    // jump to the earliest possible run.
-    if (targetDate.getTime() < earliestPossibleRun.getTime()) {
-        targetDate = new Date(earliestPossibleRun);
+        // 4. Catch-up Logic
+        // If the theoretical target is older than the earliest possible run (Tomorrow),
+        // jump to the earliest possible run.
+        if (targetDate.getTime() < earliestPossibleRun.getTime()) {
+            targetDate = new Date(earliestPossibleRun);
+        }
     }
 
     // 5. Allowed Days Logic (skip weekends etc.)

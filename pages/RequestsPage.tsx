@@ -207,8 +207,7 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
             photoUrls: req.photoUrls || [],
             assignedSupplierId: req.assignedSupplierId || 'internal',
             projectId: req.projectId || '',
-            // Keep original data for non-editable fields in payload if needed
-            plannedResolutionDate: req.plannedResolutionDate
+            plannedResolutionDate: req.plannedResolutionDate ? String(req.plannedResolutionDate).split('T')[0] : ''
         });
         setEditingRequest(req);
         setFormErrors({});

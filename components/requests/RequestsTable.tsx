@@ -263,7 +263,7 @@ export const RequestsTable = ({
                                         </td>
                                         <td className="px-4 py-3 text-slate-600">{tech ? getLocalized(tech.name, lang) : '-'}</td>
                                         <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                                            {req.plannedResolutionDate ? new Date(req.plannedResolutionDate).toLocaleDateString() : '-'}
+                                            {req.plannedResolutionDate ? new Date(req.plannedResolutionDate + (req.plannedResolutionDate.includes('T') ? '' : 'T12:00:00Z')).toLocaleDateString() : '-'}
                                         </td>
                                         
                                         <td className="px-4 py-3 text-slate-600">

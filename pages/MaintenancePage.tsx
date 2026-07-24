@@ -357,6 +357,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
                                 <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">{t('form.internal_solution')}</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">{t('option.unassigned')}</span>}</div>
+                                <div><span className="text-slate-500 block">Platnost od</span> {selectedTemplate.validFrom ? new Date(selectedTemplate.validFrom).toLocaleDateString() : '-'}</div>
                                 <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate ? new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString() : '-'}</div>
                                 <div>
                                     <span className="text-slate-500 block">Příští generování</span>
@@ -744,6 +745,17 @@ const MaintModal = ({
                             <span className="ml-2 text-sm text-slate-500">min</span>
                         </div>
                      </div>
+                 </div>
+                 
+                 <div className="mt-4">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Platnost od</label>
+                    <input 
+                        type="date" 
+                        className="w-full border p-2 rounded text-sm text-slate-700" 
+                        value={data.validFrom || ''} 
+                        onChange={e => setData({...data, validFrom: e.target.value || undefined})} 
+                    />
+                    <span className="text-[10px] text-slate-500 block mt-1">Nepovinné. Pokud je vyplněno, interval pro další údržby se začne počítat od tohoto data namísto vytvoření nebo poslední realizace.</span>
                  </div>
             </div>
 
