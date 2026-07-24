@@ -221,6 +221,11 @@ export const RequestsPage = ({ user, initialFilters }: RequestsPageProps) => {
         const errs: Record<string, string> = {};
         if (!formData.title) errs.title = t('validation.required');
         
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (formData.plannedResolutionDate && formData.plannedResolutionDate < todayStr && user.role !== 'admin') {
+            errs.plannedResolutionDate = t('validation.date_in_past');
+        }
+        
         if (Object.keys(errs).length > 0) {
             setFormErrors(errs);
             return;

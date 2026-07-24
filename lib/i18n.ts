@@ -233,6 +233,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'placeholder.write_comment': 'Napsat komentář...',
 
     'validation.required': 'Povinné pole',
+    'validation.date_in_past': 'Termín nelze zadat do minulosti',
     'val.name_length': 'Název musí mít alespoň 2 znaky',
     'val.street_req': 'Ulice je povinná',
     'val.city_req': 'Město je povinné',
@@ -553,6 +554,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'placeholder.write_comment': 'Write a comment...',
 
     'validation.required': 'Required field',
+    'validation.date_in_past': 'Date cannot be in the past',
     'val.name_length': 'Name must be at least 2 chars',
     'val.street_req': 'Street is required',
     'val.city_req': 'City is required',
@@ -873,6 +875,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'placeholder.write_comment': 'Написати коментар...',
 
     'validation.required': 'Обов\'язкове поле',
+    'validation.date_in_past': 'Термін не може бути в минулому',
     'val.name_length': 'Назва повинна мати не менше 2 символів',
     'val.street_req': 'Вулиця обов\'язкова',
     'val.city_req': 'Місто обов\'язкове',

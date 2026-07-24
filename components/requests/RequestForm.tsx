@@ -133,6 +133,9 @@ export const RequestForm = ({
         return { defaultSupplier: defSup, otherSuppliers: others };
     }, [formData.techId, technologies, suppliers, lang]);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isPastDate = formData.plannedResolutionDate && formData.plannedResolutionDate < todayStr;
+    const dateError = isPastDate ? t('validation.date_in_past') : errors.plannedResolutionDate;
 
     return (
         <div className="space-y-4 p-1">
@@ -247,13 +250,13 @@ export const RequestForm = ({
                     <div className="relative">
                          <input 
                             type="date" 
-                            className={`w-full p-2 pl-8 rounded border ${errors.plannedResolutionDate ? 'border-red-500' : ''}`}
+                            className={`w-full p-2 pl-8 rounded border ${dateError ? 'border-red-500' : ''}`}
                             value={formData.plannedResolutionDate || ''} 
                             onChange={e => setFormData({...formData, plannedResolutionDate: e.target.value})} 
                         />
                         <Calendar className="w-4 h-4 absolute left-2 top-2.5 text-slate-400" />
                     </div>
-                    {errors.plannedResolutionDate && <span className="text-xs text-red-500">{errors.plannedResolutionDate}</span>}
+                    {dateError && <span className="text-xs text-red-500">{dateError}</span>}
                 </div>
             </div>
 

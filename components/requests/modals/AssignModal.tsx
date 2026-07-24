@@ -47,7 +47,10 @@ export const AssignModal = ({
     if (!isOpen) return null;
 
     // Validation: Date is now mandatory
-    const isValid = assignSolverId && assignDate;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isPastDate = assignDate && assignDate < todayStr;
+    const dateError = isPastDate ? t('validation.date_in_past') : '';
+    const isValid = assignSolverId && assignDate && (isAdmin || !isPastDate);
 
     return (
         <Modal title={isAlreadyAssigned ? t('modal.assign_title_edit') : t('modal.assign_title_new')} onClose={onClose}>
@@ -77,11 +80,12 @@ export const AssignModal = ({
                     <p className="text-sm text-slate-600 mb-1">{t('form.resolution_date_required')}:</p>
                     <input 
                         type="date" 
-                        className={`w-full border p-2 rounded ${!assignDate ? 'border-amber-300' : ''}`}
+                        className={`w-full border p-2 rounded ${!assignDate ? 'border-amber-300' : ''} ${dateError ? 'border-red-500' : ''}`}
                         value={assignDate} 
                         onChange={e => setAssignDate(e.target.value)} 
                         required
                     />
+                    {dateError && <span className="text-xs text-red-500">{dateError}</span>}
                 </div>
             </div>
             
