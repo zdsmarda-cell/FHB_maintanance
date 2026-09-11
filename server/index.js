@@ -70,11 +70,19 @@ app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/push-logs', authenticateToken, pushLogsRoutes);
 app.use('/api/projects', authenticateToken, projectRoutes);
 
-const PORT = process.env.PORT || 3010;
+const PORT = process.env.NODE_ENV === 'production' ? (process.env.PORT || 3010) : 3010;
 
 initDb().then(() => {
+  console.log('✅ Database initialized successfully');
+}).catch(err => {
+  console.error('❌ Database initialization failed, but starting server anyway:', err.message);
+}).finally(() => {
   // Start Image Optimizer in background
-  runImageOptimizer();
+  try {
+    runImageOptimizer();
+  } catch(e) {
+    console.error('Image optimizer error:', e);
+  }
 
   console.log('--- Server Startup Diagnostics ---');
   let sslKeyPath = process.env.SSL_KEY_PATH;

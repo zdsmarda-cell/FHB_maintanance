@@ -185,13 +185,14 @@ const generateMaintenanceRequests = async () => {
                 const state = solverId ? 'assigned' : 'new';
                 const authorId = 'system'; 
                 const requestId = crypto.randomUUID();
+                const templatePrice = template.price !== null && template.price !== undefined ? Number(template.price) : 0;
 
                 // Create Request
                 // Note: The planned_resolution_date corresponds to targetDateStr which is usually TODAY
                 await pool.execute(
-                    `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?)`,
-                    [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr, template.estimated_time || null]
+                    `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time, estimated_cost) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?, ?)`,
+                    [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, targetDateStr, template.estimated_time || null, templatePrice]
                 );
 
                 // Update Success State

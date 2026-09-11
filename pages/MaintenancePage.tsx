@@ -4,7 +4,7 @@ import { db, api, isProductionDomain } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 import { calculateNextMaintenanceDate, getLocalized } from '../lib/helpers';
 import { User, Maintenance, Technology, Supplier, Location, Workplace } from '../lib/types';
-import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Filter, ArrowLeft, Edit, Loader, X, Trash, Calendar, List, Zap, Clock, AlertTriangle, CheckCircle, ArrowUp, ArrowDown, ArrowUpDown, Euro } from 'lucide-react';
 import { Modal, ConfirmModal, MultiSelect } from '../components/Shared';
 
 interface MaintenancePageProps {
@@ -55,6 +55,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                 const reqs = db.requests.list();
                 const maints = db.maintenances.list().map(m => ({
                     ...m,
+                    price: m.price !== undefined && m.price !== null ? m.price : 0,
                     generatedRequestCount: reqs.filter(r => r.maintenanceId === m.id && !['solved', 'cancelled'].includes(r.state)).length
                 }));
                 setTemplates(maints);
@@ -169,7 +170,9 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     state: runNowTemplate.responsiblePersonIds?.length > 0 ? 'assigned' : 'new',
                     priority: 'priority',
                     description: runNowTemplate.description,
-                    plannedResolutionDate: new Date().toISOString().split('T')[0]
+                    plannedResolutionDate: new Date().toISOString().split('T')[0],
+                    estimatedCost: Number(runNowTemplate.price) || 0,
+                    estimatedTime: runNowTemplate.estimatedTime || undefined
                 };
                 db.requests.add(req);
                 db.maintenances.update(runNowTemplate.id, { lastGeneratedDate: new Date().toISOString() });
@@ -231,6 +234,84 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     const localizedLocations = locations.map(l => ({ id: l.id, name: getLocalized(l.name, lang) }));
     const localizedWorkplaces = filteredWorkplaces.map(w => ({ id: w.id, name: getLocalized(w.name, lang) }));
 
+    // --- SORTING STATE & LOGIC ---
+    const [sortConfig, setSortConfig] = useState<{
+        key: 'tech' | 'interval' | 'nextRun' | 'price' | 'requests' | 'status';
+        direction: 'asc' | 'desc';
+    }>({
+        key: 'tech',
+        direction: 'asc'
+    });
+
+    const handleSort = (key: 'tech' | 'interval' | 'nextRun' | 'price' | 'requests' | 'status') => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const sortedTemplates = [...filteredTemplates].sort((a, b) => {
+        let comp = 0;
+        if (sortConfig.key === 'tech') {
+            const techA = technologies.find(t => t.id === a.techId);
+            const techB = technologies.find(t => t.id === b.techId);
+            const nameA = (getLocalized(techA?.name, lang) || a.title || '').toLowerCase();
+            const nameB = (getLocalized(techB?.name, lang) || b.title || '').toLowerCase();
+            comp = nameA.localeCompare(nameB);
+        } else if (sortConfig.key === 'interval') {
+            comp = (a.interval || 0) - (b.interval || 0);
+        } else if (sortConfig.key === 'nextRun') {
+            const dateA = calculateNextMaintenanceDate(a)?.getTime() || (a.isActive ? Infinity : 0);
+            const dateB = calculateNextMaintenanceDate(b)?.getTime() || (b.isActive ? Infinity : 0);
+            comp = dateA - dateB;
+        } else if (sortConfig.key === 'price') {
+            comp = (Number(a.price) || 0) - (Number(b.price) || 0);
+        } else if (sortConfig.key === 'requests') {
+            comp = (a.generatedRequestCount || 0) - (b.generatedRequestCount || 0);
+        } else if (sortConfig.key === 'status') {
+            comp = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0);
+        }
+        return sortConfig.direction === 'asc' ? comp : -comp;
+    });
+
+    const SortableHeader = ({ 
+        label, 
+        sortKey, 
+        align = 'left' 
+    }: { 
+        label: string; 
+        sortKey: 'tech' | 'interval' | 'nextRun' | 'price' | 'requests' | 'status'; 
+        align?: 'left' | 'center' | 'right';
+    }) => {
+        const isActive = sortConfig.key === sortKey;
+        return (
+            <th 
+                className={`px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none whitespace-nowrap group ${
+                    align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left'
+                }`}
+                onClick={() => handleSort(sortKey)}
+                title={`Seřadit: ${label}`}
+            >
+                <div className={`inline-flex items-center gap-1.5 ${
+                    align === 'center' ? 'justify-center w-full' : align === 'right' ? 'justify-end w-full' : 'justify-start'
+                }`}>
+                    <span>{label}</span>
+                    <span className="inline-flex items-center">
+                        {isActive ? (
+                            sortConfig.direction === 'asc' ? (
+                                <ArrowUp className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                            ) : (
+                                <ArrowDown className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                            )
+                        ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        )}
+                    </span>
+                </div>
+            </th>
+        );
+    };
+
     const renderActiveBadge = (isActive: boolean) => {
         return isActive 
             ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{t('status.planned')}</span>
@@ -246,7 +327,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
     const [selectedWpId, setSelectedWpId] = useState('');
     const [maintForm, setMaintForm] = useState<Partial<Maintenance>>({
         title: '', techId: '', supplierId: '', responsiblePersonIds: [],
-        description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
+        description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true, price: 0
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -255,7 +336,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
         setEditingId(null);
         setMaintForm({
             title: '', techId: '', supplierId: '', responsiblePersonIds: [],
-            description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true
+            description: '', interval: 30, allowedDays: [1,2,3,4,5], isActive: true, price: 0
         });
         setSelectedLocId(''); setSelectedWpId('');
         setErrors({});
@@ -264,7 +345,10 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
 
     const openEditModal = (m: Maintenance) => {
         setEditingId(m.id);
-        setMaintForm(m);
+        setMaintForm({
+            ...m,
+            price: m.price !== undefined && m.price !== null ? m.price : 0
+        });
         // Pre-fill location/workplace selectors based on techId
         const tech = technologies.find(t => t.id === m.techId);
         if (tech && tech.workplaceIds && tech.workplaceIds.length > 0) {
@@ -298,19 +382,24 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
             const token = localStorage.getItem('auth_token');
             const isMock = !isProductionDomain || (token && token.startsWith('mock-token-'));
 
-            if (isMock) {
-                if (editingId) {
-                    db.maintenances.update(editingId, maintForm);
-                } else {
-                    db.maintenances.add(maintForm as Omit<Maintenance, 'id'>);
-                }
+        const payload = {
+            ...maintForm,
+            price: maintForm.price !== undefined && maintForm.price !== null ? Number(maintForm.price) : 0
+        };
+
+        if (isMock) {
+            if (editingId) {
+                db.maintenances.update(editingId, payload);
             } else {
-                if (editingId) {
-                    await api.put(`/maintenance/${editingId}`, maintForm);
-                } else {
-                    await api.post('/maintenance', maintForm);
-                }
+                db.maintenances.add(payload as Omit<Maintenance, 'id'>);
             }
+        } else {
+            if (editingId) {
+                await api.put(`/maintenance/${editingId}`, payload);
+            } else {
+                await api.post('/maintenance', payload);
+            }
+        }
             setIsCreateOpen(false);
             refresh();
         } catch (e) {
@@ -357,6 +446,7 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                 <div><span className="text-slate-500 block">{t('form.allowed_days')}</span> {dayNames}</div>
                                 <div><span className="text-slate-500 block">{t('form.supplier')}</span> {supplier ? getLocalized(supplier.name, lang) : <span className="text-slate-400 italic">{t('form.internal_solution')}</span>}</div>
                                 <div><span className="text-slate-500 block">{t('form.responsible_person')}</span> {responsibleNames || <span className="text-slate-400 italic">{t('option.unassigned')}</span>}</div>
+                                <div><span className="text-slate-500 block">{t('col.cost')}</span> <span className="font-semibold text-slate-800">{selectedTemplate.price ?? 0} €</span></div>
                                 <div><span className="text-slate-500 block">Platnost od</span> {selectedTemplate.validFrom ? new Date(selectedTemplate.validFrom).toLocaleDateString() : '-'}</div>
                                 <div><span className="text-slate-500 block">Poslední generování</span> {selectedTemplate.lastGeneratedDate ? new Date(selectedTemplate.lastGeneratedDate).toLocaleDateString() : '-'}</div>
                                 <div>
@@ -440,19 +530,20 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                             <tr>
-                                <th className="px-4 py-3 whitespace-nowrap">Technologie</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('form.interval')}</th>
-                                <th className="px-4 py-3 whitespace-nowrap">Generování</th>
-                                <th className="px-4 py-3 whitespace-nowrap text-center">{t('col.open_requests')}</th>
-                                <th className="px-4 py-3 whitespace-nowrap">{t('common.status')}</th>
+                                <SortableHeader label="Technologie" sortKey="tech" />
+                                <SortableHeader label={t('form.interval')} sortKey="interval" />
+                                <SortableHeader label="Generování" sortKey="nextRun" />
+                                <SortableHeader label={t('col.cost')} sortKey="price" align="right" />
+                                <SortableHeader label={t('col.open_requests')} sortKey="requests" align="center" />
+                                <SortableHeader label={t('common.status')} sortKey="status" align="center" />
                                 <th className="px-4 py-3 text-right">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredTemplates.length === 0 ? (
-                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
+                            {sortedTemplates.length === 0 ? (
+                                <tr><td colSpan={7} className="p-4 text-center text-slate-400">Žádné šablony údržby</td></tr>
                             ) : (
-                                filteredTemplates.map(m => {
+                                sortedTemplates.map(m => {
                                     const tech = technologies.find(t => t.id === m.techId);
                                     const supplier = suppliers.find(s => s.id === m.supplierId);
                                     const responsibleNames = m.responsiblePersonIds
@@ -473,6 +564,12 @@ export const MaintenancePage = ({ user, onNavigate }: MaintenancePageProps) => {
                                                     <Calendar className="w-3 h-3" />
                                                     {nextRun ? nextRun.toLocaleDateString() : '-'}
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-slate-700">
+                                                <span className="inline-flex items-center justify-end">
+                                                    <Euro className="w-3 h-3 text-slate-400 mr-1" />
+                                                    {m.price !== undefined && m.price !== null ? m.price : 0}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap text-center">
                                                 <button 
@@ -591,6 +688,9 @@ const RunNowModal = ({ template, onConfirm, onCancel, nextRunDate }: any) => {
                 <div className="text-sm text-slate-600">
                     <p className="mb-2">Standardní termín dalšího generování by byl: <strong>{nextRunDate ? nextRunDate.toLocaleDateString() : 'Není naplánováno'}</strong>.</p>
                     <p>Pokud vytvoříte požadavek nyní, interval pro další automatické generování se přepočítá od dnešního data.</p>
+                    {template.price !== undefined && template.price !== null && Number(template.price) > 0 && (
+                        <p className="mt-2 text-slate-700">Přednastavená cena požadavku: <strong>{template.price} €</strong></p>
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4 border-t">
@@ -729,7 +829,7 @@ const MaintModal = ({
             </div>
             
             <div className="col-span-2">
-                 <div className="grid grid-cols-2 gap-4">
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                      <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">{t('form.interval')}</label>
                         <div className="flex items-center">
@@ -737,6 +837,21 @@ const MaintModal = ({
                             <span className="ml-2 text-sm text-slate-500">{t('common.days')}</span>
                         </div>
                         {errors.interval && <span className="text-xs text-red-500">{errors.interval}</span>}
+                     </div>
+                     <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">{t('col.cost')} (€)</label>
+                        <div className="flex items-center">
+                            <input 
+                                type="number" 
+                                min="0" 
+                                step="any"
+                                className="w-full border p-2 rounded" 
+                                value={data.price !== undefined && data.price !== null ? data.price : 0} 
+                                onChange={e => setData({...data, price: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0})} 
+                            />
+                            <span className="ml-2 text-sm text-slate-500">€</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">Přednastavená cena pro požadavek</span>
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">Odhad času (minuty)</label>

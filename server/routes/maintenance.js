@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
             createdAt: r.created_at,
             type: r.type,
             estimatedTime: r.estimated_time,
+            price: r.price !== null && r.price !== undefined ? Number(r.price) : 0,
             generatedRequestCount: r.request_count || 0
         }));
         res.json(parsed);
@@ -59,13 +60,14 @@ router.get('/:id/history', async (req, res) => {
 router.post('/', async (req, res) => {
     const data = req.body;
     const id = crypto.randomUUID();
+    const price = data.price !== undefined && data.price !== null ? Number(data.price) : 0;
     try {
         await pool.query(`INSERT INTO maintenances 
-            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids, estimated_time, valid_from) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null]
+            (id, tech_id, title, description, interval_days, allowed_days, is_active, supplier_id, responsible_person_ids, estimated_time, valid_from, price) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null, price]
         );
-        res.json({ id, ...data });
+        res.json({ id, ...data, price });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -95,11 +97,12 @@ router.post('/:id/run', async (req, res) => {
             const state = solverId ? 'assigned' : 'new';
             const authorId = req.user?.id || 'system';
             const requestId = crypto.randomUUID();
+            const templatePrice = template.price !== null && template.price !== undefined ? Number(template.price) : 0;
 
             await pool.execute(
-                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?)`,
-                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr, template.estimated_time || null]
+                `INSERT INTO requests (id, tech_id, maintenance_id, title, author_id, solver_id, description, priority, state, planned_resolution_date, estimated_time, estimated_cost) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'priority', ?, ?, ?, ?)`,
+                [requestId, template.tech_id, template.id, template.title, authorId, solverId, template.description, state, todayStr, template.estimated_time || null, templatePrice]
             );
 
             await pool.execute('UPDATE maintenances SET last_generated_at = ? WHERE id = ?', [todayStr, id]);
@@ -127,13 +130,14 @@ router.post('/:id/run', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const data = req.body;
+    const price = data.price !== undefined && data.price !== null ? Number(data.price) : 0;
     try {
         await pool.query(`UPDATE maintenances SET 
-            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?, estimated_time=?, valid_from=?
+            tech_id=?, title=?, description=?, interval_days=?, allowed_days=?, is_active=?, supplier_id=?, responsible_person_ids=?, estimated_time=?, valid_from=?, price=?
             WHERE id=?`,
-            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null, id]
+            [data.techId, data.title, data.description, data.interval, JSON.stringify(data.allowedDays), data.isActive, data.supplierId, JSON.stringify(data.responsiblePersonIds), data.estimatedTime || null, data.validFrom || null, price, id]
         );
-        res.json({ id, ...data });
+        res.json({ id, ...data, price });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

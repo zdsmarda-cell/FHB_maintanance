@@ -94,6 +94,7 @@ const migrations = [
                 type VARCHAR(50) DEFAULT 'planned',
                 supplier_id VARCHAR(255),
                 responsible_person_ids JSON,
+                price DECIMAL(10, 2) DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`,
             `CREATE TABLE IF NOT EXISTS requests (
@@ -362,7 +363,13 @@ const migrations = [
     {
         name: '022_add_maintenance_valid_from',
         up: [
-            `ALTER TABLE maintenances ADD COLUMN IF NOT EXISTS valid_from DATE`
+            `ALTER TABLE maintenances ADD COLUMN valid_from DATE`
+        ]
+    },
+    {
+        name: '023_add_price_to_maintenances',
+        up: [
+            `ALTER TABLE maintenances ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2) DEFAULT 0`
         ]
     }
 ];
@@ -434,6 +441,6 @@ export const initDb = async () => {
     console.log('--- Initialization Complete ---');
   } catch (err) {
     console.error('Database initialization failed:', err);
-    process.exit(1); // Exit process on critical DB failure
+    throw err;
   }
 };

@@ -112,6 +112,7 @@ export interface Maintenance {
   createdAt?: string; // For calculation if lastGeneratedDate is null
   generatedRequestCount?: number; // Count of requests generated from this template
   estimatedTime?: number; // Estimated effort in minutes
+  price?: number; // Cost / price in EUR (default 0)
   
   type: 'planned' | 'operational'; // operational might be ad-hoc templates
   isActive: boolean; // Can disable template
